@@ -15,7 +15,7 @@
     "test:ci": "vitest run --coverage",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "prepare": "husky"
+    "prepare": "[ -d .git ] && husky || echo 'Skipping husky (not a git repository)'"
   },
   "keywords": [
     "mcp",
