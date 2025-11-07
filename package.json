@@ -1,0 +1,43 @@
+{
+  "name": "countly-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Countly Analytics Platform",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node build/index.js --http",
+    "start:stdio": "node build/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "test:ci": "vitest run --coverage"
+  },
+  "keywords": [
+    "mcp",
+    "countly",
+    "analytics",
+    "server"
+  ],
+  "author": "Countly MCP Server",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "axios": "^1.6.0",
+    "dotenv": "^17.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "nock": "^13.5.6",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "build/"
+  ]
+}

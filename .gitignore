@@ -1,0 +1,15 @@
+node_modules/
+build/
+dist/
+*.log
+.env
+.env.local
+.DS_Store
+*.tsbuildinfo
+.vscode/mcp.json
+
+# Token files
+*.token
+*_token.txt
+countly_token.txt
+!countly_token.txt.example

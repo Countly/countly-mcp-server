@@ -1,0 +1,58 @@
+# Node modules
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Build output (will be built inside Docker)
+build
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Token files (secrets should not be in image)
+*.token
+*_token.txt
+countly_token.txt
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage
+.nyc_output
+test-results
+
+# Documentation
+*.md
+!README.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Docker
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile.dev
+
+# Misc
+*.log
+.cache
+tmp
+temp
