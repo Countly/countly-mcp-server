@@ -478,6 +478,8 @@ npm run test:ci
 - Authentication and credential handling
 - Tool handlers and parameter validation
 - HTTP client configuration
+- Transport layer (stdio and HTTP/SSE)
+- End-to-end server connectivity
 - Error handling
 
 ---

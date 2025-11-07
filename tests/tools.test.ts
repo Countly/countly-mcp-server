@@ -82,12 +82,8 @@ describe('Configuration', () => {
       expect(config.timeout).toBe(30000);
     });
 
-    it('should throw error when COUNTLY_SERVER_URL missing', () => {
-      expect(() => loadConfigFromEnv({})).toThrow('COUNTLY_SERVER_URL');
-    });
-
-    it('should allow missing URL in test mode', () => {
-      const config = loadConfigFromEnv({}, true);
+    it('should allow missing URL (optional for HTTP header-based auth)', () => {
+      const config = loadConfigFromEnv({});
       expect(config.serverUrl).toBe('');
     });
   });

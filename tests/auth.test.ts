@@ -32,7 +32,7 @@ describe('Authentication', () => {
   });
 
   describe('resolveAuthToken', () => {
-    it('should prioritize metadata token over all others', () => {
+    it('should prioritize args token over metadata', () => {
       const result = resolveAuthToken({
         metadata: { countlyAuthToken: 'metadata-token' },
         args: { countly_auth_token: 'args-token' },
@@ -41,7 +41,7 @@ describe('Authentication', () => {
         },
       });
 
-      expect(result).toBe('metadata-token');
+      expect(result).toBe('args-token');
     });
 
     it('should use args token when metadata is not provided', () => {
@@ -144,7 +144,7 @@ describe('Authentication', () => {
       const error = createMissingAuthError();
 
       expect(error.message).toContain('No authentication token provided');
-      expect(error.message).toContain('metadata.countlyAuthToken');
+      expect(error.message).toContain('X-Countly-Auth-Token');
       expect(error.message).toContain('countly_auth_token');
       expect(error.message).toContain('COUNTLY_AUTH_TOKEN');
       expect(error.message).toContain('COUNTLY_AUTH_TOKEN_FILE');
