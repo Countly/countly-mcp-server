@@ -494,7 +494,7 @@ MIT
 ## Support
 
 For issues and questions:
-- GitHub Issues: [countly/mcp-server](https://github.com/countly/mcp-server)
+- GitHub Issues: [countly/countly-mcp-server](https://github.com/countly/countly-mcp-server)
 - Countly Community: [https://community.count.ly](https://community.count.ly)
 
 ## CI/CD

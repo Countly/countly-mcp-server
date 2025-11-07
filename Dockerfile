@@ -23,6 +23,17 @@ RUN npm run build
 # Stage 2: Production
 FROM node:20-alpine
 
+# OCI Labels for metadata and Docker Desktop icon
+LABEL org.opencontainers.image.title="Countly MCP Server" \
+    org.opencontainers.image.description="Model Context Protocol server for Countly Analytics Platform" \
+    org.opencontainers.image.vendor="Countly" \
+    org.opencontainers.image.authors="Countly Team" \
+    org.opencontainers.image.url="https://count.ly" \
+    org.opencontainers.image.documentation="https://github.com/countly/countly-mcp-server" \
+    org.opencontainers.image.source="https://github.com/countly/countly-mcp-server" \
+    org.opencontainers.image.licenses="MIT" \
+    com.docker.extension.icon="https://cdn.prod.website-files.com/61c1b7c3e2f3805325be4594/63cc3bf4993f0072054270a6_Logo%20-%20Dark%20background.png"
+
 WORKDIR /app
 
 # Install dumb-init for proper signal handling
