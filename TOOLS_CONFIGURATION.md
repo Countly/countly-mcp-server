@@ -100,11 +100,11 @@ Special values:
 **Note**: Returns management/admin users who access the Countly dashboard. These are the users who log into Countly to analyze data, configure settings, and manage applications.
 
 ### app_users
-**Tools**: `create_app_user`, `delete_app_user`, `export_app_users`
+**Tools**: `create_app_user`, `edit_app_user`, `delete_app_user`, `export_app_users`
 
 **Operations**:
 - C: create_app_user
-- R: export_app_users
+- U: edit_app_user
 - D: delete_app_user
 
 **Note**: Manages end-users of the applications being tracked by Countly. These are the users of your mobile apps, websites, or other applications that send data to Countly for analytics.

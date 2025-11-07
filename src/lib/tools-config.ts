@@ -97,8 +97,8 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
   app_users: {
     operations: {
       'create_app_user': 'C',
+      'edit_app_user': 'U',
       'delete_app_user': 'D',
-      'export_app_users': 'R',
     }
   },
 };
