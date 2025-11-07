@@ -17,9 +17,15 @@ export interface ServerEnvironment {
 
 /**
  * Normalize URL by removing trailing slashes
+ * Uses iterative approach to avoid ReDoS vulnerability
  */
 export function normalizeServerUrl(url: string): string {
-  return url.replace(/\/+$/, '');
+  // Remove trailing slashes safely without regex
+  let cleanUrl = url;
+  while (cleanUrl.endsWith('/')) {
+    cleanUrl = cleanUrl.slice(0, -1);
+  }
+  return cleanUrl;
 }
 
 /**

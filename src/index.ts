@@ -318,7 +318,12 @@ class CountlyMCPServer {
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
           
           if (headerServerUrl) {
-            this.config.serverUrl = headerServerUrl.replace(/\/+$/, '');
+            // Remove trailing slashes safely without regex
+            let cleanUrl = headerServerUrl;
+            while (cleanUrl.endsWith('/')) {
+              cleanUrl = cleanUrl.slice(0, -1);
+            }
+            this.config.serverUrl = cleanUrl;
             this.httpClient.defaults.baseURL = this.config.serverUrl;
             console.error('Using Countly server from headers:', this.config.serverUrl);
           }
