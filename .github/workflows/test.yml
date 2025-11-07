@@ -71,4 +71,4 @@ jobs:
 
       - name: Test server starts (smoke test)
         run: |
-          timeout 5 node build/index.js || [ $? -eq 124 ]
+          COUNTLY_SERVER_URL=https://test.count.ly COUNTLY_API_KEY=test timeout 5 node build/index.js || [ $? -eq 124 ]
