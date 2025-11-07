@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+
 import { AppCache, CountlyApp } from '../lib/app-cache.js';
 
 export interface ToolContext {

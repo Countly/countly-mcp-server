@@ -1,4 +1,3 @@
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
 
 // ============================================================================
@@ -108,10 +107,15 @@ export async function handleListNotes(context: ToolContext, args: any): Promise<
     const now = Date.now();
     let startTime = now;
     
-    if (period === '30days') startTime = now - (30 * 24 * 60 * 60 * 1000);
-    else if (period === '60days') startTime = now - (60 * 24 * 60 * 60 * 1000);
-    else if (period === '7days') startTime = now - (7 * 24 * 60 * 60 * 1000);
-    else if (period === 'month') startTime = now - (30 * 24 * 60 * 60 * 1000);
+    if (period === '30days') {
+startTime = now - (30 * 24 * 60 * 60 * 1000);
+} else if (period === '60days') {
+startTime = now - (60 * 24 * 60 * 60 * 1000);
+} else if (period === '7days') {
+startTime = now - (7 * 24 * 60 * 60 * 1000);
+} else if (period === 'month') {
+startTime = now - (30 * 24 * 60 * 60 * 1000);
+}
     
     periodParam = `[${startTime},${now}]`;
   }

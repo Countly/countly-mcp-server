@@ -1,4 +1,5 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+
 import { ToolContext, ToolResult } from './types.js';
 
 // ============================================================================
@@ -89,9 +90,15 @@ export async function handleCreateApp(context: ToolContext, args: any): Promise<
   const { name, country, timezone, category } = args;
   
   const appData: any = { name };
-  if (country) appData.country = country;
-  if (timezone) appData.timezone = timezone;
-  if (category) appData.category = category;
+  if (country) {
+appData.country = country;
+}
+  if (timezone) {
+appData.timezone = timezone;
+}
+  if (category) {
+appData.category = category;
+}
   
   const response = await context.httpClient.get('/i/apps/create', {
     params: {
@@ -139,10 +146,18 @@ export async function handleUpdateApp(context: ToolContext, args: any): Promise<
   const targetAppId = await context.resolveAppId({ app_id, app_name });
   
   const updateData: any = {};
-  if (name) updateData.name = name;
-  if (country) updateData.country = country;
-  if (timezone) updateData.timezone = timezone;
-  if (category) updateData.category = category;
+  if (name) {
+updateData.name = name;
+}
+  if (country) {
+updateData.country = country;
+}
+  if (timezone) {
+updateData.timezone = timezone;
+}
+  if (category) {
+updateData.category = category;
+}
   
   // Include app_id in the args for updates
   updateData.app_id = targetAppId;

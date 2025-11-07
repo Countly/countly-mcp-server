@@ -120,10 +120,18 @@ export function parseCrudPermissions(value: string | undefined): Set<CrudOperati
   const operations = new Set<CrudOperation>();
   const upper = value.toUpperCase();
   
-  if (upper.includes('C')) operations.add('C');
-  if (upper.includes('R')) operations.add('R');
-  if (upper.includes('U')) operations.add('U');
-  if (upper.includes('D')) operations.add('D');
+  if (upper.includes('C')) {
+operations.add('C');
+}
+  if (upper.includes('R')) {
+operations.add('R');
+}
+  if (upper.includes('U')) {
+operations.add('U');
+}
+  if (upper.includes('D')) {
+operations.add('D');
+}
   
   return operations;
 }

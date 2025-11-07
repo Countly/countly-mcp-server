@@ -128,8 +128,12 @@ export function parseBooleanParam(value: any, paramName: string): boolean {
 
   if (typeof value === 'string') {
     const lower = value.toLowerCase();
-    if (lower === 'true' || lower === '1') return true;
-    if (lower === 'false' || lower === '0') return false;
+    if (lower === 'true' || lower === '1') {
+return true;
+}
+    if (lower === 'false' || lower === '0') {
+return false;
+}
   }
 
   throw new McpError(

@@ -1,0 +1,28 @@
+{
+    // Enable ESLint
+    "eslint.enable": true,
+    // Validate these file types with ESLint
+    "eslint.validate": [
+        "javascript",
+        "javascriptreact",
+        "typescript",
+        "typescriptreact"
+    ],
+    // Format on save
+    "editor.formatOnSave": true,
+    // Use ESLint to fix issues on save
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    // Set default formatter for TypeScript files
+    "[typescript]": {
+        "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    },
+    // Optional: Auto-save files
+    "files.autoSave": "onFocusChange",
+    // Show ESLint status in the status bar
+    "eslint.alwaysShowStatus": true
+}
