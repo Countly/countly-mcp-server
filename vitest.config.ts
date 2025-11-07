@@ -15,6 +15,8 @@ export default defineConfig({
         'tests/',
         '*.config.ts',
         '*.config.js',
+        'src/index.ts', // MCP server entry point - requires integration testing
+        'src/tools/*.ts', // Tool handlers require live Countly server for integration testing
       ],
       thresholds: {
         lines: 80,
