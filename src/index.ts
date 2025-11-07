@@ -10,7 +10,7 @@ import http from 'http';
 import url from 'url';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
@@ -92,12 +92,19 @@ class CountlyMCPServer {
 
   /**
    * Extract auth token from request metadata, arguments, or environment
-   * Priority: request metadata > arguments > environment variables > file
+   * Priority: request metadata > arguments > current config (set from headers) > environment variables > file
    * Uses lib/auth.ts resolveAuthToken function
    */
   private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
     const metadata = (request as any)?._meta || (request as any)?.meta;
-    const authToken = resolveAuthToken({ metadata, args });
+    
+    // Try to get from metadata or args first
+    let authToken = resolveAuthToken({ metadata, args });
+    
+    // If not found in metadata/args, use the one already configured (from headers or environment)
+    if (!authToken && this.config.authToken) {
+      authToken = this.config.authToken;
+    }
     
     if (!authToken) {
       throw createMissingAuthError();
@@ -262,7 +269,16 @@ class CountlyMCPServer {
       console.error(`Health check available at: /health`);
       console.error(`All other endpoints are available for other applications on this server`);
       
+      // Create a single StreamableHTTPServerTransport instance in stateless mode
+      // Stateless mode (sessionIdGenerator: undefined) allows clients to manage their own sessions
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+      });
+      
+      await this.server.connect(transport);
+      
       const httpServer = http.createServer((req, res) => {
+        void (async () => {
         // Handle CORS for MCP and health endpoints only
         if (corsEnabled) {
           const parsedUrl = url.parse(req.url || '', true);
@@ -297,20 +313,24 @@ class CountlyMCPServer {
         
         // MCP endpoint - ONLY endpoint that handles MCP protocol requests
         if (pathname === mcpEndpoint) {
-          try {
-            const transport = new SSEServerTransport(mcpEndpoint, res);
-            this.server.connect(transport).catch((error) => {
-              console.error('MCP transport connection error:', error);
-              if (!res.headersSent) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'MCP connection failed' }));
-              }
-            });
-          } catch (error) {
-            console.error('MCP transport creation error:', error);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Failed to create MCP transport' }));
+          // Check for configuration in custom headers (secure way)
+          const headerServerUrl = req.headers['x-countly-server-url'] as string;
+          const headerAuthToken = req.headers['x-countly-auth-token'] as string;
+          
+          if (headerServerUrl) {
+            this.config.serverUrl = headerServerUrl.replace(/\/+$/, '');
+            this.httpClient.defaults.baseURL = this.config.serverUrl;
+            console.error('Using Countly server from headers:', this.config.serverUrl);
           }
+          
+          if (headerAuthToken) {
+            this.config.authToken = headerAuthToken;
+            this.setAuthHeader(headerAuthToken);
+            console.error('Auth token configured from headers');
+          }
+          
+          // Handle with StreamableHTTPServerTransport (modern protocol)
+          await transport.handleRequest(req, res);
           return;
         }
         
@@ -325,6 +345,13 @@ class CountlyMCPServer {
           },
           info: 'Other endpoints on this server are available for other applications'
         }));
+        })().catch(error => {
+          console.error('Error handling request:', error);
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Internal server error' }));
+          }
+        });
       });
       
       httpServer.listen(port, hostname, () => {

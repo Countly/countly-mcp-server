@@ -10,23 +10,42 @@ Countly is an open-source, enterprise-grade product analytics platform. It helps
 
 The Model Context Protocol (MCP) is an open protocol that enables seamless integration between AI applications and external data sources. This server implements MCP to allow AI assistants like Claude to interact with your Countly analytics data naturally through conversation.
 
+## Requirements
+
+### Server Requirements
+- **Node.js 18+** (for local installation) OR **Docker** (recommended)
+- **Countly Server**: Access to a Countly instance (cloud or self-hosted)
+- **Auth Token**: Valid Countly authentication token with appropriate permissions
+
+### Client Requirements
+- **MCP Protocol Version**: `2025-03-26` (Streamable HTTP specification)
+- **Compatible Clients**:
+  - VS Code MCP Extension (latest version)
+  - Claude Desktop (recent versions supporting 2025-03-26 spec)
+  - Any MCP client implementing the Streamable HTTP transport protocol
+
+> ⚠️ **Note**: For SSE type this server uses `StreamableHTTPServerTransport` which implements the modern MCP specification (2025-03-26). Older MCP clients that only support the legacy SSE protocol (2024-11-05) are not compatible. Please ensure your MCP client is up-to-date.
+
 ## Features
 
-- 🔐 Multiple authentication methods (metadata, environment variables, file-based)
+- 🔐 Multiple authentication methods (HTTP headers, environment variables, file-based)
 - 📊 Comprehensive Countly API access
 - �️ Fine-grained tools configuration with CRUD operation control per category
 - �🐳 Docker support with production-ready configuration
 - 🔄 Support for both stdio and HTTP transports
 - 🏥 Built-in health checks
-- 🔒 Secure token handling with Docker secrets support
+- 🔒 Secure token handling with cryptographically secure session IDs
+- 🌐 Multi-client support with per-client credential passing
 
 ## Quick Start
 
 ### Prerequisites
 
-- **Countly Server**: Access to a Countly instance (cloud or self-hosted)
-- **Auth Token**: Valid Countly authentication token with appropriate permissions
-- **Node.js 18+** (for local installation) OR **Docker** (recommended)
+Before starting, ensure you have:
+- Access to a Countly instance (cloud or self-hosted)
+- Valid Countly authentication token with appropriate permissions
+- Node.js 18+ (for local installation) OR Docker (recommended)
+- MCP client supporting protocol version 2025-03-26 (Streamable HTTP)
 
 ### Using Docker (Recommended)
 
@@ -94,17 +113,21 @@ docker run -d \
 
 The server supports multiple authentication methods (in priority order):
 
-1. **MCP Client Metadata** (highest priority)
-   - Passed via `metadata.countlyAuthToken`
-   
+1. **HTTP Headers** (recommended for HTTP/SSE transport)
+   - Pass via `X-Countly-Server-Url` and `X-Countly-Auth-Token` headers
+   - Supported by VS Code MCP extension and other HTTP clients
+   - See [VS Code MCP Configuration](examples/vscode-mcp.md) for details
+
 2. **Tool Arguments**
-   - Passed as `countly_auth_token` parameter
+   - Passed as `countly_auth_token` parameter in individual tool calls
 
 3. **Environment Variable**
    - Set `COUNTLY_AUTH_TOKEN` in environment
+   - Recommended for stdio transport mode
 
 4. **Token File** (recommended for production)
    - Set `COUNTLY_AUTH_TOKEN_FILE` pointing to a file containing the token
+   - Useful with Docker secrets
 
 ## Configuration
 
@@ -290,7 +313,7 @@ The most common use case is with Claude Desktop. Add to your Claude configuratio
 }
 ```
 
-**Using metadata for token (more secure):**
+**Using environment variable for token (alternative):**
 
 ```json
 {
@@ -299,10 +322,8 @@ The most common use case is with Claude Desktop. Add to your Claude configuratio
       "command": "node",
       "args": ["/path/to/countly-mcp-server/build/index.js"],
       "env": {
-        "COUNTLY_SERVER_URL": "https://your-countly-instance.com"
-      },
-      "metadata": {
-        "countlyAuthToken": "your-token-here"
+        "COUNTLY_SERVER_URL": "https://your-countly-instance.com",
+        "COUNTLY_AUTH_TOKEN": "your-token-here"
       }
     }
   }
@@ -312,8 +333,8 @@ The most common use case is with Claude Desktop. Add to your Claude configuratio
 ### Other MCP Clients
 
 This server is compatible with any MCP client that supports:
-- **stdio transport** (default) - For local/desktop clients
-- **HTTP/SSE transport** - For web-based or remote clients
+- **stdio transport** (default) - For local/desktop clients (uses environment variables for auth)
+- **HTTP/SSE transport** - For web-based or remote clients (uses HTTP headers for auth)
 
 For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 

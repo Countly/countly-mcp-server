@@ -76,5 +76,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Default command: run in HTTP mode (can be overridden for stdio mode)
-CMD ["node", "build/index.js", "--http"]
+# Default command: run in HTTP mode on port 3000 (can be overridden for stdio mode)
+CMD ["node", "build/index.js", "--http", "--port", "3000", "--hostname", "0.0.0.0"]

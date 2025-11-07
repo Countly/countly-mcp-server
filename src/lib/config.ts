@@ -43,21 +43,14 @@ export function parseTimeout(timeoutStr?: string, defaultTimeout = 30000): numbe
 
 /**
  * Load configuration from environment variables
- * Throws if required config is missing
+ * Server URL is optional - can be provided by client or environment
  */
 export function loadConfigFromEnv(
-  env: ServerEnvironment = process.env,
-  testMode = false
+  env: ServerEnvironment = process.env
 ): Omit<CountlyConfig, 'authToken'> {
   const serverUrl = env.COUNTLY_SERVER_URL;
 
-  if (!serverUrl && !testMode) {
-    throw new Error(
-      'COUNTLY_SERVER_URL environment variable is required.\n' +
-      'Example: COUNTLY_SERVER_URL=https://your-countly-instance.com'
-    );
-  }
-
+  // Server URL is optional - can be provided by client configuration
   const timeout = parseTimeout(env.COUNTLY_TIMEOUT);
 
   return {
@@ -80,15 +73,17 @@ export function validateServerUrl(url: string): boolean {
 
 /**
  * Build full configuration with validation
+ * Server URL is optional - can be provided by client or environment
  */
 export function buildConfig(
   env: ServerEnvironment = process.env,
   authToken?: string,
   testMode = false
 ): CountlyConfig {
-  const config = loadConfigFromEnv(env, testMode);
+  const config = loadConfigFromEnv(env);
 
-  if (!testMode && !validateServerUrl(config.serverUrl)) {
+  // Only validate server URL if provided
+  if (!testMode && config.serverUrl && !validateServerUrl(config.serverUrl)) {
     throw new Error(
       `Invalid COUNTLY_SERVER_URL: ${config.serverUrl}\n` +
       'Must be a valid HTTP or HTTPS URL.'

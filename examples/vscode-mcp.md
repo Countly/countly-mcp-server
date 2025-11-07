@@ -58,8 +58,9 @@ This example shows how to configure VS Code's MCP support to connect to Countly 
     "countly": {
       "type": "sse",
       "url": "http://localhost:3000/mcp",
-      "metadata": {
-        "countlyAuthToken": "your-auth-token-here"
+      "headers": {
+        "X-Countly-Server-Url": "https://your-countly-instance.com",
+        "X-Countly-Auth-Token": "your-auth-token-here"
       }
     }
   },
@@ -67,7 +68,7 @@ This example shows how to configure VS Code's MCP support to connect to Countly 
 }
 ```
 
-**Note**: The client can pass authentication via `metadata.countlyAuthToken`. The server will use this token to authenticate with your Countly instance.
+**Note**: The VS Code MCP extension passes credentials via HTTP headers (`X-Countly-Server-Url` and `X-Countly-Auth-Token`). This allows multiple users to connect to the same Docker instance with their own credentials.
 
 **Method 3: Docker Container (stdio)**
 

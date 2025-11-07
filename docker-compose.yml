@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   countly-mcp-server:
     build:
@@ -7,39 +5,39 @@ services:
       dockerfile: Dockerfile
     container_name: countly-mcp-server
     restart: unless-stopped
-    
-    # Environment variables
+
+    # Environment variables (optional - can be provided by MCP client via HTTP headers)
     environment:
-      - COUNTLY_SERVER_URL=${COUNTLY_SERVER_URL:-https://api.count.ly}
+      # Countly server URL (optional - can be provided via X-Countly-Server-Url header)
+      - COUNTLY_SERVER_URL=${COUNTLY_SERVER_URL:-}
+      # Auth token (optional - can be provided via X-Countly-Auth-Token header)
+      - COUNTLY_AUTH_TOKEN=${COUNTLY_AUTH_TOKEN:-}
+      # Request timeout in milliseconds
       - COUNTLY_TIMEOUT=${COUNTLY_TIMEOUT:-30000}
-      # Option 1: Direct token (not recommended for production)
-      # - COUNTLY_AUTH_TOKEN=${COUNTLY_AUTH_TOKEN}
-      # Option 2: Token from file (recommended for production)
-      - COUNTLY_AUTH_TOKEN_FILE=/run/secrets/countly_token
-    
+
     # Ports
     ports:
       - "3000:3000"
-    
-    # Docker secrets (recommended for production)
-    secrets:
-      - countly_token
-    
+
+    # Docker secrets (optional - uncomment for production use)
+    # secrets:
+    #   - countly_token
+
     # Health check
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 5s
-    
+
     # Logging
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    
+
     # Resource limits (adjust as needed)
     deploy:
       resources:
@@ -50,28 +48,13 @@ services:
           cpus: '0.5'
           memory: 256M
 
-# Docker secrets configuration
-secrets:
-  countly_token:
-    # Option 1: Load from file
-    file: ./countly_token.txt
-    # Option 2: External secret (for Docker Swarm)
-    # external: true
+# Docker secrets configuration (optional - for production use)
+# Uncomment the secrets section in the service above and this section to use secrets
+# secrets:
+#   countly_token:
+#     file: ./countly_token.txt
 
-# Alternative configuration without secrets (development only)
-# Uncomment this and comment out the secrets section above
-# ---
-# version: '3.8'
-# services:
-#   countly-mcp-server:
-#     build:
-#       context: .
-#       dockerfile: Dockerfile
-#     container_name: countly-mcp-server
-#     restart: unless-stopped
-#     environment:
-#       - COUNTLY_SERVER_URL=https://api.count.ly
-#       - COUNTLY_AUTH_TOKEN=your-token-here
-#       - COUNTLY_TIMEOUT=30000
-#     ports:
-#       - "3000:3000"
+# For production with Docker Swarm:
+# 1. Uncomment the secrets sections above
+# 2. Create the secret: echo "your-token" | docker secret create countly_token -
+# 3. Change the secret config to: external: true
