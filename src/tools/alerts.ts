@@ -67,12 +67,9 @@ export const createAlertToolDefinition = {
           },
           filterValue: { 
             oneOf: [
-              { type: "string" },
-              {  
-                type: "array",
-                items: { type: "string" }
-              },
-              { type: "null" }
+              { type: 'string' },
+              { type: 'array', items: { type: 'string' } },
+              { type: 'null' }
             ],
             description: 'Optional filter value. For crashes: array of version strings (e.g. ["22:02:0"]). For rating: array of numbers 1-5. For nps: "detractor"/"passive"/"promoter". For events: string value. Set to null if no filter' 
           },
