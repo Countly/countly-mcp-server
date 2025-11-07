@@ -50,6 +50,10 @@ jobs:
 
       - name: Run tests
         run: npm run test:ci
+        env:
+          # Set test credentials for transport integration tests
+          COUNTLY_SERVER_URL: https://test.count.ly
+          COUNTLY_AUTH_TOKEN: test-token-for-ci
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

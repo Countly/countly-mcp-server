@@ -20,8 +20,8 @@ The fastest way to get started:
 
 ```bash
 # 1. Clone and navigate to the repository
-git clone https://github.com/countly/mcp-server.git
-cd mcp-server
+git clone https://github.com/countly/countly-mcp-server.git
+cd countly-mcp-server
 
 # 2. Run the quick start script
 ./docker-start.sh
@@ -37,7 +37,7 @@ The script will guide you through:
 ### Pull from Docker Hub
 
 ```bash
-docker pull countly/mcp-server:latest
+docker pull countly/countly-mcp-server:latest
 ```
 
 ### Run from Docker Hub
@@ -48,7 +48,7 @@ docker run -d \
   -p 3000:3000 \
   -e COUNTLY_SERVER_URL=https://your-countly-instance.com \
   -e COUNTLY_AUTH_TOKEN=your-token-here \
-  countly/mcp-server:latest
+  countly/countly-mcp-server:latest
 ```
 
 ## Local Build
@@ -227,7 +227,7 @@ spec:
     spec:
       containers:
       - name: countly-mcp-server
-        image: countly/mcp-server:latest
+        image: countly/countly-mcp-server:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
@@ -523,6 +523,6 @@ logging:
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/countly/mcp-server/issues)
+- Issues: [GitHub Issues](https://github.com/countly/countly-mcp-server/issues)
 - Community: [Countly Community](https://community.count.ly)
 - Documentation: [README.md](./README.md)

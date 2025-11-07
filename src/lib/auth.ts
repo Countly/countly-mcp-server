@@ -7,10 +7,13 @@ import fs from 'fs';
 
 /**
  * Priority order for authentication token resolution:
- * 1. MCP metadata (countlyAuthToken)
- * 2. Arguments (countly_auth_token)
+ * 1. Tool arguments (countly_auth_token) - per-request override
+ * 2. MCP metadata (countlyAuthToken) - rarely supported by clients
  * 3. Environment variable (COUNTLY_AUTH_TOKEN)
  * 4. Environment file path (COUNTLY_AUTH_TOKEN_FILE)
+ * 
+ * Note: For HTTP/SSE transport, credentials are typically passed via HTTP headers
+ * (X-Countly-Auth-Token) which are extracted and stored in config before reaching this function.
  */
 
 export interface AuthSources {
@@ -25,14 +28,14 @@ export interface AuthSources {
 export function resolveAuthToken(sources: AuthSources): string | undefined {
   const { metadata, args, env = process.env } = sources;
 
-  // Priority 1: MCP metadata
-  if (metadata?.countlyAuthToken) {
-    return metadata.countlyAuthToken;
-  }
-
-  // Priority 2: Arguments
+  // Priority 1: Arguments (per-request override)
   if (args?.countly_auth_token) {
     return args.countly_auth_token;
+  }
+
+  // Priority 2: MCP metadata (rarely supported by clients)
+  if (metadata?.countlyAuthToken) {
+    return metadata.countlyAuthToken;
   }
 
   // Priority 3: Environment variable
@@ -89,7 +92,7 @@ export function readTokenFromFile(filePath: string): string {
 export function createMissingAuthError(): Error {
   return new Error(
     'No authentication token provided. Please provide credentials via:\n' +
-    '1. MCP client metadata: metadata.countlyAuthToken\n' +
+    '1. HTTP headers: X-Countly-Auth-Token (for HTTP/SSE transport)\n' +
     '2. Tool arguments: countly_auth_token\n' +
     '3. Environment variable: COUNTLY_AUTH_TOKEN\n' +
     '4. Token file: COUNTLY_AUTH_TOKEN_FILE'
