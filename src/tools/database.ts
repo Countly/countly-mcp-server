@@ -1,5 +1,3 @@
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-
 import { ToolContext, ToolResult } from './types.js';
 
 // ============================================================================
@@ -78,7 +76,7 @@ export async function handleQueryDatabase(context: ToolContext, args: any): Prom
   if (args.app_id || args.app_name) {
     try {
       params.app_id = await context.resolveAppId(args);
-    } catch (error) {
+    } catch {
       // If app resolution fails, continue without app_id filter
     }
   }
@@ -147,7 +145,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
   if (args.app_id || args.app_name) {
     try {
       params.app_id = await context.resolveAppId(args);
-    } catch (error) {
+    } catch {
       // If app resolution fails, continue without app_id filter
     }
   }
@@ -203,7 +201,7 @@ export async function handleAggregateCollection(context: ToolContext, args: any)
   if (args.app_id || args.app_name) {
     try {
       params.app_id = await context.resolveAppId(args);
-    } catch (error) {
+    } catch {
       // If app resolution fails, continue without app_id filter
     }
   }

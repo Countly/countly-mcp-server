@@ -20,7 +20,7 @@ export async function handleSearch(context: ToolContext, args: any): Promise<Too
   const { query } = args;
   
   // Search across multiple Countly data sources
-  const apps = await context.appCache.getAll();
+  const apps = context.appCache.getAll();
   const appResults = apps.filter(app => 
     app.name.toLowerCase().includes(query.toLowerCase())
   );
@@ -55,7 +55,7 @@ export async function handleFetch(context: ToolContext, args: any): Promise<Tool
   const { id } = args;
   
   // Fetch specific document by ID
-  const apps = await context.appCache.getAll();
+  const apps = context.appCache.getAll();
   const app = apps.find(a => a._id === id);
   
   if (!app) {
