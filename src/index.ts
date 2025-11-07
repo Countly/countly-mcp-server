@@ -2,11 +2,16 @@
 
 // Load environment variables from .env file (quiet mode for MCP stdio compatibility)
 import dotenv from 'dotenv';
+
 dotenv.config({ quiet: true });
 
+
+import http from 'http';
+import url from 'url';
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -15,11 +20,10 @@ import {
   CallToolRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
-import http from 'http';
-import url from 'url';
+
+import { AppCache, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, requireAuthToken, createMissingAuthError } from './lib/auth.js';
 import { buildConfig, normalizeServerUrl } from './lib/config.js';
-import { AppCache, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
 import { 
   getAllToolDefinitions, 

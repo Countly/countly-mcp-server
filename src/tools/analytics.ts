@@ -1,4 +1,5 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+
 import { ToolContext, ToolResult } from './types.js';
 
 // ============================================================================
@@ -49,9 +50,15 @@ export async function handleGetAnalyticsData(context: ToolContext, args: any): P
     method,
   };
   
-  if (period) params.period = period;
-  if (event) params.event = event;
-  if (segmentation) params.segmentation = segmentation;
+  if (period) {
+params.period = period;
+}
+  if (event) {
+params.event = event;
+}
+  if (segmentation) {
+params.segmentation = segmentation;
+}
 
   const response = await context.httpClient.get('/o', { params });
   
@@ -95,7 +102,9 @@ export async function handleGetDashboardData(context: ToolContext, args: any): P
     app_id,
   };
   
-  if (period) params.period = period;
+  if (period) {
+params.period = period;
+}
 
   const response = await context.httpClient.get('/o/analytics/dashboard', { params });
   
@@ -140,8 +149,12 @@ export async function handleGetEventsData(context: ToolContext, args: any): Prom
     app_id,
   };
   
-  if (period) params.period = period;
-  if (event) params.event = event;
+  if (period) {
+params.period = period;
+}
+  if (event) {
+params.event = event;
+}
 
   const response = await context.httpClient.get('/o/analytics/events', { params });
   
@@ -188,7 +201,9 @@ export async function handleGetEventsOverview(context: ToolContext, args: any): 
     app_id,
   };
   
-  if (period) params.period = period;
+  if (period) {
+params.period = period;
+}
 
   const response = await context.httpClient.get('/o/analytics/events/overview', { params });
   
@@ -237,7 +252,9 @@ export async function handleGetTopEvents(context: ToolContext, args: any): Promi
     limit,
   };
   
-  if (period) params.period = period;
+  if (period) {
+params.period = period;
+}
 
   const response = await context.httpClient.get('/o/analytics/events/top', { params });
   
