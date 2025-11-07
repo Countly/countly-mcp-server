@@ -10,14 +10,11 @@ export default [
       'coverage/**',
       '**/*.js',
       '**/*.d.ts',
-      'dist/**',
-      'tests/**',
-      '*.config.ts',
-      '*.config.js'
+      'dist/**'
     ]
   },
   {
-    files: ['src/**/*.ts'],
+    files: ['**/*.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {

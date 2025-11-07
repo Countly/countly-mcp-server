@@ -58,8 +58,8 @@ describe('Tools Configuration', () => {
     it('should have valid CRUD operations for all tools', () => {
       const validOperations = ['C', 'R', 'U', 'D'];
       
-      for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
-        for (const [tool, operation] of Object.entries(config.operations)) {
+      for (const [_category, config] of Object.entries(TOOL_CATEGORIES)) {
+        for (const [_tool, operation] of Object.entries(config.operations)) {
           expect(validOperations).toContain(operation);
         }
       }

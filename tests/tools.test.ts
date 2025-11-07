@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import {
   normalizeServerUrl,
   parseTimeout,
