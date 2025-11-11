@@ -119,14 +119,19 @@ The server supports multiple authentication methods (in priority order):
    - Supported by VS Code MCP extension and other HTTP clients
    - See [VS Code MCP Configuration](examples/vscode-mcp.md) for details
 
-2. **Tool Arguments**
+2. **URL Parameters** (alternative for HTTP/SSE transport)
+   - Pass as query string: `?server_url=https://your-server.count.ly&auth_token=your-api-key`
+   - Useful for quick testing or tools that don't support custom headers
+   - Less secure than headers, use headers when possible
+
+3. **Tool Arguments**
    - Passed as `countly_auth_token` parameter in individual tool calls
 
-3. **Environment Variable**
+4. **Environment Variable**
    - Set `COUNTLY_AUTH_TOKEN` in environment
    - Recommended for stdio transport mode
 
-4. **Token File** (recommended for production)
+5. **Token File** (recommended for production)
    - Set `COUNTLY_AUTH_TOKEN_FILE` pointing to a file containing the token
    - Useful with Docker secrets
 

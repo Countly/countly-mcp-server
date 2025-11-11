@@ -352,25 +352,36 @@ class CountlyMCPServer {
         if (pathname === mcpEndpoint) {
           analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
           
-          // Check for configuration in custom headers (secure way)
+          // Check for configuration in custom headers (secure way, recommended)
           const headerServerUrl = req.headers['x-countly-server-url'] as string;
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
           
-          if (headerServerUrl) {
+          // Also check URL parameters (alternative method)
+          const urlParams = new URL(req.url || '', `http://${req.headers.host}`).searchParams;
+          const paramServerUrl = urlParams.get('server_url') || urlParams.get('serverUrl');
+          const paramAuthToken = urlParams.get('auth_token') || urlParams.get('authToken');
+          
+          // Priority: Headers > URL parameters
+          const serverUrl = headerServerUrl || paramServerUrl;
+          const authToken = headerAuthToken || paramAuthToken;
+          
+          if (serverUrl) {
             // Remove trailing slashes safely without regex
-            let cleanUrl = headerServerUrl;
+            let cleanUrl = serverUrl;
             while (cleanUrl.endsWith('/')) {
               cleanUrl = cleanUrl.slice(0, -1);
             }
             this.config.serverUrl = cleanUrl;
             this.httpClient.defaults.baseURL = this.config.serverUrl;
-            console.error('Using Countly server from headers:', this.config.serverUrl);
+            const source = headerServerUrl ? 'headers' : 'URL parameters';
+            console.error(`Using Countly server from ${source}:`, this.config.serverUrl);
           }
           
-          if (headerAuthToken) {
-            this.config.authToken = headerAuthToken;
-            this.setAuthHeader(headerAuthToken);
-            console.error('Auth token configured from headers');
+          if (authToken) {
+            this.config.authToken = authToken;
+            this.setAuthHeader(authToken);
+            const source = headerAuthToken ? 'headers' : 'URL parameters';
+            console.error(`Auth token configured from ${source}`);
           }
           
           // Handle with StreamableHTTPServerTransport (modern protocol)
@@ -889,11 +900,17 @@ class CountlyMCPServer {
       </div>
 
       <h3>HTTP/SSE Connection</h3>
-      <p>Connect via HTTP with custom headers:</p>
+      <p>Connect via HTTP with custom headers (recommended):</p>
       <div class="example-box">
         <pre><span class="key">POST</span> ${mcpEndpoint}
 <span class="key">X-Countly-Server-Url:</span> <span class="string">https://your-server.count.ly</span>
 <span class="key">X-Countly-Auth-Token:</span> <span class="string">your-api-key</span>
+<span class="key">Content-Type:</span> <span class="string">application/json</span></pre>
+      </div>
+
+      <p>Or use URL parameters:</p>
+      <div class="example-box">
+        <pre><span class="key">POST</span> ${mcpEndpoint}?server_url=https://your-server.count.ly&auth_token=your-api-key
 <span class="key">Content-Type:</span> <span class="string">application/json</span></pre>
       </div>
       </div>
@@ -950,6 +967,7 @@ class CountlyMCPServer {
         <ul>
           <li><strong>Environment Variables:</strong> <code>COUNTLY_SERVER_URL</code>, <code>COUNTLY_AUTH_TOKEN</code></li>
           <li><strong>HTTP Headers:</strong> <code>X-Countly-Server-Url</code>, <code>X-Countly-Auth-Token</code></li>
+          <li><strong>URL Parameters:</strong> <code>?server_url=...&auth_token=...</code></li>
           <li><strong>Configuration File:</strong> <code>countly_token.txt</code> for authentication</li>
         </ul>
       </div>

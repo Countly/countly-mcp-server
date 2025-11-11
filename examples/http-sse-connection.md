@@ -244,15 +244,44 @@ node build/index.js --http --port 3000
 
 ### 1. Authentication
 
-The server uses `countly-token` header for authentication:
+The server supports multiple authentication methods for HTTP connections:
+
+**Method 1: HTTP Headers (Recommended - More Secure)**
+
+```bash
+# Pass credentials via custom headers
+curl -X POST http://localhost:3000/mcp \
+  -H "X-Countly-Server-Url: https://your-countly-instance.com" \
+  -H "X-Countly-Auth-Token: your-token-here" \
+  -H "Content-Type: application/json"
+```
+
+**Method 2: URL Parameters (Alternative - Less Secure)**
+
+```bash
+# Pass credentials via query string
+curl -X POST "http://localhost:3000/mcp?server_url=https://your-countly-instance.com&auth_token=your-token-here" \
+  -H "Content-Type: application/json"
+```
+
+**Method 3: Environment Variables**
 
 ```bash
 # Set in environment
+export COUNTLY_SERVER_URL="https://your-countly-instance.com"
 export COUNTLY_AUTH_TOKEN="your-token"
 
 # Or in metadata (client-specific)
 # The client should pass token via MCP metadata
 ```
+
+**Priority Order:** Headers > URL Parameters > Environment Variables
+
+⚠️ **Security Note**: URL parameters are less secure than headers because:
+- They may be logged in server access logs
+- They appear in browser history
+- They may be visible in monitoring tools
+- Use headers when possible for production environments
 
 ### 2. HTTPS in Production
 
