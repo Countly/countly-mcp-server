@@ -139,10 +139,43 @@ The server supports multiple authentication methods (in priority order):
 | `COUNTLY_AUTH_TOKEN` | No* | - | Authentication token (direct) |
 | `COUNTLY_AUTH_TOKEN_FILE` | No* | - | Path to file containing auth token |
 | `COUNTLY_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
+| `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
 
 *At least one authentication method must be configured
+
+### Analytics Tracking (Optional)
+
+The MCP server includes optional anonymous usage analytics to help improve the product. Analytics are **disabled by default** and can be enabled via the `ENABLE_ANALYTICS=true` environment variable.
+
+**What is tracked:**
+- Transport type used (stdio vs HTTP)
+- Tool execution metrics (success/failure, duration, tool names)
+- Authentication methods used (headers, env, file, args)
+- HTTP endpoint access patterns
+- Error occurrences (type and message, NO sensitive data)
+- Server start/stop events
+
+**What is NOT tracked:**
+- Authentication tokens or credentials
+- Server URLs or domains
+- User data or analytics content
+- Personal information
+- IP addresses or client identifiers
+
+**Privacy & Device ID:**
+All analytics are aggregated under a single device ID "mcp" to ensure complete anonymity. No server-specific or user-specific information is collected.
+
+**To enable:**
+```bash
+export ENABLE_ANALYTICS=true
+```
+
+Or in your `.env` file:
+```
+ENABLE_ANALYTICS=true
+```
 
 ### Tools Configuration
 

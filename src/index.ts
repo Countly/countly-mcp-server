@@ -23,6 +23,7 @@ import axios, { AxiosInstance } from 'axios';
 
 import { AppCache, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
+import { analytics } from './lib/analytics.js';
 import { buildConfig } from './lib/config.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
 import { 
@@ -53,6 +54,10 @@ class CountlyMCPServer {
   constructor(testMode: boolean = false) {
     this.appCache = new AppCache();
     this.toolsConfig = loadToolsConfig(process.env);
+    
+    // Initialize analytics (disabled by default, enabled via ENABLE_ANALYTICS=true)
+    const analyticsEnabled = process.env.ENABLE_ANALYTICS === 'true';
+    analytics.init(analyticsEnabled);
     
     // Log configuration on startup (only in non-test mode)
     if (!testMode) {
@@ -124,10 +129,23 @@ class CountlyMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       let originalAuthToken: string | undefined;
+      const startTime = Date.now();
 
       try {
         // Extract credentials from request (client-side)
         const credentials = this.getCredentials(request, args);
+        
+        // Track authentication method used
+        const metadata = (request as any)?._meta || (request as any)?.meta;
+        if (metadata?.countlyAuthToken) {
+          analytics.trackAuthMethod('metadata');
+        } else if (args?.countly_auth_token) {
+          analytics.trackAuthMethod('args');
+        } else if (credentials.authToken) {
+          analytics.trackAuthMethod('headers');
+        } else if (process.env.COUNTLY_AUTH_TOKEN) {
+          analytics.trackAuthMethod('env');
+        }
         
         // Store the original auth token temporarily for this request
         originalAuthToken = this.config.authToken;
@@ -187,8 +205,24 @@ class CountlyMCPServer {
         const instance = toolInstances[instanceKey];
         const result = await instance[methodName](args);
         
+        // Track successful tool execution
+        const duration = Date.now() - startTime;
+        analytics.trackToolExecution(name, true, duration);
+        
+        // Track tool category based on prefix (e.g., "get_", "create_", "list_")
+        const category = name.split('_')[0] || 'unknown';
+        analytics.trackToolCategory(category);
+        
         return result as any;
       } catch (error) {
+        // Track failed tool execution
+        const duration = Date.now() - startTime;
+        analytics.trackToolExecution(name, false, duration);
+        analytics.trackError(
+          error instanceof McpError ? error.code.toString() : 'unknown',
+          error instanceof Error ? error.message : String(error),
+          name
+        );
         
         if (error instanceof McpError) {
           throw error;
@@ -255,6 +289,8 @@ class CountlyMCPServer {
 
   async run(transportType: 'stdio' | 'http' = 'stdio', httpConfig?: HttpConfig) {
     // Track transport type with analytics
+    analytics.trackTransport(transportType);
+    analytics.trackSession('begin');
 
     if (transportType === 'http') {
       const port = httpConfig?.port || 3101;
@@ -303,6 +339,7 @@ class CountlyMCPServer {
         
         // Simple health check endpoint for Docker/monitoring
         if (pathname === '/health') {
+          analytics.trackHttpRequest('/health', req.method || 'GET');
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ 
             status: 'healthy',
@@ -313,6 +350,8 @@ class CountlyMCPServer {
         
         // MCP endpoint - ONLY endpoint that handles MCP protocol requests
         if (pathname === mcpEndpoint) {
+          analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
+          
           // Check for configuration in custom headers (secure way)
           const headerServerUrl = req.headers['x-countly-server-url'] as string;
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
@@ -341,6 +380,8 @@ class CountlyMCPServer {
         
         // Root page - show welcome guide
         if (pathname === '/') {
+          analytics.trackView('welcome_page');
+          analytics.trackHttpRequest('/', req.method || 'GET');
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(`<!DOCTYPE html>
 <html lang="en">
@@ -968,6 +1009,8 @@ class CountlyMCPServer {
       // Graceful shutdown
       process.on('SIGTERM', () => {
         console.error('Received SIGTERM, shutting down gracefully...');
+        analytics.trackSession('end');
+        analytics.flush();
         httpServer.close(() => {
           console.error('HTTP server closed.');
           process.exit(0);
@@ -976,6 +1019,8 @@ class CountlyMCPServer {
       
       process.on('SIGINT', () => {
         console.error('Received SIGINT, shutting down gracefully...');
+        analytics.trackSession('end');
+        analytics.flush();
         httpServer.close(() => {
           console.error('HTTP server closed.');
           process.exit(0);
