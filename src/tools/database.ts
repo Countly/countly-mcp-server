@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // LIST_DATABASES TOOL
@@ -19,7 +20,16 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
     ...context.getAuthParams(),
   };
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -94,7 +104,16 @@ params.sort = sort;
 params.sSearch = search;
 }
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -150,7 +169,16 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
     }
   }
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -206,7 +234,16 @@ export async function handleAggregateCollection(context: ToolContext, args: any)
     }
   }
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -250,7 +287,16 @@ export async function handleGetCollectionIndexes(context: ToolContext, args: any
     action: 'get_indexes',
   };
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -290,7 +336,13 @@ export async function handleGetDbStatistics(context: ToolContext, args: any): Pr
   };
 
   const endpoint = stat_type === 'mongotop' ? '/o/db/mongotop' : '/o/db/mongostat';
-  const response = await context.httpClient.get(endpoint, { params });
+  const response = await safeApiCall(
+
+    () => context.httpClient.get(endpoint, { params }),
+
+    'Failed to execute request to API request'
+
+  );
   
   return {
     content: [

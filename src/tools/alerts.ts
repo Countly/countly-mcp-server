@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_ALERT TOOL
@@ -117,7 +118,10 @@ export async function handleCreateAlert(context: ToolContext, args: any): Promis
     alert_config: typeof alert_config === 'string' ? alert_config : JSON.stringify(alert_config),
   };
 
-  const response = await context.httpClient.get('/i/alert/save', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/alert/save', { params }),
+    'Failed to create/update alert'
+  );
   
   return {
     content: [
@@ -160,7 +164,10 @@ export async function handleDeleteAlert(context: ToolContext, args: any): Promis
     alertID: alert_id,
   };
 
-  const response = await context.httpClient.get('/i/alert/delete', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/alert/delete', { params }),
+    'Failed to delete alert'
+  );
   
   return {
     content: [
@@ -200,7 +207,10 @@ export async function handleListAlerts(context: ToolContext, args: any): Promise
     app_id,
   };
 
-  const response = await context.httpClient.get('/o/alert/list', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/alert/list', { params }),
+    'Failed to list alerts'
+  );
   
   return {
     content: [

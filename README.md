@@ -30,12 +30,13 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 - 🔐 Multiple authentication methods (HTTP headers, environment variables, file-based)
 - 📊 Comprehensive Countly API access
-- �️ Fine-grained tools configuration with CRUD operation control per category
-- �🐳 Docker support with production-ready configuration
+- ⚙️ Fine-grained tools configuration with CRUD operation control per category
+- 🐳 Docker support with production-ready configuration
 - 🔄 Support for both stdio and HTTP transports
 - 🏥 Built-in health checks
 - 🔒 Secure token handling with cryptographically secure session IDs
 - 🌐 Multi-client support with per-client credential passing
+- 🚨 **Enhanced error handling** with detailed API error messages
 
 ## Quick Start
 

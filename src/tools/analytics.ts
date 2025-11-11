@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // GET_ANALYTICS_DATA TOOL
@@ -58,7 +59,16 @@ params.event = event;
 params.segmentation = segmentation;
 }
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [
@@ -104,7 +114,16 @@ export async function handleGetDashboardData(context: ToolContext, args: any): P
 params.period = period;
 }
 
-  const response = await context.httpClient.get('/o/analytics/dashboard', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/analytics/dashboard', { params }),
+
+
+    'Failed to execute request to /o/analytics/dashboard'
+
+
+  );
   
   return {
     content: [
@@ -154,7 +173,16 @@ params.period = period;
 params.event = event;
 }
 
-  const response = await context.httpClient.get('/o/analytics/events', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/analytics/events', { params }),
+
+
+    'Failed to execute request to /o/analytics/events'
+
+
+  );
   
   return {
     content: [
@@ -203,7 +231,16 @@ export async function handleGetEventsOverview(context: ToolContext, args: any): 
 params.period = period;
 }
 
-  const response = await context.httpClient.get('/o/analytics/events/overview', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/analytics/events/overview', { params }),
+
+
+    'Failed to execute request to /o/analytics/events/overview'
+
+
+  );
   
   return {
     content: [
@@ -254,7 +291,16 @@ export async function handleGetTopEvents(context: ToolContext, args: any): Promi
 params.period = period;
 }
 
-  const response = await context.httpClient.get('/o/analytics/events/top', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/analytics/events/top', { params }),
+
+
+    'Failed to execute request to /o/analytics/events/top'
+
+
+  );
   
   return {
     content: [
@@ -306,7 +352,16 @@ export async function handleGetSlippingAwayUsers(context: ToolContext, args: any
     skip,
   };
 
-  const response = await context.httpClient.get('/o/slipping', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/slipping', { params }),
+
+
+    'Failed to execute request to /o/slipping'
+
+
+  );
   
   return {
     content: [

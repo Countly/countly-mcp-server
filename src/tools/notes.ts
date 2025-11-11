@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_NOTE TOOL
@@ -59,7 +60,16 @@ export async function handleCreateNote(context: ToolContext, args: any): Promise
     args: JSON.stringify(noteArgs),
   };
 
-  const response = await context.httpClient.get('/i/notes/save', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/notes/save', { params }),
+
+
+    'Failed to execute request to /i/notes/save'
+
+
+  );
   
   return {
     content: [
@@ -128,7 +138,16 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
     period: periodParam,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   const notes = response.data?.notes || response.data || [];
   const noteCount = Array.isArray(notes) ? notes.length : Object.keys(notes).length;
@@ -167,7 +186,16 @@ export async function handleDeleteNote(context: ToolContext, args: any): Promise
     note_id,
   };
 
-  const response = await context.httpClient.get('/i/notes/delete', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/notes/delete', { params }),
+
+
+    'Failed to execute request to /i/notes/delete'
+
+
+  );
   
   return {
     content: [
