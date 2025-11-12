@@ -374,6 +374,80 @@ export async function handleGetSlippingAwayUsers(context: ToolContext, args: any
 }
 
 // ============================================================================
+// GET_SESSION_FREQUENCY TOOL
+// ============================================================================
+
+export const getSessionFrequencyToolDefinition = {
+  name: 'get_session_frequency',
+  description: 'Get session frequency distribution showing how many sessions fall into different time buckets. Buckets: f=0 (first session), f=1 (1-24 hours), f=2 (1 day), f=3 (2 days), f=4 (3 days), f=5 (4 days), f=6 (5 days), f=7 (6 days), f=8 (7 days), f=9 (8-14 days), f=10 (15-30 days), f=11 (30+ days)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { 
+        type: 'string', 
+        description: 'Application ID (optional if app_name is provided)' 
+      },
+      app_name: { 
+        type: 'string', 
+        description: 'Application name (alternative to app_id)' 
+      },
+      period: { 
+        type: 'string', 
+        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range',
+        default: '30days'
+      },
+    },
+    anyOf: [
+      { required: ['app_id'] },
+      { required: ['app_name'] }
+    ],
+  },
+};
+
+export async function handleGetSessionFrequency(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+  const period = args.period || '30days';
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    period,
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/analytics/frequency', { params }),
+    'Failed to get session frequency'
+  );
+
+  // Add helpful description of frequency buckets
+  let resultText = `Session frequency distribution for app ${app_id} (${period}):\n\n`;
+  resultText += `**Frequency Buckets:**\n`;
+  resultText += `- f=0: First session\n`;
+  resultText += `- f=1: Every 1-24 hours\n`;
+  resultText += `- f=2: Every 1 day\n`;
+  resultText += `- f=3: Every 2 days\n`;
+  resultText += `- f=4: Every 3 days\n`;
+  resultText += `- f=5: Every 4 days\n`;
+  resultText += `- f=6: Every 5 days\n`;
+  resultText += `- f=7: Every 6 days\n`;
+  resultText += `- f=8: Every 7 days\n`;
+  resultText += `- f=9: Every 8-14 days\n`;
+  resultText += `- f=10: Every 15-30 days\n`;
+  resultText += `- f=11: Every 30+ days\n\n`;
+  resultText += `**Results:**\n`;
+  resultText += JSON.stringify(response.data, null, 2);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: resultText,
+      },
+    ],
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -384,6 +458,7 @@ export const analyticsToolDefinitions = [
   getEventsOverviewToolDefinition,
   getTopEventsToolDefinition,
   getSlippingAwayUsersToolDefinition,
+  getSessionFrequencyToolDefinition,
 ];
 
 export const analyticsToolHandlers = {
@@ -393,6 +468,7 @@ export const analyticsToolHandlers = {
   'get_events_overview': 'getEventsOverview',
   'get_top_events': 'getTopEvents',
   'get_slipping_away_users': 'getSlippingAwayUsers',
+  'get_session_frequency': 'getSessionFrequency',
 } as const;
 
 export class AnalyticsTools {
@@ -420,6 +496,10 @@ export class AnalyticsTools {
 
   async getSlippingAwayUsers(args: any): Promise<ToolResult> {
     return handleGetSlippingAwayUsers(this.context, args);
+  }
+
+  async getSessionFrequency(args: any): Promise<ToolResult> {
+    return handleGetSessionFrequency(this.context, args);
   }
 }
 

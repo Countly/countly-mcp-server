@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 69 tools across 15 categories for comprehensive Countly integration:
+The server provides 70 tools across 15 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -399,6 +399,7 @@ The server provides 69 tools across 15 categories for comprehensive Countly inte
 - **`get_events_overview`** - Events overview and totals
 - **`get_top_events`** - Most frequently occurring events
 - **`get_slipping_away_users`** - Identify inactive app users
+- **`get_session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
 
 ### Events
 - **`create_event`** - Define event with metadata and configuration
