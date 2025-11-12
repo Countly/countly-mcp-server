@@ -178,6 +178,15 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'funnels',
     availableByDefault: false,
   },
+  formulas: {
+    operations: {
+      'run_formula': 'R',
+      'list_formulas': 'R',
+      'delete_formula': 'D',
+    },
+    requiresPlugin: 'formulas',
+    availableByDefault: false,
+  },
 };
 
 /**

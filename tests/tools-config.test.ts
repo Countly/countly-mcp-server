@@ -32,6 +32,7 @@ describe('Tools Configuration', () => {
       'user_profiles',
       'cohorts',
       'funnels',
+      'formulas',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
@@ -53,6 +54,7 @@ describe('Tools Configuration', () => {
       user_profiles: 4,
       cohorts: 5,
       funnels: 8,
+      formulas: 3,
     };
 
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -71,12 +73,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 72 tools', () => {
+    it('should have total of 75 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(72);
+      expect(totalTools).toBe(75);
     });
   });
 
@@ -425,6 +427,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('user_profiles');
       expect(categoriesRequiringCheck).toContain('cohorts');
       expect(categoriesRequiringCheck).toContain('funnels');
+      expect(categoriesRequiringCheck).toContain('formulas');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -440,6 +443,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('user_profiles')).toBe('users');
       expect(getRequiredPlugin('cohorts')).toBe('cohorts');
       expect(getRequiredPlugin('funnels')).toBe('funnels');
+      expect(getRequiredPlugin('formulas')).toBe('formulas');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();

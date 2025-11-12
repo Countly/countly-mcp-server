@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 72 tools across 15 categories for comprehensive Countly integration:
+The server provides 75 tools across 16 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -473,6 +473,11 @@ The server provides 72 tools across 15 categories for comprehensive Countly inte
 - **`create_funnel`** - Create conversion funnel with event sequence
 - **`update_funnel`** - Update funnel configuration
 - **`delete_funnel`** - Delete a funnel
+
+### Formulas (requires `formulas` plugin)
+- **`run_formula`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
+- **`list_formulas`** - List all saved formulas
+- **`delete_formula`** - Delete a saved formula
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

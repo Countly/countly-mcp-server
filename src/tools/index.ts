@@ -78,6 +78,11 @@ import { funnelsToolDefinitions, funnelsToolHandlers, funnelsToolMetadata, Funne
 
 export { funnelsToolDefinitions, funnelsToolHandlers, funnelsToolMetadata, FunnelsTools };
 
+// Formulas
+import { formulasToolDefinitions, formulasToolHandlers, formulasToolMetadata, FormulasTools } from './formulas.js';
+
+export { formulasToolDefinitions, formulasToolHandlers, formulasToolMetadata, FormulasTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -102,6 +107,7 @@ export function getAllToolDefinitions() {
     ...userProfilesToolDefinitions,
     ...cohortsToolDefinitions,
     ...funnelsToolDefinitions,
+    ...formulasToolDefinitions,
   ];
 }
 
@@ -126,6 +132,7 @@ export function getAllToolHandlers() {
     ...userProfilesToolHandlers,
     ...cohortsToolHandlers,
     ...funnelsToolHandlers,
+    ...formulasToolHandlers,
   };
 }
 
@@ -150,5 +157,6 @@ export function getAllToolMetadata() {
     userProfilesToolMetadata,
     cohortsToolMetadata,
     funnelsToolMetadata,
+    formulasToolMetadata,
   ];
 }
