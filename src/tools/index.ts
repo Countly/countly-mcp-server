@@ -98,6 +98,11 @@ import { remoteConfigToolDefinitions, remoteConfigToolHandlers, remoteConfigTool
 
 export { remoteConfigToolDefinitions, remoteConfigToolHandlers, remoteConfigToolMetadata, RemoteConfigTools };
 
+// A/B Testing
+import { abTestingToolDefinitions, abTestingToolHandlers, abTestingToolMetadata, ABTestingTools } from './ab-testing.js';
+
+export { abTestingToolDefinitions, abTestingToolHandlers, abTestingToolMetadata, ABTestingTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -126,6 +131,7 @@ export function getAllToolDefinitions() {
     ...liveToolDefinitions,
     ...retentionToolDefinitions,
     ...remoteConfigToolDefinitions,
+    ...abTestingToolDefinitions,
   ];
 }
 
@@ -154,6 +160,7 @@ export function getAllToolHandlers() {
     ...liveToolHandlers,
     ...retentionToolHandlers,
     ...remoteConfigToolHandlers,
+    ...abTestingToolHandlers,
   };
 }
 
@@ -182,5 +189,6 @@ export function getAllToolMetadata() {
     liveToolMetadata,
     retentionToolMetadata,
     remoteConfigToolMetadata,
+    abTestingToolMetadata,
   ];
 }

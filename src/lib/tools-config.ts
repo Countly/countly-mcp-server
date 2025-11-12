@@ -219,6 +219,18 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'remote-config',
     availableByDefault: false,
   },
+  ab_testing: {
+    operations: {
+      'list_ab_experiments': 'R',
+      'get_ab_experiment_detail': 'R',
+      'create_ab_experiment': 'C',
+      'start_ab_experiment': 'U',
+      'stop_ab_experiment': 'U',
+      'delete_ab_experiment': 'D',
+    },
+    requiresPlugin: 'ab-testing',
+    availableByDefault: false,
+  },
 };
 
 /**

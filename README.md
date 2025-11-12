@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 89 tools across 19 categories for comprehensive Countly integration:
+The server provides 95 tools across 20 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -498,6 +498,14 @@ The server provides 89 tools across 19 categories for comprehensive Countly inte
 - **`add_remote_config_parameter`** - Add parameter with default and conditional values
 - **`update_remote_config_parameter`** - Update parameter values, conditions, or status
 - **`delete_remote_config_parameter`** - Delete a parameter
+
+### A/B Testing (requires `ab-testing` plugin)
+- **`list_ab_experiments`** - List all A/B testing experiments with statuses and results
+- **`get_ab_experiment_detail`** - Get detailed experiment info including variants and statistical significance
+- **`create_ab_experiment`** - Create new experiment with variants, user targeting, and goals
+- **`start_ab_experiment`** - Start experiment to begin collecting data
+- **`stop_ab_experiment`** - Stop running experiment
+- **`delete_ab_experiment`** - Delete experiment and all its data
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
