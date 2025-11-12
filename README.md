@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 101 tools across 23 categories for comprehensive Countly integration:
+The server provides 105 tools across 24 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -518,6 +518,12 @@ The server provides 101 tools across 23 categories for comprehensive Countly int
 - **`get_consent_stats`** - Get aggregated consent statistics showing which consents users gave and when
 - **`list_user_consents`** - List specific users and their consent status
 - **`search_consent_history`** - Search consent history records with detailed audit trail
+
+### Filtering Rules (requires `blocks` plugin)
+- **`list_filtering_rules`** - List all blocking rules that filter incoming requests
+- **`create_filtering_rule`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
+- **`update_filtering_rule`** - Update existing blocking rule configuration
+- **`delete_filtering_rule`** - Delete a blocking rule
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

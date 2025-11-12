@@ -40,6 +40,7 @@ describe('Tools Configuration', () => {
       'logger',
       'sdks',
       'compliance_hub',
+      'filtering_rules',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
@@ -69,6 +70,7 @@ describe('Tools Configuration', () => {
       logger: 1,
       sdks: 2,
       compliance_hub: 3,
+      filtering_rules: 4,
     };
 
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -87,12 +89,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 101 tools', () => {
+    it('should have total of 105 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(101);
+      expect(totalTools).toBe(105);
     });
   });
 
@@ -449,6 +451,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('logger');
       expect(categoriesRequiringCheck).toContain('sdks');
       expect(categoriesRequiringCheck).toContain('compliance_hub');
+      expect(categoriesRequiringCheck).toContain('filtering_rules');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -472,6 +475,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('logger')).toBe('logger');
       expect(getRequiredPlugin('sdks')).toBe('sdks');
       expect(getRequiredPlugin('compliance_hub')).toBe('compliance-hub');
+      expect(getRequiredPlugin('filtering_rules')).toBe('blocks');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();

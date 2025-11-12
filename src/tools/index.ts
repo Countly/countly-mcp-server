@@ -118,6 +118,11 @@ import { complianceHubToolDefinitions, complianceHubToolHandlers, complianceHubT
 
 export { complianceHubToolDefinitions, complianceHubToolHandlers, complianceHubToolMetadata, ComplianceHubTools };
 
+// Filtering Rules
+import { filteringRulesToolDefinitions, filteringRulesToolHandlers, filteringRulesToolMetadata, FilteringRulesTools } from './filtering-rules.js';
+
+export { filteringRulesToolDefinitions, filteringRulesToolHandlers, filteringRulesToolMetadata, FilteringRulesTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -150,6 +155,7 @@ export function getAllToolDefinitions() {
     ...loggerToolDefinitions,
     ...sdksToolDefinitions,
     ...complianceHubToolDefinitions,
+    ...filteringRulesToolDefinitions,
   ];
 }
 
@@ -182,6 +188,7 @@ export function getAllToolHandlers() {
     ...loggerToolHandlers,
     ...sdksToolHandlers,
     ...complianceHubToolHandlers,
+    ...filteringRulesToolHandlers,
   };
 }
 
@@ -214,5 +221,6 @@ export function getAllToolMetadata() {
     loggerToolMetadata,
     sdksToolMetadata,
     complianceHubToolMetadata,
+    filteringRulesToolMetadata,
   ];
 }

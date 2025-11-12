@@ -255,6 +255,16 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'compliance-hub',
     availableByDefault: false,
   },
+  filtering_rules: {
+    operations: {
+      'list_filtering_rules': 'R',
+      'create_filtering_rule': 'C',
+      'update_filtering_rule': 'U',
+      'delete_filtering_rule': 'D',
+    },
+    requiresPlugin: 'blocks',
+    availableByDefault: false,
+  },
 };
 
 /**

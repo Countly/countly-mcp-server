@@ -18,8 +18,7 @@ export const getAnalyticsDataToolDefinition = {
         enum: [
           'locations', 'sessions', 'users', 'carriers',
           'devices', 'device_details', 'app_versions', 'cities', 'get_events',
-          'browser', 'consents', 'density', 
-          'langs', 'sources', 'systemlogs', 'times-of-day'
+          'browser', 'density', 'langs', 'sources', 'systemlogs', 'times-of-day'
         ],
         description: 'Data retrieval method'
       },
