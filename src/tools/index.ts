@@ -138,6 +138,11 @@ import { emailReportsToolDefinitions, emailReportsToolHandlers, emailReportsTool
 
 export { emailReportsToolDefinitions, emailReportsToolHandlers, emailReportsToolMetadata, EmailReportsTools };
 
+// Dashboards
+import { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetadata, DashboardsTools } from './dashboards.js';
+
+export { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetadata, DashboardsTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -174,6 +179,7 @@ export function getAllToolDefinitions() {
     ...datapointToolDefinitions,
     ...serverLogsToolDefinitions,
     ...emailReportsToolDefinitions,
+    ...dashboardsToolDefinitions,
   ];
 }
 
@@ -210,6 +216,7 @@ export function getAllToolHandlers() {
     ...datapointToolHandlers,
     ...serverLogsToolHandlers,
     ...emailReportsToolHandlers,
+    ...dashboardsToolHandlers,
   };
 }
 
@@ -246,5 +253,6 @@ export function getAllToolMetadata() {
     datapointToolMetadata,
     serverLogsToolMetadata,
     emailReportsToolMetadata,
+    dashboardsToolMetadata,
   ];
 }

@@ -297,6 +297,20 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'reports',
     availableByDefault: false,
   },
+  dashboards: {
+    operations: {
+      'list_dashboards': 'R',
+      'get_dashboard_data': 'R',
+      'create_dashboard': 'C',
+      'update_dashboard': 'U',
+      'delete_dashboard': 'D',
+      'add_dashboard_widget': 'C',
+      'update_dashboard_widget': 'U',
+      'remove_dashboard_widget': 'D',
+    },
+    requiresPlugin: 'dashboards',
+    availableByDefault: false,
+  },
 };
 
 /**

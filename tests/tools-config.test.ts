@@ -44,22 +44,23 @@ describe('Tools Configuration', () => {
       'datapoint',
       'server_logs',
       'email_reports',
+      'dashboards',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
 
-    it('should have correct tool counts per category', () => {
-      const expectedCounts = {
-        core: 7,
-        apps: 6,
-        analytics: 9,
-        crashes: 10,
-        notes: 3,
-        events: 1,
-        alerts: 3,
-        views: 3,
-        database: 6,
-        dashboard_users: 1,
+    it('should have correct number of operations per category', () => {
+    const expectedCounts = {
+      core: 7,
+      apps: 6,
+      analytics: 9,
+      crashes: 10,
+      notes: 3,
+      events: 1,
+      alerts: 3,
+      views: 3,
+      database: 6,
+      dashboard_users: 1,
       app_users: 3,
       drill: 5,
       user_profiles: 4,
@@ -77,9 +78,8 @@ describe('Tools Configuration', () => {
       datapoint: 3,
       server_logs: 2,
       email_reports: 7,
-    };
-
-    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
+      dashboards: 8,
+    };    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
       expect(toolCount).toBe(expectedCounts[category as keyof typeof expectedCounts]);
     }
@@ -95,12 +95,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 119 tools', () => {
+    it('should have total of 127 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(119);
+      expect(totalTools).toBe(127);
     });
   });
 
@@ -461,6 +461,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('datapoint');
       expect(categoriesRequiringCheck).toContain('server_logs');
       expect(categoriesRequiringCheck).toContain('email_reports');
+      expect(categoriesRequiringCheck).toContain('dashboards');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -488,6 +489,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('datapoint')).toBe('server-stats');
       expect(getRequiredPlugin('server_logs')).toBe('errorlogs');
       expect(getRequiredPlugin('email_reports')).toBe('reports');
+      expect(getRequiredPlugin('dashboards')).toBe('dashboards');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();

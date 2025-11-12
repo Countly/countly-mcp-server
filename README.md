@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 119 tools across 27 categories for comprehensive Countly integration:
+The server provides 127 tools across 28 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -547,6 +547,16 @@ The server provides 119 tools across 27 categories for comprehensive Countly int
 - **`preview_email_report`** - Preview an email report to see what it will look like before sending
 - **`send_email_report`** - Manually trigger sending an email report immediately
 - **`delete_email_report`** - Delete an email report configuration
+
+### Dashboards (requires `dashboards` plugin)
+- **`list_dashboards`** - List all available dashboards (with optional schema-only parameter)
+- **`get_dashboard_data`** - Get widgets and data for a specific dashboard with time period filtering
+- **`create_dashboard`** - Create a new dashboard with sharing settings, auto-refresh configuration, and theme
+- **`update_dashboard`** - Update dashboard configuration (name, sharing, refresh rate, theme)
+- **`delete_dashboard`** - Delete a dashboard by ID
+- **`add_dashboard_widget`** - Add a widget to a dashboard with full configuration (title, feature, widget type, apps, metrics, visualization)
+- **`update_dashboard_widget`** - Update widget position and size in the grid layout
+- **`remove_dashboard_widget`** - Remove a widget from a dashboard
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
