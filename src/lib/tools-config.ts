@@ -206,6 +206,19 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'retention_segments',
     availableByDefault: false,
   },
+  remote_config: {
+    operations: {
+      'list_remote_configs': 'R',
+      'add_remote_config_condition': 'C',
+      'update_remote_config_condition': 'U',
+      'delete_remote_config_condition': 'D',
+      'add_remote_config_parameter': 'C',
+      'update_remote_config_parameter': 'U',
+      'delete_remote_config_parameter': 'D',
+    },
+    requiresPlugin: 'remote-config',
+    availableByDefault: false,
+  },
 };
 
 /**

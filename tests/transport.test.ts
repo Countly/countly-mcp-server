@@ -104,27 +104,36 @@ describe('Transport Integration Tests', () => {
           reject(new Error('List tools request timeout'));
         }, 5000);
 
-        serverProcess.stdout?.once('data', (data) => {
-          clearTimeout(timeout);
-          try {
-            const response = JSON.parse(data.toString());
-            expect(response.jsonrpc).toBe('2.0');
-            expect(response.id).toBe(2);
-            expect(response.result).toBeDefined();
-            expect(response.result.tools).toBeDefined();
-            expect(Array.isArray(response.result.tools)).toBe(true);
-            expect(response.result.tools.length).toBeGreaterThan(0);
+        let buffer = '';
+        const dataHandler = (data: Buffer) => {
+          buffer += data.toString();
+          
+          // Check if we have a complete JSON object (ends with newline)
+          if (buffer.endsWith('\n')) {
+            clearTimeout(timeout);
+            serverProcess.stdout?.removeListener('data', dataHandler);
             
-            // Check that we have some expected tools
-            const toolNames = response.result.tools.map((t: any) => t.name);
-            expect(toolNames).toContain('list_apps');
-            
-            resolve();
-          } catch (error) {
-            reject(error);
+            try {
+              const response = JSON.parse(buffer.trim());
+              expect(response.jsonrpc).toBe('2.0');
+              expect(response.id).toBe(2);
+              expect(response.result).toBeDefined();
+              expect(response.result.tools).toBeDefined();
+              expect(Array.isArray(response.result.tools)).toBe(true);
+              expect(response.result.tools.length).toBeGreaterThan(0);
+              
+              // Check that we have some expected tools
+              const toolNames = response.result.tools.map((t: any) => t.name);
+              expect(toolNames).toContain('list_apps');
+              
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
           }
-        });
+        };
 
+        serverProcess.stdout?.on('data', dataHandler);
         serverProcess.stdin?.write(JSON.stringify(listToolsRequest) + '\n');
       });
     });

@@ -93,6 +93,11 @@ import { retentionToolDefinitions, retentionToolHandlers, retentionToolMetadata,
 
 export { retentionToolDefinitions, retentionToolHandlers, retentionToolMetadata, RetentionTools };
 
+// Remote Config
+import { remoteConfigToolDefinitions, remoteConfigToolHandlers, remoteConfigToolMetadata, RemoteConfigTools } from './remote-config.js';
+
+export { remoteConfigToolDefinitions, remoteConfigToolHandlers, remoteConfigToolMetadata, RemoteConfigTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -120,6 +125,7 @@ export function getAllToolDefinitions() {
     ...formulasToolDefinitions,
     ...liveToolDefinitions,
     ...retentionToolDefinitions,
+    ...remoteConfigToolDefinitions,
   ];
 }
 
@@ -147,6 +153,7 @@ export function getAllToolHandlers() {
     ...formulasToolHandlers,
     ...liveToolHandlers,
     ...retentionToolHandlers,
+    ...remoteConfigToolHandlers,
   };
 }
 
@@ -174,5 +181,6 @@ export function getAllToolMetadata() {
     formulasToolMetadata,
     liveToolMetadata,
     retentionToolMetadata,
+    remoteConfigToolMetadata,
   ];
 }

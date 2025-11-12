@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 82 tools across 18 categories for comprehensive Countly integration:
+The server provides 89 tools across 19 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -489,6 +489,15 @@ The server provides 82 tools across 18 categories for comprehensive Countly inte
 
 ### Retention (requires `retention_segments` plugin)
 - **`get_retention`** - Get retention data showing consecutive event streaks. Supports three types: Full (strict - breaks on first skip), Classic (Day N - specific days independently), Unbounded (lenient - any return counts)
+
+### Remote Config (requires `remote-config` plugin)
+- **`list_remote_configs`** - List all remote config parameters and conditions
+- **`add_remote_config_condition`** - Add user segmentation condition using MongoDB queries
+- **`update_remote_config_condition`** - Update existing condition criteria
+- **`delete_remote_config_condition`** - Delete a condition (if not in use)
+- **`add_remote_config_parameter`** - Add parameter with default and conditional values
+- **`update_remote_config_parameter`** - Update parameter values, conditions, or status
+- **`delete_remote_config_parameter`** - Delete a parameter
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
