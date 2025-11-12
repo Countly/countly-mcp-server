@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 108 tools across 25 categories for comprehensive Countly integration:
+The server provides 110 tools across 26 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -529,6 +529,10 @@ The server provides 108 tools across 25 categories for comprehensive Countly int
 - **`get_datapoint_statistics`** - Get data points collected per app per datapoint type. Data points measure collected data and are tied to server specs and billing.
 - **`get_top_datapoint_apps`** - Get top apps ranked by data point collection for understanding data usage and billing
 - **`get_datapoint_punch_card`** - Get hourly data point breakdown punchcard showing server load patterns for capacity planning
+
+### Server Logs (requires `errorlogs` plugin)
+- **`list_server_log_files`** - List available server log files (only available in non-Docker deployments)
+- **`get_server_log_contents`** - Get contents of a specific server log file for debugging and monitoring (only available in non-Docker deployments)
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

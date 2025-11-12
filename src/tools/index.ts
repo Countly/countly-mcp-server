@@ -128,6 +128,11 @@ import { datapointToolDefinitions, datapointToolHandlers, datapointToolMetadata,
 
 export { datapointToolDefinitions, datapointToolHandlers, datapointToolMetadata, DatapointTools };
 
+// Server Logs
+import { serverLogsToolDefinitions, serverLogsToolHandlers, serverLogsToolMetadata, ServerLogsTools } from './server-logs.js';
+
+export { serverLogsToolDefinitions, serverLogsToolHandlers, serverLogsToolMetadata, ServerLogsTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -162,6 +167,7 @@ export function getAllToolDefinitions() {
     ...complianceHubToolDefinitions,
     ...filteringRulesToolDefinitions,
     ...datapointToolDefinitions,
+    ...serverLogsToolDefinitions,
   ];
 }
 
@@ -196,6 +202,7 @@ export function getAllToolHandlers() {
     ...complianceHubToolHandlers,
     ...filteringRulesToolHandlers,
     ...datapointToolHandlers,
+    ...serverLogsToolHandlers,
   };
 }
 
@@ -230,5 +237,6 @@ export function getAllToolMetadata() {
     complianceHubToolMetadata,
     filteringRulesToolMetadata,
     datapointToolMetadata,
+    serverLogsToolMetadata,
   ];
 }

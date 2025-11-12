@@ -274,6 +274,14 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'server-stats',
     availableByDefault: false,
   },
+  server_logs: {
+    operations: {
+      'list_server_log_files': 'R',
+      'get_server_log_contents': 'R',
+    },
+    requiresPlugin: 'errorlogs',
+    availableByDefault: false,
+  },
 };
 
 /**
