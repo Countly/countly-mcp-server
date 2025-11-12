@@ -63,6 +63,16 @@ import { drillToolDefinitions, drillToolHandlers, drillToolMetadata, DrillTools 
 
 export { drillToolDefinitions, drillToolHandlers, drillToolMetadata, DrillTools };
 
+// User Profiles
+import { userProfilesToolDefinitions, userProfilesToolHandlers, userProfilesToolMetadata, UserProfilesTools } from './user-profiles.js';
+
+export { userProfilesToolDefinitions, userProfilesToolHandlers, userProfilesToolMetadata, UserProfilesTools };
+
+// Cohorts
+import { cohortsToolDefinitions, cohortsToolHandlers, cohortsToolMetadata, CohortsTools } from './cohorts.js';
+
+export { cohortsToolDefinitions, cohortsToolHandlers, cohortsToolMetadata, CohortsTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -84,6 +94,8 @@ export function getAllToolDefinitions() {
     ...crashAnalyticsToolDefinitions,
     ...viewsToolDefinitions,
     ...drillToolDefinitions,
+    ...userProfilesToolDefinitions,
+    ...cohortsToolDefinitions,
   ];
 }
 
@@ -105,6 +117,8 @@ export function getAllToolHandlers() {
     ...crashAnalyticsToolHandlers,
     ...viewsToolHandlers,
     ...drillToolHandlers,
+    ...userProfilesToolHandlers,
+    ...cohortsToolHandlers,
   };
 }
 
@@ -126,5 +140,7 @@ export function getAllToolMetadata() {
     crashAnalyticsToolMetadata,
     viewsToolMetadata,
     drillToolMetadata,
+    userProfilesToolMetadata,
+    cohortsToolMetadata,
   ];
 }

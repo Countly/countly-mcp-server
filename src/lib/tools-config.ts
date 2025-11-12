@@ -140,6 +140,27 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'drill',
     availableByDefault: false,
   },
+  user_profiles: {
+    operations: {
+      'query_user_profiles': 'R',
+      'breakdown_user_profiles': 'R',
+      'get_user_profile_details': 'R',
+      'add_user_note': 'C',
+    },
+    requiresPlugin: 'users',
+    availableByDefault: false,
+  },
+  cohorts: {
+    operations: {
+      'list_cohorts': 'R',
+      'get_cohort': 'R',
+      'create_cohort': 'C',
+      'update_cohort': 'U',
+      'delete_cohort': 'D',
+    },
+    requiresPlugin: 'cohorts',
+    availableByDefault: false,
+  },
 };
 
 /**

@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides over 40 tools for comprehensive Countly integration:
+The server provides 61 tools across 14 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -440,6 +440,26 @@ The server provides over 40 tools for comprehensive Countly integration:
 - **`add_crash_comment`** - Add comment to crash
 - **`edit_crash_comment`** - Edit crash comment
 - **`delete_crash_comment`** - Delete crash comment
+
+### Drill Segmentation (requires `drill` plugin)
+- **`get_segmentation_meta`** - Get available properties for segmentation
+- **`run_segmentation_query`** - Run drill query with filters and time buckets
+- **`list_drill_bookmarks`** - List saved segmentation queries
+- **`create_drill_bookmark`** - Save a segmentation query
+- **`delete_drill_bookmark`** - Delete a saved query
+
+### User Profiles (requires `users` plugin)
+- **`query_user_profiles`** - Query users with MongoDB filters
+- **`breakdown_user_profiles`** - Break down user counts by properties
+- **`get_user_profile_details`** - Get specific user details by UID
+- **`add_user_note`** - Add notes to user profiles
+
+### Cohorts (requires `cohorts` plugin)
+- **`list_cohorts`** - List all user cohorts with filtering
+- **`get_cohort`** - Get detailed cohort information
+- **`create_cohort`** - Create behavioral cohort based on user actions
+- **`update_cohort`** - Update cohort configuration
+- **`delete_cohort`** - Delete a cohort
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

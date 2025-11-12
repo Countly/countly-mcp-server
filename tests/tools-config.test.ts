@@ -16,22 +16,22 @@ describe('Tools Configuration', () => {
   
   describe('TOOL_CATEGORIES structure', () => {
     it('should have all expected categories', () => {
-      const expectedCategories = [
-        'core',
-        'apps',
-        'analytics',
-        'crashes',
-        'notes',
-        'events',
-        'alerts',
-        'views',
-        'database',
-        'dashboard_users',
-        'app_users',
-        'drill',
-      ];
-      
-      const actualCategories = Object.keys(TOOL_CATEGORIES);
+    const expectedCategories = [
+      'core',
+      'apps',
+      'analytics',
+      'crashes',
+      'notes',
+      'events',
+      'alerts',
+      'views',
+      'database',
+      'dashboard_users',
+      'app_users',
+      'drill',
+      'user_profiles',
+      'cohorts',
+    ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
 
@@ -47,15 +47,17 @@ describe('Tools Configuration', () => {
         views: 3,
         database: 6,
         dashboard_users: 1,
-        app_users: 3,
-        drill: 5,
-      };
+      app_users: 3,
+      drill: 5,
+      user_profiles: 4,
+      cohorts: 5,
+    };
 
-      for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
-        const toolCount = Object.keys(config.operations).length;
-        expect(toolCount).toBe(expectedCounts[category as keyof typeof expectedCounts]);
-      }
-    });
+    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
+      const toolCount = Object.keys(config.operations).length;
+      expect(toolCount).toBe(expectedCounts[category as keyof typeof expectedCounts]);
+    }
+  });
 
     it('should have valid CRUD operations for all tools', () => {
       const validOperations = ['C', 'R', 'U', 'D'];
@@ -67,12 +69,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 52 tools', () => {
+    it('should have total of 61 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(52);
+      expect(totalTools).toBe(61);
     });
   });
 
@@ -418,6 +420,8 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('views');
       expect(categoriesRequiringCheck).toContain('database');
       expect(categoriesRequiringCheck).toContain('drill');
+      expect(categoriesRequiringCheck).toContain('user_profiles');
+      expect(categoriesRequiringCheck).toContain('cohorts');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -430,6 +434,8 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('views')).toBe('views');
       expect(getRequiredPlugin('database')).toBe('dbviewer');
       expect(getRequiredPlugin('drill')).toBe('drill');
+      expect(getRequiredPlugin('user_profiles')).toBe('users');
+      expect(getRequiredPlugin('cohorts')).toBe('cohorts');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();
@@ -438,6 +444,8 @@ describe('Tools Configuration', () => {
       expect(requirements).toHaveProperty('views', 'views');
       expect(requirements).toHaveProperty('database', 'dbviewer');
       expect(requirements).toHaveProperty('drill', 'drill');
+      expect(requirements).toHaveProperty('user_profiles', 'users');
+      expect(requirements).toHaveProperty('cohorts', 'cohorts');
       expect(requirements).not.toHaveProperty('core');
     });
 

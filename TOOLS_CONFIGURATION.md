@@ -34,6 +34,8 @@ The following categories are **only available if their corresponding plugin is i
 - **views** → requires `views` plugin
 - **database** → requires `dbviewer` plugin
 - **drill** → requires `drill` plugin
+- **user_profiles** → requires `users` plugin
+- **cohorts** → requires `cohorts` plugin
 
 ### Categories Available by Default
 
@@ -315,6 +317,123 @@ if (plugins.includes('drill')) {
     name: 'US Users',
     query_obj: '{"up.country":"US"}',
     desc: 'Users from United States'
+  });
+}
+```
+
+### user_profiles
+**Tools**: `query_user_profiles`, `breakdown_user_profiles`, `get_user_profile_details`, `add_user_note`
+
+**Requires plugin**: `users`
+
+Query user profiles and manage user notes. Note that user properties in queries do NOT use the "up." prefix (different from drill queries).
+
+**Examples:**
+```typescript
+async function userProfileExamples() {
+  // Query users with MongoDB filters (NO "up." prefix)
+  const users = await tools.query_user_profiles({
+    app_name: 'MyApp',
+    query: '{"country":"US"}',  // Note: no "up." prefix
+    period: '30days'
+  });
+  
+  // Break down users by property with grouping
+  const breakdown = await tools.breakdown_user_profiles({
+    app_name: 'MyApp',
+    projection_key: '{"country":"$country","plan":"$custom.plan"}',
+    period: '30days'
+  });
+  
+  // Get specific user details by UID
+  const user = await tools.get_user_profile_details({
+    app_name: 'MyApp',
+    uid: 'user123'
+  });
+  
+  // Add note to user profile
+  await tools.add_user_note({
+    app_name: 'MyApp',
+    uid: 'user123',
+    note: 'User upgraded to premium plan'
+  });
+}
+```
+
+### cohorts
+**Tools**: `list_cohorts`, `get_cohort`, `create_cohort`, `update_cohort`, `delete_cohort`
+
+**Requires plugin**: `cohorts`
+
+Manage user cohorts - groups of users based on behavioral criteria or manual selection. Create sophisticated user segments based on events they did or did not perform.
+
+**Examples:**
+```typescript
+async function cohortExamples() {
+  // List all cohorts
+  const cohorts = await tools.list_cohorts({
+    app_name: 'MyApp',
+    type: 'auto',  // or 'manual'
+    limit: 10
+  });
+  
+  // Get specific cohort details
+  const cohort = await tools.get_cohort({
+    app_name: 'MyApp',
+    cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c'
+  });
+  
+  // Create behavioral cohort
+  // Users who had sessions with app version 5:10:0 but did not view any pages in the last 7 days
+  const steps = [
+    {
+      type: 'did',
+      event: '[CLY]_session',
+      times: '{"$gte":1}',
+      period: '0days',  // all time
+      query: '{"up.av":{"$in":["5:10:0"]}}',
+      queryText: 'App Version = 5:10:0',
+      byVal: '',
+      group: 0,
+      conj: 'and'
+    },
+    {
+      type: 'didnot',
+      event: '[CLY]_view',
+      times: '{"$gte":1}',
+      period: '7days',
+      query: '{}',
+      queryText: '',
+      byVal: '',
+      group: 1,
+      conj: 'and'
+    }
+  ];
+  
+  await tools.create_cohort({
+    app_name: 'MyApp',
+    name: 'Inactive Users on Old Version',
+    description: 'Users on version 5:10:0 who haven\'t viewed pages in 7 days',
+    visibility: 'global',
+    steps: JSON.stringify(steps),
+    user_segmentation: JSON.stringify({
+      query: '{"up.av":{"$in":["5:10:2"]}}',
+      queryText: 'App Version = 5:10:2'
+    })
+  });
+  
+  // Update existing cohort
+  await tools.update_cohort({
+    app_name: 'MyApp',
+    cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c',
+    description: 'Updated description',
+    visibility: 'private'
+  });
+  
+  // Delete cohort
+  await tools.delete_cohort({
+    app_name: 'MyApp',
+    cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c'
   });
 }
 ```
