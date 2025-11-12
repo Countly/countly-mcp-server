@@ -83,6 +83,11 @@ import { formulasToolDefinitions, formulasToolHandlers, formulasToolMetadata, Fo
 
 export { formulasToolDefinitions, formulasToolHandlers, formulasToolMetadata, FormulasTools };
 
+// Live (Concurrent Users)
+import { liveToolDefinitions, liveToolHandlers, liveToolMetadata, LiveTools } from './live.js';
+
+export { liveToolDefinitions, liveToolHandlers, liveToolMetadata, LiveTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -108,6 +113,7 @@ export function getAllToolDefinitions() {
     ...cohortsToolDefinitions,
     ...funnelsToolDefinitions,
     ...formulasToolDefinitions,
+    ...liveToolDefinitions,
   ];
 }
 
@@ -133,6 +139,7 @@ export function getAllToolHandlers() {
     ...cohortsToolHandlers,
     ...funnelsToolHandlers,
     ...formulasToolHandlers,
+    ...liveToolHandlers,
   };
 }
 
@@ -158,5 +165,6 @@ export function getAllToolMetadata() {
     cohortsToolMetadata,
     funnelsToolMetadata,
     formulasToolMetadata,
+    liveToolMetadata,
   ];
 }

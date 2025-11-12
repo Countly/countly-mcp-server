@@ -187,6 +187,18 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'formulas',
     availableByDefault: false,
   },
+  live: {
+    operations: {
+      'get_live_users': 'R',
+      'get_live_metrics': 'R',
+      'get_live_last_hour': 'R',
+      'get_live_last_day': 'R',
+      'get_live_last_30_days': 'R',
+      'get_live_overall': 'R',
+    },
+    requiresPlugin: 'concurrent_users',
+    availableByDefault: false,
+  },
 };
 
 /**

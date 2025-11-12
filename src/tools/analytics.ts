@@ -20,7 +20,7 @@ export const getAnalyticsDataToolDefinition = {
           'devices', 'device_details', 'app_versions', 'cities', 'get_events',
           'browser', 'consents', 'density', 
           'langs', 'logs', 'sdks', 'sources', 'systemlogs', 'times-of-day', 'ab-testing', 
-          'get_cohorts', 'live', 'get_funnels', 'retention', 'user_details'
+          'retention'
         ],
         description: 'Data retrieval method'
       },

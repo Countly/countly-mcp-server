@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 75 tools across 16 categories for comprehensive Countly integration:
+The server provides 81 tools across 17 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -478,6 +478,14 @@ The server provides 75 tools across 16 categories for comprehensive Countly inte
 - **`run_formula`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
 - **`list_formulas`** - List all saved formulas
 - **`delete_formula`** - Delete a saved formula
+
+### Live/Concurrent Users (requires `concurrent_users` plugin)
+- **`get_live_users`** - Get current online user count and new users at this moment
+- **`get_live_metrics`** - Get breakdown by countries, devices and carriers for users currently online
+- **`get_live_last_hour`** - Get minute-by-minute data for the last hour (60 data points)
+- **`get_live_last_day`** - Get hour-by-hour data for the last day (24 data points)
+- **`get_live_last_30_days`** - Get daily data for the last 30 days (30 data points)
+- **`get_live_overall`** - Get maximum values for online users (peak concurrent usage records)
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
