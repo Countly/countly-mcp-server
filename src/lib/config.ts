@@ -6,6 +6,7 @@
 export interface CountlyConfig {
   serverUrl: string;
   timeout?: number;
+  authToken?: string;
 }
 
 export interface ServerEnvironment {
@@ -82,7 +83,7 @@ export function validateServerUrl(url: string): boolean {
  */
 export function buildConfig(
   env: ServerEnvironment = process.env,
-  _authToken?: string,
+  authToken?: string,
   testMode = false
 ): CountlyConfig {
   const config = loadConfigFromEnv(env);
@@ -95,5 +96,6 @@ export function buildConfig(
     );
   }
 
-  return config;
+  // Return config with authToken if provided
+  return authToken ? { ...config, authToken } : config;
 }
