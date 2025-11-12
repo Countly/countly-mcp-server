@@ -448,6 +448,133 @@ export async function handleGetSessionFrequency(context: ToolContext, args: any)
 }
 
 // ============================================================================
+// GET_USER_LOYALTY TOOL
+// ============================================================================
+
+export const getUserLoyaltyToolDefinition = {
+  name: 'get_user_loyalty',
+  description: 'Get user loyalty data showing how many sessions users have had. Results are divided into loyalty buckets: 1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, and 500+ sessions.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      query: { 
+        type: 'string', 
+        description: 'Optional MongoDB query as JSON string to filter users (e.g., \'{"country":"US"}\' or \'{}\'). Defaults to \'{}\' (all users).' 
+      },
+    },
+    anyOf: [
+      { required: ['app_id'] },
+      { required: ['app_name'] }
+    ],
+  },
+};
+
+export async function handleGetUserLoyalty(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+  const query = args.query || '{}';
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    query,
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/app_users/loyalty', { params }),
+    'Failed to get user loyalty data'
+  );
+
+  // Add helpful description of loyalty buckets
+  let resultText = `User loyalty data for app ${app_id}:\n\n`;
+  resultText += `**Loyalty Buckets (Session Counts):**\n`;
+  resultText += `- Bucket 0: 1 session\n`;
+  resultText += `- Bucket 1: 2 sessions\n`;
+  resultText += `- Bucket 2: 3-5 sessions\n`;
+  resultText += `- Bucket 3: 6-9 sessions\n`;
+  resultText += `- Bucket 4: 10-19 sessions\n`;
+  resultText += `- Bucket 5: 20-49 sessions\n`;
+  resultText += `- Bucket 6: 50-99 sessions\n`;
+  resultText += `- Bucket 7: 100-499 sessions\n`;
+  resultText += `- Bucket 8: 500+ sessions\n\n`;
+  resultText += `**Results:**\n`;
+  resultText += JSON.stringify(response.data, null, 2);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: resultText,
+      },
+    ],
+  };
+}
+
+// ============================================================================
+// GET_SESSION_DURATIONS TOOL
+// ============================================================================
+
+export const getSessionDurationsToolDefinition = {
+  name: 'get_session_durations',
+  description: 'Get session duration distribution showing how long user sessions lasted. Results are divided into duration buckets: 0-10 seconds, 11-30 seconds, 31-60 seconds, 1-3 minutes, 3-10 minutes, 10-30 minutes, 30-60 minutes, and over 1 hour.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      period: { 
+        type: 'string', 
+        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]"). Defaults to "30days".'
+      },
+    },
+    anyOf: [
+      { required: ['app_id'] },
+      { required: ['app_name'] }
+    ],
+  },
+};
+
+export async function handleGetSessionDurations(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+  const period = args.period || '30days';
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    period,
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/analytics/durations', { params }),
+    'Failed to get session durations'
+  );
+
+  // Add helpful description of duration buckets
+  let resultText = `Session duration distribution for app ${app_id} (${period}):\n\n`;
+  resultText += `**Duration Buckets:**\n`;
+  resultText += `- Bucket 0: 0-10 seconds\n`;
+  resultText += `- Bucket 1: 11-30 seconds\n`;
+  resultText += `- Bucket 2: 31-60 seconds\n`;
+  resultText += `- Bucket 3: 1-3 minutes\n`;
+  resultText += `- Bucket 4: 3-10 minutes\n`;
+  resultText += `- Bucket 5: 10-30 minutes\n`;
+  resultText += `- Bucket 6: 30-60 minutes\n`;
+  resultText += `- Bucket 7: Over 1 hour\n\n`;
+  resultText += `**Results:**\n`;
+  resultText += JSON.stringify(response.data, null, 2);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: resultText,
+      },
+    ],
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -459,6 +586,8 @@ export const analyticsToolDefinitions = [
   getTopEventsToolDefinition,
   getSlippingAwayUsersToolDefinition,
   getSessionFrequencyToolDefinition,
+  getUserLoyaltyToolDefinition,
+  getSessionDurationsToolDefinition,
 ];
 
 export const analyticsToolHandlers = {
@@ -469,6 +598,8 @@ export const analyticsToolHandlers = {
   'get_top_events': 'getTopEvents',
   'get_slipping_away_users': 'getSlippingAwayUsers',
   'get_session_frequency': 'getSessionFrequency',
+  'get_user_loyalty': 'getUserLoyalty',
+  'get_session_durations': 'getSessionDurations',
 } as const;
 
 export class AnalyticsTools {
@@ -501,9 +632,17 @@ export class AnalyticsTools {
   async getSessionFrequency(args: any): Promise<ToolResult> {
     return handleGetSessionFrequency(this.context, args);
   }
+
+  async getUserLoyalty(args: any): Promise<ToolResult> {
+    return handleGetUserLoyalty(this.context, args);
+  }
+
+  async getSessionDurations(args: any): Promise<ToolResult> {
+    return handleGetSessionDurations(this.context, args);
+  }
 }
 
-// Metadata for dynamic routing (must be after class declaration)
+// Metadata for dynamic routing (must be after class declaration)// Metadata for dynamic routing (must be after class declaration)
 export const analyticsToolMetadata = {
   instanceKey: 'analytics',
   toolClass: AnalyticsTools,

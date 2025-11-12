@@ -53,6 +53,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'get_top_events': 'R',
       'get_slipping_away_users': 'R',
       'get_session_frequency': 'R',
+      'get_user_loyalty': 'R',
+      'get_session_durations': 'R',
     },
     availableByDefault: true,
   },
