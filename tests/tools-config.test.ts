@@ -28,6 +28,7 @@ describe('Tools Configuration', () => {
         'database',
         'dashboard_users',
         'app_users',
+        'drill',
       ];
       
       const actualCategories = Object.keys(TOOL_CATEGORIES);
@@ -47,6 +48,7 @@ describe('Tools Configuration', () => {
         database: 6,
         dashboard_users: 1,
         app_users: 3,
+        drill: 5,
       };
 
       for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -65,12 +67,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 47 tools', () => {
+    it('should have total of 52 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(47);
+      expect(totalTools).toBe(52);
     });
   });
 
@@ -415,6 +417,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('crashes');
       expect(categoriesRequiringCheck).toContain('views');
       expect(categoriesRequiringCheck).toContain('database');
+      expect(categoriesRequiringCheck).toContain('drill');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -426,6 +429,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('crashes')).toBe('crashes');
       expect(getRequiredPlugin('views')).toBe('views');
       expect(getRequiredPlugin('database')).toBe('dbviewer');
+      expect(getRequiredPlugin('drill')).toBe('drill');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();
@@ -433,6 +437,7 @@ describe('Tools Configuration', () => {
       expect(requirements).toHaveProperty('crashes', 'crashes');
       expect(requirements).toHaveProperty('views', 'views');
       expect(requirements).toHaveProperty('database', 'dbviewer');
+      expect(requirements).toHaveProperty('drill', 'drill');
       expect(requirements).not.toHaveProperty('core');
     });
 

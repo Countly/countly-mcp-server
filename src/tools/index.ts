@@ -58,6 +58,11 @@ import { viewsToolDefinitions, viewsToolHandlers, viewsToolMetadata, ViewsTools 
 
 export { viewsToolDefinitions, viewsToolHandlers, viewsToolMetadata, ViewsTools };
 
+// Drill
+import { drillToolDefinitions, drillToolHandlers, drillToolMetadata, DrillTools } from './drill.js';
+
+export { drillToolDefinitions, drillToolHandlers, drillToolMetadata, DrillTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -78,6 +83,7 @@ export function getAllToolDefinitions() {
     ...databaseToolDefinitions,
     ...crashAnalyticsToolDefinitions,
     ...viewsToolDefinitions,
+    ...drillToolDefinitions,
   ];
 }
 
@@ -98,6 +104,7 @@ export function getAllToolHandlers() {
     ...databaseToolHandlers,
     ...crashAnalyticsToolHandlers,
     ...viewsToolHandlers,
+    ...drillToolHandlers,
   };
 }
 
@@ -118,5 +125,6 @@ export function getAllToolMetadata() {
     databaseToolMetadata,
     crashAnalyticsToolMetadata,
     viewsToolMetadata,
+    drillToolMetadata,
   ];
 }

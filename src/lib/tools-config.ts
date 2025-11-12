@@ -129,6 +129,17 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     },
     availableByDefault: true,
   },
+  drill: {
+    operations: {
+      'get_segmentation_meta': 'R',
+      'run_segmentation_query': 'R',
+      'list_drill_bookmarks': 'R',
+      'create_drill_bookmark': 'C',
+      'delete_drill_bookmark': 'D',
+    },
+    requiresPlugin: 'drill',
+    availableByDefault: false,
+  },
 };
 
 /**

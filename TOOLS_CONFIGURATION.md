@@ -33,6 +33,7 @@ The following categories are **only available if their corresponding plugin is i
 - **crashes** → requires `crashes` plugin  
 - **views** → requires `views` plugin
 - **database** → requires `dbviewer` plugin
+- **drill** → requires `drill` plugin
 
 ### Categories Available by Default
 
@@ -131,6 +132,23 @@ These categories are always available without plugin checks:
 - R: get_all_dashboard_users
 
 **Note**: Returns management/admin users who access the Countly dashboard. These are the users who log into Countly to analyze data, configure settings, and manage applications.
+
+### drill
+**Tools**: `get_segmentation_meta`, `run_segmentation_query`, `list_drill_bookmarks`, `create_drill_bookmark`, `delete_drill_bookmark`
+
+**Operations**:
+- R: get_segmentation_meta, run_segmentation_query, list_drill_bookmarks
+- C: create_drill_bookmark
+- D: delete_drill_bookmark
+
+**Notes**:
+- `get_segmentation_meta`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
+- `run_segmentation_query`: Run drill segmentation queries with MongoDB query objects. Can break down by projection key (segment or user property). Supports buckets: hourly, daily, weekly, monthly
+- `list_drill_bookmarks`: List all saved drill bookmarks for a specific event
+- `create_drill_bookmark`: Create a new bookmark to save a query for later reuse in the dashboard
+- `delete_drill_bookmark`: Delete an existing drill bookmark
+
+**⚠️ Requires Plugin**: `drill` plugin must be installed on Countly server
 
 ### app_users
 **Tools**: `create_app_user`, `edit_app_user`, `delete_app_user`, `export_app_users`
@@ -231,6 +249,7 @@ const pluginsResponse = await tools.get_plugins({});
 // - alerts tools: ✗ not available (alerts plugin not in list)
 // - views tools: ✓ available (views plugin present)
 // - database tools: ✗ not available (dbviewer plugin not in list)
+// - drill tools: ✗ not available (drill plugin not in list)
 ```
 
 The server will automatically filter out tools for categories whose plugins are not installed, so you won't see them in the available tools list. However, checking `get_plugins` first allows you to:
@@ -265,6 +284,38 @@ if (plugins.includes('views')) {
 
 if (plugins.includes('dbviewer')) {
   const databases = await tools.list_databases({});
+}
+
+if (plugins.includes('drill')) {
+  // Get user properties and event segments metadata
+  const meta = await tools.get_segmentation_meta({ 
+    app_name: 'MyApp',
+    event: 'Account Created' 
+  });
+  
+  // Run segmentation query
+  const results = await tools.run_segmentation_query({
+    app_name: 'MyApp',
+    event: 'Account Created',
+    query_object: '{"up.country":"US"}',
+    period: '30days',
+    bucket: 'daily'
+  });
+  
+  // List existing bookmarks
+  const bookmarks = await tools.list_drill_bookmarks({
+    app_name: 'MyApp',
+    event_key: 'Account Created'
+  });
+  
+  // Create a bookmark
+  await tools.create_drill_bookmark({
+    app_name: 'MyApp',
+    event_key: 'Account Created',
+    name: 'US Users',
+    query_obj: '{"up.country":"US"}',
+    desc: 'Users from United States'
+  });
 }
 ```
 
