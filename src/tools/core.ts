@@ -171,6 +171,155 @@ export async function handleFetch(context: ToolContext, args: any): Promise<Tool
 }
 
 // ============================================================================
+// JOBS TOOLS
+// ============================================================================
+
+export const listJobsToolDefinition = {
+  name: 'list_jobs',
+  description: 'List all background jobs running on the Countly server with pagination and sorting options',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID (optional if app_name is provided)',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id)',
+      },
+      skip: {
+        type: 'number',
+        description: 'Number of records to skip for pagination (iDisplayStart)',
+        default: 0,
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of records to return (iDisplayLength)',
+        default: 10,
+      },
+      sort_column: {
+        type: 'number',
+        description: 'Column index to sort by (iSortCol_0)',
+        default: 0,
+      },
+      sort_direction: {
+        type: 'string',
+        description: 'Sort direction: "asc" or "desc" (sSortDir_0)',
+        enum: ['asc', 'desc'],
+        default: 'asc',
+      },
+    },
+    required: [],
+  },
+};
+
+export async function handleListJobs(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    method: 'jobs',
+    iDisplayStart: args.skip || 0,
+    iDisplayLength: args.limit || 10,
+    iSortCol_0: args.sort_column || 0,
+    sSortDir_0: args.sort_direction || 'asc',
+    ready: 'true',
+    sEcho: '0',
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o', { params }),
+    'Failed to list jobs'
+  );
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Jobs for app ${app_id}:\n\n${JSON.stringify(response.data, null, 2)}`,
+      },
+    ],
+  };
+}
+
+export const getJobRunsToolDefinition = {
+  name: 'get_job_runs',
+  description: 'Get run history and details for a specific background job by name',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID (optional if app_name is provided)',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id)',
+      },
+      job_name: {
+        type: 'string',
+        description: 'Job name to get run history for (e.g., "active_users:generate_active_users")',
+      },
+      skip: {
+        type: 'number',
+        description: 'Number of records to skip for pagination (iDisplayStart)',
+        default: 0,
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of records to return (iDisplayLength)',
+        default: 10,
+      },
+      sort_column: {
+        type: 'number',
+        description: 'Column index to sort by (iSortCol_0)',
+        default: 2,
+      },
+      sort_direction: {
+        type: 'string',
+        description: 'Sort direction: "asc" or "desc" (sSortDir_0)',
+        enum: ['asc', 'desc'],
+        default: 'desc',
+      },
+    },
+    required: ['job_name'],
+  },
+};
+
+export async function handleGetJobRuns(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    method: 'jobs',
+    name: args.job_name,
+    iDisplayStart: args.skip || 0,
+    iDisplayLength: args.limit || 10,
+    iSortCol_0: args.sort_column !== undefined ? args.sort_column : 2,
+    sSortDir_0: args.sort_direction || 'desc',
+    ready: 'true',
+    sEcho: '0',
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o', { params }),
+    `Failed to get runs for job: ${args.job_name}`
+  );
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Run history for job "${args.job_name}" (app ${app_id}):\n\n${JSON.stringify(response.data, null, 2)}`,
+      },
+    ],
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -180,6 +329,8 @@ export const coreToolDefinitions = [
   pluginsToolDefinition,
   searchToolDefinition,
   fetchToolDefinition,
+  listJobsToolDefinition,
+  getJobRunsToolDefinition,
 ];
 
 export const coreToolHandlers = {
@@ -188,6 +339,8 @@ export const coreToolHandlers = {
   'get_plugins': 'handleGetPlugins',
   'search': 'handleSearch',
   'fetch': 'handleFetch',
+  'list_jobs': 'handleListJobs',
+  'get_job_runs': 'handleGetJobRuns',
 } as const;
 
 export class CoreTools {
@@ -211,6 +364,14 @@ export class CoreTools {
 
   async fetch(args: any): Promise<ToolResult> {
     return handleFetch(this.context, args);
+  }
+
+  async list_jobs(args: any): Promise<ToolResult> {
+    return handleListJobs(this.context, args);
+  }
+
+  async get_job_runs(args: any): Promise<ToolResult> {
+    return handleGetJobRuns(this.context, args);
   }
 }
 

@@ -379,11 +379,16 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 110 tools across 26 categories for comprehensive Countly integration:
+The server provides 112 tools across 26 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
+- **`ping`** - Check if Countly server is healthy and reachable
+- **`get_version`** - Check what version of Countly is running on the server
+- **`get_plugins`** - Get list of installed plugins on the server
 - **`search`** - Search for relevant content in Countly data
 - **`fetch`** - Retrieve specific documents by ID
+- **`list_jobs`** - List all background jobs running on the Countly server with pagination and sorting
+- **`get_job_runs`** - Get run history and details for a specific background job by name
 
 ### App Management
 - **`list_apps`** - List all applications

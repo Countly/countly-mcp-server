@@ -30,6 +30,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'get_plugins': 'R',
       'search': 'R',
       'fetch': 'R',
+      'list_jobs': 'R',
+      'get_job_runs': 'R',
     },
     availableByDefault: true,
   },

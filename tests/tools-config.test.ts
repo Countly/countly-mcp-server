@@ -49,7 +49,7 @@ describe('Tools Configuration', () => {
 
     it('should have correct tool counts per category', () => {
       const expectedCounts = {
-        core: 5,
+        core: 7,
         apps: 6,
         analytics: 9,
         crashes: 10,
@@ -93,12 +93,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 110 tools', () => {
+    it('should have total of 112 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(110);
+      expect(totalTools).toBe(112);
     });
   });
 
