@@ -311,6 +311,13 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'dashboards',
     availableByDefault: false,
   },
+  times_of_day: {
+    operations: {
+      'get_times_of_day': 'R',
+    },
+    requiresPlugin: 'times-of-day',
+    availableByDefault: false,
+  },
 };
 
 /**

@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 127 tools across 28 categories for comprehensive Countly integration:
+The server provides 128 tools across 29 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -557,6 +557,9 @@ The server provides 127 tools across 28 categories for comprehensive Countly int
 - **`add_dashboard_widget`** - Add a widget to a dashboard with full configuration (title, feature, widget type, apps, metrics, visualization)
 - **`update_dashboard_widget`** - Update widget position and size in the grid layout
 - **`remove_dashboard_widget`** - Remove a widget from a dashboard
+
+### Times of Day (requires `times-of-day` plugin)
+- **`get_times_of_day`** - Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

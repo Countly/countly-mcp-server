@@ -143,6 +143,11 @@ import { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetada
 
 export { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetadata, DashboardsTools };
 
+// Times of Day
+import { timesOfDayTools, timesOfDayHandlers } from './times-of-day.js';
+
+export { timesOfDayTools, timesOfDayHandlers };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -180,6 +185,7 @@ export function getAllToolDefinitions() {
     ...serverLogsToolDefinitions,
     ...emailReportsToolDefinitions,
     ...dashboardsToolDefinitions,
+    ...timesOfDayTools,
   ];
 }
 
@@ -217,6 +223,7 @@ export function getAllToolHandlers() {
     ...serverLogsToolHandlers,
     ...emailReportsToolHandlers,
     ...dashboardsToolHandlers,
+    ...timesOfDayHandlers,
   };
 }
 
