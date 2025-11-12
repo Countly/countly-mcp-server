@@ -36,8 +36,8 @@ export function extractErrorDetails(error: unknown): {
         if (typeof responseData === 'string') {
           message += `: ${responseData}`;
         } else if (
-          responseData !== null &&
           typeof responseData === 'object' &&
+          responseData !== null &&
           Object.prototype.toString.call(responseData) === '[object Object]'
         ) {
           // Robust check for plain objects (not Date, RegExp, Array, etc.)
