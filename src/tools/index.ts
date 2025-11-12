@@ -148,6 +148,11 @@ import { timesOfDayTools, timesOfDayHandlers } from './times-of-day.js';
 
 export { timesOfDayTools, timesOfDayHandlers };
 
+// Hooks
+import { hooksTools, hooksHandlers } from './hooks.js';
+
+export { hooksTools, hooksHandlers };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -186,6 +191,7 @@ export function getAllToolDefinitions() {
     ...emailReportsToolDefinitions,
     ...dashboardsToolDefinitions,
     ...timesOfDayTools,
+    ...hooksTools,
   ];
 }
 
@@ -224,6 +230,7 @@ export function getAllToolHandlers() {
     ...emailReportsToolHandlers,
     ...dashboardsToolHandlers,
     ...timesOfDayHandlers,
+    ...hooksHandlers,
   };
 }
 

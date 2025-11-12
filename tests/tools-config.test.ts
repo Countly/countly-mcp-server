@@ -46,6 +46,7 @@ describe('Tools Configuration', () => {
       'email_reports',
       'dashboards',
       'times_of_day',
+      'hooks',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
@@ -81,6 +82,7 @@ describe('Tools Configuration', () => {
       email_reports: 7,
       dashboards: 8,
       times_of_day: 1,
+      hooks: 6,
     };    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
       expect(toolCount).toBe(expectedCounts[category as keyof typeof expectedCounts]);
@@ -97,12 +99,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 128 tools', () => {
+    it('should have total of 134 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(128);
+      expect(totalTools).toBe(134);
     });
   });
 
@@ -465,6 +467,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('email_reports');
       expect(categoriesRequiringCheck).toContain('dashboards');
       expect(categoriesRequiringCheck).toContain('times_of_day');
+      expect(categoriesRequiringCheck).toContain('hooks');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -494,6 +497,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('email_reports')).toBe('reports');
       expect(getRequiredPlugin('dashboards')).toBe('dashboards');
       expect(getRequiredPlugin('times_of_day')).toBe('times-of-day');
+      expect(getRequiredPlugin('hooks')).toBe('hooks');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();

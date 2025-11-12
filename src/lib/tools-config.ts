@@ -318,6 +318,18 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'times-of-day',
     availableByDefault: false,
   },
+  hooks: {
+    operations: {
+      'list_hooks': 'R',
+      'test_hook': 'R',
+      'create_hook': 'C',
+      'update_hook': 'U',
+      'delete_hook': 'D',
+      'get_internal_events': 'R',
+    },
+    requiresPlugin: 'hooks',
+    availableByDefault: false,
+  },
 };
 
 /**

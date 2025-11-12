@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 128 tools across 29 categories for comprehensive Countly integration:
+The server provides 134 tools across 30 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -560,6 +560,14 @@ The server provides 128 tools across 29 categories for comprehensive Countly int
 
 ### Times of Day (requires `times-of-day` plugin)
 - **`get_times_of_day`** - Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.
+
+### Hooks (requires `hooks` plugin)
+- **`list_hooks`** - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.
+- **`test_hook`** - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
+- **`create_hook`** - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
+- **`update_hook`** - Update an existing webhook/hook configuration.
+- **`delete_hook`** - Delete a webhook/hook by its ID.
+- **`get_internal_events`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
