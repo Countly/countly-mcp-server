@@ -199,6 +199,13 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'concurrent_users',
     availableByDefault: false,
   },
+  retention: {
+    operations: {
+      'get_retention': 'R',
+    },
+    requiresPlugin: 'retention_segments',
+    availableByDefault: false,
+  },
 };
 
 /**

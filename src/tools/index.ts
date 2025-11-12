@@ -88,6 +88,11 @@ import { liveToolDefinitions, liveToolHandlers, liveToolMetadata, LiveTools } fr
 
 export { liveToolDefinitions, liveToolHandlers, liveToolMetadata, LiveTools };
 
+// Retention
+import { retentionToolDefinitions, retentionToolHandlers, retentionToolMetadata, RetentionTools } from './retention.js';
+
+export { retentionToolDefinitions, retentionToolHandlers, retentionToolMetadata, RetentionTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -114,6 +119,7 @@ export function getAllToolDefinitions() {
     ...funnelsToolDefinitions,
     ...formulasToolDefinitions,
     ...liveToolDefinitions,
+    ...retentionToolDefinitions,
   ];
 }
 
@@ -140,6 +146,7 @@ export function getAllToolHandlers() {
     ...funnelsToolHandlers,
     ...formulasToolHandlers,
     ...liveToolHandlers,
+    ...retentionToolHandlers,
   };
 }
 
@@ -166,5 +173,6 @@ export function getAllToolMetadata() {
     funnelsToolMetadata,
     formulasToolMetadata,
     liveToolMetadata,
+    retentionToolMetadata,
   ];
 }

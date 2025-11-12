@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 81 tools across 17 categories for comprehensive Countly integration:
+The server provides 82 tools across 18 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -486,6 +486,9 @@ The server provides 81 tools across 17 categories for comprehensive Countly inte
 - **`get_live_last_day`** - Get hour-by-hour data for the last day (24 data points)
 - **`get_live_last_30_days`** - Get daily data for the last 30 days (30 data points)
 - **`get_live_overall`** - Get maximum values for online users (peak concurrent usage records)
+
+### Retention (requires `retention_segments` plugin)
+- **`get_retention`** - Get retention data showing consecutive event streaks. Supports three types: Full (strict - breaks on first skip), Classic (Day N - specific days independently), Unbounded (lenient - any return counts)
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
