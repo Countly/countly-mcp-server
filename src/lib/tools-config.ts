@@ -15,6 +15,9 @@ export interface ToolsConfig {
 export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOperation> }> = {
   core: {
     operations: {
+      'ping': 'R',
+      'get_version': 'R',
+      'get_plugins': 'R',
       'search': 'R',
       'fetch': 'R',
     }

@@ -24,12 +24,16 @@ Special values:
 ## Tool Categories
 
 ### core
-**Tools**: `search`, `fetch`
+**Tools**: `ping`, `get_version`, `get_plugins`, `search`, `fetch`
 
 **Operations**:
 - R: All core tools (read-only)
 
-**Note**: Core tools provide MCP Connector required functionality for ChatGPT and similar clients.
+**Notes**: 
+- `ping`: Check if Countly server is healthy and reachable
+- `get_version`: Check what version of Countly is running on the server
+- `get_plugins`: Check what plugins are enabled on the Countly server
+- `search` and `fetch`: Provide MCP Connector required functionality for ChatGPT and similar clients
 
 ### apps
 **Tools**: `list_apps`, `get_app_by_name`, `create_app`, `update_app`, `delete_app`, `reset_app`
