@@ -28,6 +28,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.21.0",
     "axios": "^1.13.2",
+    "countly-sdk-nodejs": "^24.10.3",
     "dotenv": "^17.2.3"
   },
   "devDependencies": {

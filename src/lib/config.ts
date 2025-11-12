@@ -5,8 +5,8 @@
 
 export interface CountlyConfig {
   serverUrl: string;
-  authToken?: string;
   timeout?: number;
+  authToken?: string;
 }
 
 export interface ServerEnvironment {
@@ -96,8 +96,6 @@ export function buildConfig(
     );
   }
 
-  return {
-    ...config,
-    authToken,
-  };
+  // Return config with authToken if provided
+  return authToken ? { ...config, authToken } : config;
 }

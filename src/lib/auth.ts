@@ -12,8 +12,10 @@ import fs from 'fs';
  * 3. Environment variable (COUNTLY_AUTH_TOKEN)
  * 4. Environment file path (COUNTLY_AUTH_TOKEN_FILE)
  * 
- * Note: For HTTP/SSE transport, credentials are typically passed via HTTP headers
- * (X-Countly-Auth-Token) which are extracted and stored in config before reaching this function.
+ * Note: For HTTP/SSE transport, credentials can also be passed via:
+ * - HTTP headers: X-Countly-Auth-Token, X-Countly-Server-Url (recommended, more secure)
+ * - URL parameters: ?auth_token=...&server_url=... (alternative method)
+ * These are extracted in the HTTP handler before reaching this function.
  */
 
 export interface AuthSources {

@@ -9,15 +9,31 @@ export interface ToolsConfig {
   [category: string]: Set<CrudOperation>;
 }
 
+export interface ToolCategoryConfig {
+  operations: Record<string, CrudOperation>;
+  requiresPlugin?: string; // Optional plugin name required for this category
+  availableByDefault?: boolean; // If false, requires plugin check (default: true)
+}
+
 /**
  * Tool categories and their operations mapping
+ * 
+ * Categories can be marked with:
+ * - requiresPlugin: Name of the plugin required (e.g., "alerts", "crashes")
+ * - availableByDefault: If false, requires checking /o/system/plugins first
  */
-export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOperation> }> = {
+export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   core: {
     operations: {
+      'ping': 'R',
+      'get_version': 'R',
+      'get_plugins': 'R',
       'search': 'R',
       'fetch': 'R',
-    }
+      'list_jobs': 'R',
+      'get_job_runs': 'R',
+    },
+    availableByDefault: true,
   },
   apps: {
     operations: {
@@ -27,7 +43,8 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'update_app': 'U',
       'delete_app': 'D',
       'reset_app': 'D',
-    }
+    },
+    availableByDefault: true,
   },
   analytics: {
     operations: {
@@ -37,7 +54,11 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'get_events_overview': 'R',
       'get_top_events': 'R',
       'get_slipping_away_users': 'R',
-    }
+      'get_session_frequency': 'R',
+      'get_user_loyalty': 'R',
+      'get_session_durations': 'R',
+    },
+    availableByDefault: true,
   },
   crashes: {
     operations: {
@@ -51,33 +72,41 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'unresolve_crash': 'U',
       'hide_crash': 'U',
       'show_crash': 'U',
-    }
+    },
+    requiresPlugin: 'crashes',
+    availableByDefault: false,
   },
   notes: {
     operations: {
       'list_notes': 'R',
       'create_note': 'C',
       'delete_note': 'D',
-    }
+    },
+    availableByDefault: true,
   },
   events: {
     operations: {
       'create_event': 'C',
-    }
+    },
+    availableByDefault: true,
   },
   alerts: {
     operations: {
       'list_alerts': 'R',
       'create_alert': 'C', // Also handles updates
       'delete_alert': 'D',
-    }
+    },
+    requiresPlugin: 'alerts',
+    availableByDefault: false,
   },
   views: {
     operations: {
       'get_views_table': 'R',
       'get_view_segments': 'R',
       'get_views_data': 'R',
-    }
+    },
+    requiresPlugin: 'views',
+    availableByDefault: false,
   },
   database: {
     operations: {
@@ -87,19 +116,219 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'aggregate_collection': 'R',
       'get_collection_indexes': 'R',
       'get_db_statistics': 'R',
-    }
+    },
+    requiresPlugin: 'dbviewer',
+    availableByDefault: false,
   },
   dashboard_users: {
     operations: {
       'get_all_dashboard_users': 'R',
-    }
+    },
+    availableByDefault: true,
   },
   app_users: {
     operations: {
       'create_app_user': 'C',
       'edit_app_user': 'U',
       'delete_app_user': 'D',
-    }
+    },
+    availableByDefault: true,
+  },
+  drill: {
+    operations: {
+      'get_segmentation_meta': 'R',
+      'run_segmentation_query': 'R',
+      'list_drill_bookmarks': 'R',
+      'create_drill_bookmark': 'C',
+      'delete_drill_bookmark': 'D',
+    },
+    requiresPlugin: 'drill',
+    availableByDefault: false,
+  },
+  user_profiles: {
+    operations: {
+      'query_user_profiles': 'R',
+      'breakdown_user_profiles': 'R',
+      'get_user_profile_details': 'R',
+      'add_user_note': 'C',
+    },
+    requiresPlugin: 'users',
+    availableByDefault: false,
+  },
+  cohorts: {
+    operations: {
+      'list_cohorts': 'R',
+      'get_cohort': 'R',
+      'create_cohort': 'C',
+      'update_cohort': 'U',
+      'delete_cohort': 'D',
+    },
+    requiresPlugin: 'cohorts',
+    availableByDefault: false,
+  },
+  funnels: {
+    operations: {
+      'list_funnels': 'R',
+      'get_funnel': 'R',
+      'get_funnel_data': 'R',
+      'get_funnel_step_users': 'R',
+      'get_funnel_dropoff_users': 'R',
+      'create_funnel': 'C',
+      'update_funnel': 'U',
+      'delete_funnel': 'D',
+    },
+    requiresPlugin: 'funnels',
+    availableByDefault: false,
+  },
+  formulas: {
+    operations: {
+      'run_formula': 'R',
+      'list_formulas': 'R',
+      'delete_formula': 'D',
+    },
+    requiresPlugin: 'formulas',
+    availableByDefault: false,
+  },
+  live: {
+    operations: {
+      'get_live_users': 'R',
+      'get_live_metrics': 'R',
+      'get_live_last_hour': 'R',
+      'get_live_last_day': 'R',
+      'get_live_last_30_days': 'R',
+      'get_live_overall': 'R',
+    },
+    requiresPlugin: 'concurrent_users',
+    availableByDefault: false,
+  },
+  retention: {
+    operations: {
+      'get_retention': 'R',
+    },
+    requiresPlugin: 'retention_segments',
+    availableByDefault: false,
+  },
+  remote_config: {
+    operations: {
+      'list_remote_configs': 'R',
+      'add_remote_config_condition': 'C',
+      'update_remote_config_condition': 'U',
+      'delete_remote_config_condition': 'D',
+      'add_remote_config_parameter': 'C',
+      'update_remote_config_parameter': 'U',
+      'delete_remote_config_parameter': 'D',
+    },
+    requiresPlugin: 'remote-config',
+    availableByDefault: false,
+  },
+  ab_testing: {
+    operations: {
+      'list_ab_experiments': 'R',
+      'get_ab_experiment_detail': 'R',
+      'create_ab_experiment': 'C',
+      'start_ab_experiment': 'U',
+      'stop_ab_experiment': 'U',
+      'delete_ab_experiment': 'D',
+    },
+    requiresPlugin: 'ab-testing',
+    availableByDefault: false,
+  },
+  logger: {
+    operations: {
+      'list_sdk_logs': 'R',
+    },
+    requiresPlugin: 'logger',
+    availableByDefault: false,
+  },
+  sdks: {
+    operations: {
+      'get_sdk_stats': 'R',
+      'get_sdk_config': 'R',
+    },
+    requiresPlugin: 'sdks',
+    availableByDefault: false,
+  },
+  compliance_hub: {
+    operations: {
+      'get_consent_stats': 'R',
+      'list_user_consents': 'R',
+      'search_consent_history': 'R',
+    },
+    requiresPlugin: 'compliance-hub',
+    availableByDefault: false,
+  },
+  filtering_rules: {
+    operations: {
+      'list_filtering_rules': 'R',
+      'create_filtering_rule': 'C',
+      'update_filtering_rule': 'U',
+      'delete_filtering_rule': 'D',
+    },
+    requiresPlugin: 'blocks',
+    availableByDefault: false,
+  },
+  datapoint: {
+    operations: {
+      'get_datapoint_statistics': 'R',
+      'get_top_datapoint_apps': 'R',
+      'get_datapoint_punch_card': 'R',
+    },
+    requiresPlugin: 'server-stats',
+    availableByDefault: false,
+  },
+  server_logs: {
+    operations: {
+      'list_server_log_files': 'R',
+      'get_server_log_contents': 'R',
+    },
+    requiresPlugin: 'errorlogs',
+    availableByDefault: false,
+  },
+  email_reports: {
+    operations: {
+      'list_email_reports': 'R',
+      'create_core_email_report': 'C',
+      'create_dashboard_email_report': 'C',
+      'update_email_report': 'U',
+      'preview_email_report': 'R',
+      'send_email_report': 'C',
+      'delete_email_report': 'D',
+    },
+    requiresPlugin: 'reports',
+    availableByDefault: false,
+  },
+  dashboards: {
+    operations: {
+      'list_dashboards': 'R',
+      'get_dashboard_data': 'R',
+      'create_dashboard': 'C',
+      'update_dashboard': 'U',
+      'delete_dashboard': 'D',
+      'add_dashboard_widget': 'C',
+      'update_dashboard_widget': 'U',
+      'remove_dashboard_widget': 'D',
+    },
+    requiresPlugin: 'dashboards',
+    availableByDefault: false,
+  },
+  times_of_day: {
+    operations: {
+      'get_times_of_day': 'R',
+    },
+    requiresPlugin: 'times-of-day',
+    availableByDefault: false,
+  },
+  hooks: {
+    operations: {
+      'list_hooks': 'R',
+      'test_hook': 'R',
+      'create_hook': 'C',
+      'update_hook': 'U',
+      'delete_hook': 'D',
+      'get_internal_events': 'R',
+    },
+    requiresPlugin: 'hooks',
+    availableByDefault: false,
   },
 };
 
@@ -212,4 +441,95 @@ export function getConfigSummary(config: ToolsConfig): string {
   }
   
   return lines.join('\n');
+}
+
+/**
+ * Check if a category requires plugin verification
+ */
+export function requiresPluginCheck(category: string): boolean {
+  const categoryConfig = TOOL_CATEGORIES[category];
+  return categoryConfig?.availableByDefault === false;
+}
+
+/**
+ * Get the required plugin name for a category
+ */
+export function getRequiredPlugin(category: string): string | undefined {
+  return TOOL_CATEGORIES[category]?.requiresPlugin;
+}
+
+/**
+ * Check if a category is available based on installed plugins
+ */
+export function isCategoryAvailable(category: string, installedPlugins: string[]): boolean {
+  const categoryConfig = TOOL_CATEGORIES[category];
+  
+  if (!categoryConfig) {
+    return false;
+  }
+  
+  // If available by default, no plugin check needed
+  if (categoryConfig.availableByDefault !== false) {
+    return true;
+  }
+  
+  // Check if required plugin is installed
+  const requiredPlugin = categoryConfig.requiresPlugin;
+  if (!requiredPlugin) {
+    // No plugin specified but not available by default - should not happen
+    return false;
+  }
+  
+  return installedPlugins.includes(requiredPlugin);
+}
+
+/**
+ * Filter tool definitions based on configuration and available plugins
+ */
+export function filterToolsByPlugins<T extends { name: string }>(
+  tools: T[],
+  config: ToolsConfig,
+  installedPlugins: string[]
+): T[] {
+  return tools.filter(tool => {
+    // First check if tool is allowed by config
+    if (!isToolAllowed(tool.name, config)) {
+      return false;
+    }
+    
+    // Find which category this tool belongs to
+    for (const [category, categoryData] of Object.entries(TOOL_CATEGORIES)) {
+      if (tool.name in categoryData.operations) {
+        // Check if category is available based on plugins
+        return isCategoryAvailable(category, installedPlugins);
+      }
+    }
+    
+    // If tool is not in any category, allow it by default
+    return true;
+  });
+}
+
+/**
+ * Get list of categories that require plugin checks
+ */
+export function getCategoriesRequiringPluginCheck(): string[] {
+  return Object.entries(TOOL_CATEGORIES)
+    .filter(([_, config]) => config.availableByDefault === false)
+    .map(([category, _]) => category);
+}
+
+/**
+ * Get mapping of categories to their required plugins
+ */
+export function getPluginRequirements(): Record<string, string> {
+  const requirements: Record<string, string> = {};
+  
+  for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
+    if (config.requiresPlugin) {
+      requirements[category] = config.requiresPlugin;
+    }
+  }
+  
+  return requirements;
 }

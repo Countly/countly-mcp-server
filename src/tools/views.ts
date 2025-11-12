@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // GET_VIEWS_TABLE TOOL
@@ -48,7 +49,16 @@ export async function handleGetViewsTable(context: ToolContext, args: any): Prom
     visibleColumns: JSON.stringify(visibleColumns),
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   const viewCount = response.data?.aaData?.length || 0;
   
@@ -98,7 +108,16 @@ export async function handleGetViewSegments(context: ToolContext, args: any): Pr
     period,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   const segments = response.data?.segments || response.data || [];
   const segmentCount = Array.isArray(segments) ? segments.length : Object.keys(segments).length;
@@ -159,7 +178,16 @@ export async function handleGetViewsData(context: ToolContext, args: any): Promi
     segmentVal,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [

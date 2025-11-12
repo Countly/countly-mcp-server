@@ -16,6 +16,10 @@ import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   McpError,
   CallToolRequest,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -23,8 +27,11 @@ import axios, { AxiosInstance } from 'axios';
 
 import { AppCache, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
+import { analytics } from './lib/analytics.js';
 import { buildConfig } from './lib/config.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
+import { listResources, readResource } from './lib/resources.js';
+import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
   getAllToolDefinitions, 
   getAllToolMetadata,
@@ -54,6 +61,10 @@ class CountlyMCPServer {
     this.appCache = new AppCache();
     this.toolsConfig = loadToolsConfig(process.env);
     
+    // Initialize analytics (disabled by default, enabled via ENABLE_ANALYTICS=true)
+    const analyticsEnabled = process.env.ENABLE_ANALYTICS === 'true';
+    analytics.init(analyticsEnabled);
+    
     // Log configuration on startup (only in non-test mode)
     if (!testMode) {
       console.error(getConfigSummary(this.toolsConfig));
@@ -69,11 +80,20 @@ class CountlyMCPServer {
           tools: {
             listChanged: true,
           },
+          resources: {
+            subscribe: false,
+            listChanged: false,
+          },
+          prompts: {
+            listChanged: false,
+          },
         },
       }
     );
 
     this.setupToolHandlers();
+    this.setupResourceHandlers();
+    this.setupPromptHandlers();
     
     // Initialize config from environment variables using lib/config.ts
     // Auth token can be loaded from environment or overridden per-request from client metadata
@@ -124,10 +144,23 @@ class CountlyMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       let originalAuthToken: string | undefined;
+      const startTime = Date.now();
 
       try {
         // Extract credentials from request (client-side)
         const credentials = this.getCredentials(request, args);
+        
+        // Track authentication method used
+        const metadata = (request as any)?._meta || (request as any)?.meta;
+        if (metadata?.countlyAuthToken) {
+          analytics.trackAuthMethod('metadata');
+        } else if (args?.countly_auth_token) {
+          analytics.trackAuthMethod('args');
+        } else if (credentials.authToken) {
+          analytics.trackAuthMethod('headers');
+        } else if (process.env.COUNTLY_AUTH_TOKEN) {
+          analytics.trackAuthMethod('env');
+        }
         
         // Store the original auth token temporarily for this request
         originalAuthToken = this.config.authToken;
@@ -187,8 +220,24 @@ class CountlyMCPServer {
         const instance = toolInstances[instanceKey];
         const result = await instance[methodName](args);
         
+        // Track successful tool execution
+        const duration = Date.now() - startTime;
+        analytics.trackToolExecution(name, true, duration);
+        
+        // Track tool category based on prefix (e.g., "get_", "create_", "list_")
+        const category = name.split('_')[0] || 'unknown';
+        analytics.trackToolCategory(category);
+        
         return result as any;
       } catch (error) {
+        // Track failed tool execution
+        const duration = Date.now() - startTime;
+        analytics.trackToolExecution(name, false, duration);
+        analytics.trackError(
+          error instanceof McpError ? error.code.toString() : 'unknown',
+          error instanceof Error ? error.message : String(error),
+          name
+        );
         
         if (error instanceof McpError) {
           throw error;
@@ -205,9 +254,153 @@ class CountlyMCPServer {
     });
   }
 
+  private setupResourceHandlers() {
+    // Handle resources/list requests
+    this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+      try {
+        // Unify auth token resolution for resources
+        const metadata = (request as any)?._meta || (request as any)?.meta;
+        const args = (request as any)?.params || {};
+        let authToken = resolveAuthToken({ metadata, args });
+        if (!authToken && this.config.authToken) {
+          authToken = this.config.authToken;
+        }
+        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
+          authToken = process.env.COUNTLY_AUTH_TOKEN;
+        }
+        if (authToken) {
+          this.setAuthHeader(authToken);
+        }
+        const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
+        const resources = await listResources(
+          this.httpClient,
+          this.appCache,
+          getAuthParams
+        );
+        analytics.trackHttpRequest('/resources/list', 'MCP');
+        return { resources };
+      } catch (error) {
+        analytics.trackError(
+          'resource_list_error',
+          error instanceof Error ? error.message : String(error),
+          'resources/list'
+        );
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to list resources: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+
+    // Handle resources/read requests
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      try {
+        // Unify auth token resolution for resources
+        const metadata = (request as any)?._meta || (request as any)?.meta;
+        const args = (request as any)?.params || {};
+        let authToken = resolveAuthToken({ metadata, args });
+        if (!authToken && this.config.authToken) {
+          authToken = this.config.authToken;
+        }
+        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
+          authToken = process.env.COUNTLY_AUTH_TOKEN;
+        }
+        if (authToken) {
+          this.setAuthHeader(authToken);
+        }
+        const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
+        const { uri } = request.params;
+        const content = await readResource(
+          uri,
+          this.httpClient,
+          this.appCache,
+          getAuthParams
+        );
+        analytics.trackHttpRequest('/resources/read', 'MCP');
+        return { contents: [content] };
+      } catch (error) {
+        analytics.trackError(
+          'resource_read_error',
+          error instanceof Error ? error.message : String(error),
+          'resources/read'
+        );
+        if (error instanceof Error && error.message.includes('not found')) {
+          throw new McpError(
+            -32002, // Resource not found error code
+            error.message
+          );
+        }
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to read resource: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+  }
+
+  private setupPromptHandlers() {
+    // Handle prompts/list requests
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      try {
+        const prompts = listPrompts();
+        
+        analytics.trackHttpRequest('/prompts/list', 'MCP');
+        
+        return { prompts };
+      } catch (error) {
+        analytics.trackError(
+          'prompt_list_error',
+          error instanceof Error ? error.message : String(error),
+          'prompts/list'
+        );
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to list prompts: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+
+    // Handle prompts/get requests
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      try {
+        const { name, arguments: args } = request.params;
+        
+        const result = getPrompt(name, args || {});
+        
+        analytics.trackHttpRequest('/prompts/get', 'MCP');
+        
+        return {
+          description: result.description,
+          messages: result.messages
+        };
+      } catch (error) {
+        analytics.trackError(
+          'prompt_get_error',
+          error instanceof Error ? error.message : String(error),
+          'prompts/get'
+        );
+        
+        if (error instanceof Error && error.message.includes('Unknown prompt')) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            error.message
+          );
+        }
+        
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to get prompt: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+  }
+
   // Helper Methods
   private getAuthParams(): {} {
-    // Auth is now handled via headers, not query params
+    // Return auth_token as query param for endpoints that require it (e.g., /o/apps/mine)
+    if (this.config.authToken) {
+      return { auth_token: this.config.authToken };
+    }
     return {};
   }
 
@@ -255,6 +448,8 @@ class CountlyMCPServer {
 
   async run(transportType: 'stdio' | 'http' = 'stdio', httpConfig?: HttpConfig) {
     // Track transport type with analytics
+    analytics.trackTransport(transportType);
+    analytics.trackSession('begin');
 
     if (transportType === 'http') {
       const port = httpConfig?.port || 3101;
@@ -285,7 +480,7 @@ class CountlyMCPServer {
           const pathname = parsedUrl.pathname;
           
           // Only set CORS headers for our endpoints
-          if (pathname === mcpEndpoint || pathname === '/health') {
+          if (pathname === mcpEndpoint || pathname === '/health' || pathname === '/.well-known/mcp-manifest.json') {
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
             res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -303,6 +498,7 @@ class CountlyMCPServer {
         
         // Simple health check endpoint for Docker/monitoring
         if (pathname === '/health') {
+          analytics.trackHttpRequest('/health', req.method || 'GET');
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ 
             status: 'healthy',
@@ -311,27 +507,124 @@ class CountlyMCPServer {
           return;
         }
         
+        // MCP manifest discovery endpoint
+        if (pathname === '/.well-known/mcp-manifest.json') {
+          analytics.trackHttpRequest('/.well-known/mcp-manifest.json', req.method || 'GET');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          
+          // Get filtered tools based on configuration
+          const filteredTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
+          const prompts = listPrompts();
+          
+          const manifest = {
+            name: 'countly-mcp-server',
+            version: '1.0.1',
+            description: 'Model Context Protocol server for Countly Analytics Platform',
+            protocol: {
+              version: '2025-06-18',
+              name: 'Model Context Protocol'
+            },
+            endpoints: {
+              mcp: mcpEndpoint,
+              health: '/health',
+              manifest: '/.well-known/mcp-manifest.json'
+            },
+            transports: ['stdio', 'http-sse'],
+            capabilities: {
+              tools: {
+                count: filteredTools.length,
+                categories: [...new Set(filteredTools.map((t: { name: string }) => t.name.split('_')[0]))].length,
+                listChanged: true
+              },
+              resources: {
+                supported: true,
+                subscribe: false,
+                listChanged: false,
+                types: ['app-config', 'event-schemas', 'analytics-overview'],
+                uri_scheme: 'countly://'
+              },
+              prompts: {
+                supported: true,
+                count: prompts.length,
+                listChanged: false,
+                templates: prompts.map(p => p.name)
+              },
+              features: [
+                'analytics',
+                'crash-analytics',
+                'app-management',
+                'user-management',
+                'events',
+                'views',
+                'dashboards',
+                'alerts',
+                'hooks',
+                'database-operations',
+                'resources',
+                'prompts'
+              ]
+            },
+            authentication: {
+              methods: [
+                'environment-variables',
+                'http-headers',
+                'url-parameters',
+                'token-file'
+              ],
+              required: true
+            },
+            documentation: {
+              readme: 'https://github.com/countly/countly-mcp-server/blob/main/README.md',
+              tools: 'https://github.com/countly/countly-mcp-server/blob/main/TOOLS_CONFIGURATION.md',
+              contributing: 'https://github.com/countly/countly-mcp-server/blob/main/CONTRIBUTING.md'
+            },
+            repository: {
+              type: 'git',
+              url: 'https://github.com/countly/countly-mcp-server'
+            },
+            license: 'MIT',
+            vendor: 'Countly',
+            homepage: 'https://count.ly'
+          };
+          
+          res.end(JSON.stringify(manifest, null, 2));
+          return;
+        }
+        
         // MCP endpoint - ONLY endpoint that handles MCP protocol requests
         if (pathname === mcpEndpoint) {
-          // Check for configuration in custom headers (secure way)
+          analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
+          
+          // Check for configuration in custom headers (secure way, recommended)
           const headerServerUrl = req.headers['x-countly-server-url'] as string;
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
           
-          if (headerServerUrl) {
+          // Also check URL parameters (alternative method)
+          const urlParams = new URL(req.url || '', `http://${req.headers.host}`).searchParams;
+          const paramServerUrl = urlParams.get('server_url') || urlParams.get('serverUrl');
+          const paramAuthToken = urlParams.get('auth_token') || urlParams.get('authToken');
+          
+          // Priority: Headers > URL parameters
+          const serverUrl = headerServerUrl || paramServerUrl;
+          const authToken = headerAuthToken || paramAuthToken;
+          
+          if (serverUrl) {
             // Remove trailing slashes safely without regex
-            let cleanUrl = headerServerUrl;
+            let cleanUrl = serverUrl;
             while (cleanUrl.endsWith('/')) {
               cleanUrl = cleanUrl.slice(0, -1);
             }
             this.config.serverUrl = cleanUrl;
             this.httpClient.defaults.baseURL = this.config.serverUrl;
-            console.error('Using Countly server from headers:', this.config.serverUrl);
+            const source = headerServerUrl ? 'headers' : 'URL parameters';
+            console.error(`Using Countly server from ${source}:`, this.config.serverUrl);
           }
           
-          if (headerAuthToken) {
-            this.config.authToken = headerAuthToken;
-            this.setAuthHeader(headerAuthToken);
-            console.error('Auth token configured from headers');
+          if (authToken) {
+            this.config.authToken = authToken;
+            this.setAuthHeader(authToken);
+            const source = headerAuthToken ? 'headers' : 'URL parameters';
+            console.error(`Auth token configured from ${source}`);
           }
           
           // Handle with StreamableHTTPServerTransport (modern protocol)
@@ -339,16 +632,632 @@ class CountlyMCPServer {
           return;
         }
         
-        // All other endpoints - return 404 with clear message that this is MCP server only
+        // Root page - show welcome guide
+        if (pathname === '/') {
+          analytics.trackView('welcome_page');
+          analytics.trackHttpRequest('/', req.method || 'GET');
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Countly MCP Server</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: white;
+      min-height: 100vh;
+      color: #2d3748;
+    }
+    .container {
+      max-width: 100%;
+      margin: 0;
+      background: white;
+    }
+    .top-bar {
+      background: white;
+      padding: 12px 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .top-bar-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .top-bar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #1a202c;
+      font-weight: 700;
+      font-size: 18px;
+      text-decoration: none;
+    }
+    .top-bar-logo:hover {
+      color: #1ea45c;
+    }
+    .top-bar-nav {
+      display: flex;
+      gap: 25px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .top-bar-link {
+      color: #4a5568;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .top-bar-link:hover {
+      color: #1ea45c;
+    }
+    .header {
+      background: white;
+      color: #1a202c;
+      padding: 80px 20px;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header h1 {
+      font-size: 42px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+      color: #1a202c;
+    }
+    .header p {
+      font-size: 18px;
+      color: #4a5568;
+      max-width: 700px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .header-cta {
+      margin-top: 30px;
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .cta-button {
+      display: inline-block;
+      padding: 14px 30px;
+      background: #1ea45c;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.2s ease;
+    }
+    .cta-button:hover {
+      background: #178f4d;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(30, 164, 92, 0.3);
+    }
+    .cta-button-secondary {
+      background: white;
+      color: #1ea45c;
+      border: 2px solid #1ea45c;
+    }
+    .cta-button-secondary:hover {
+      background: #f7fafc;
+    }
+    .header h1 {
+      font-size: 42px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      font-size: 18px;
+      opacity: 0.95;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .content {
+      padding: 80px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .status {
+      background: #1ea45c;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      margin-bottom: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .status::before {
+      content: "✓";
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    h2 {
+      color: #1a202c;
+      font-size: 32px;
+      font-weight: 700;
+      margin: 80px 0 40px 0;
+      text-align: center;
+    }
+    h2:first-of-type {
+      margin-top: 0;
+    }
+    h3 {
+      color: #2d3748;
+      font-size: 22px;
+      font-weight: 600;
+      margin: 50px 0 20px 0;
+    }
+    .section {
+      margin-bottom: 80px;
+    }
+    .section-alt {
+      background: #f8f9fa;
+      margin: 0 -20px;
+      padding: 80px 20px;
+    }
+    .section-content {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .endpoint-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin: 40px 0;
+    }
+    .endpoint-card {
+      background: white;
+      border: 2px solid #e2e8f0;
+      padding: 35px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    .endpoint-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 30px rgba(30, 164, 92, 0.15);
+      border-color: #1ea45c;
+    }
+    .endpoint-card strong {
+      display: block;
+      color: #1ea45c;
+      font-size: 18px;
+      margin-bottom: 8px;
+      font-family: 'Courier New', monospace;
+    }
+    .endpoint-card p {
+      color: #4a5568;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #1ea45c;
+      color: white;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 8px;
+    }
+    .example-box {
+      background: #1a202c;
+      color: #e2e8f0;
+      padding: 25px;
+      border-radius: 12px;
+      margin: 20px 0;
+      overflow-x: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .example-box pre {
+      margin: 0;
+      font-family: 'Courier New', Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #a0aec0;
+    }
+    .example-box .key {
+      color: #1ea45c;
+    }
+    .example-box .string {
+      color: #68d391;
+    }
+    .example-box .comment {
+      color: #718096;
+    }
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 25px;
+      margin: 40px 0;
+    }
+    .tool-item {
+      background: white;
+      border: 2px solid #e2e8f0;
+      padding: 30px;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+    }
+    .tool-item:hover {
+      border-color: #1ea45c;
+      background: #f7fafc;
+    }
+    .tool-item strong {
+      display: block;
+      color: #1ea45c;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+    .tool-item p {
+      color: #4a5568;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .docs-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin: 40px 0;
+    }
+    .doc-link {
+      display: block;
+      padding: 25px;
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      color: #1ea45c;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      text-align: center;
+      font-size: 16px;
+    }
+    .doc-link:hover {
+      background: #1ea45c;
+      color: white;
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(30, 164, 92, 0.25);
+      border-color: #1ea45c;
+    }
+    .config-list {
+      background: #f7fafc;
+      border-left: 4px solid #1ea45c;
+      padding: 25px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .config-list ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .config-list li {
+      padding: 10px 0;
+      color: #2d3748;
+      font-size: 15px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .config-list li::before {
+      content: "→";
+      color: #1ea45c;
+      font-weight: bold;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .config-list code {
+      background: #e2e8f0;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #1ea45c;
+    }
+    .footer {
+      background: #1a202c;
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .footer-content {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .footer p {
+      color: #a0aec0;
+      font-size: 14px;
+      margin: 8px 0;
+    }
+    .footer code {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      color: #68d391;
+    }
+    @media (max-width: 768px) {
+      .top-bar-content {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .top-bar-nav {
+        width: 100%;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .header {
+        padding: 50px 20px;
+      }
+      .header h1 {
+        font-size: 28px;
+      }
+      .header p {
+        font-size: 16px;
+      }
+      .header-cta {
+        flex-direction: column;
+      }
+      .cta-button {
+        width: 100%;
+      }
+      .content {
+        padding: 50px 20px;
+      }
+      h2 {
+        font-size: 26px;
+        margin: 50px 0 30px 0;
+      }
+      .section-alt {
+        margin: 0 -20px;
+        padding: 50px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-bar">
+      <div class="top-bar-content">
+        <a href="https://countly.com" class="top-bar-logo" target="_blank">
+          <span>⚡</span> Countly MCP Server
+        </a>
+        <nav class="top-bar-nav">
+          <a href="https://countly.com/" class="top-bar-link" target="_blank">About Countly</a>
+          <a href="https://github.com/Countly/countly-server" class="top-bar-link" target="_blank">Countly Server</a>
+          <a href="https://github.com/Countly/countly-mcp-server" class="top-bar-link" target="_blank">Countly MCP Server</a>
+          <a href="https://support.countly.com/hc/en-us" class="top-bar-link" target="_blank">Read Documentation</a>
+          <a href="/health" class="top-bar-link">💚 Health</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="header">
+      <div class="header-content">
+        <h1>Model Context Protocol Server</h1>
+        <p>Connect your AI assistants to Countly's powerful analytics platform. Access real-time data, manage applications, and analyze user behavior through the Model Context Protocol.</p>
+        <div class="header-cta">
+          <a href="https://github.com/Countly/countly-mcp-server" class="cta-button" target="_blank">View on GitHub</a>
+          <a href="https://support.count.ly" class="cta-button cta-button-secondary" target="_blank">Read Documentation</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="status">
+        Server is running and ready to accept connections
+      </div>
+
+      <div class="section">
+        <h2>📡 Available Endpoints</h2>
+        
+        <div class="endpoint-grid">
+          <div class="endpoint-card">
+            <strong>${mcpEndpoint}</strong>
+            <span class="badge">MCP Protocol</span>
+            <p>Model Context Protocol endpoint for AI assistants and MCP clients</p>
+          </div>
+          
+          <div class="endpoint-card">
+            <strong>/health</strong>
+            <span class="badge">Health Check</span>
+            <p>Monitoring endpoint for Docker health checks and uptime verification</p>
+          </div>
+          
+          <div class="endpoint-card">
+            <strong>/.well-known/mcp-manifest.json</strong>
+            <span class="badge">Discovery</span>
+            <p>Server capabilities manifest for automated discovery and configuration</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-alt">
+      <div class="section-content">
+        <h2>🔌 Connection Methods</h2>
+
+        <h3>VS Code Integration (Recommended)</h3>
+        <p>Add this configuration to your VS Code <code>settings.json</code>:</p>
+        <div class="example-box">
+        <pre>{
+  <span class="key">"mcp.servers"</span>: {
+    <span class="key">"countly"</span>: {
+      <span class="key">"type"</span>: <span class="string">"stdio"</span>,
+      <span class="key">"command"</span>: <span class="string">"npx"</span>,
+      <span class="key">"args"</span>: [<span class="string">"-y"</span>, <span class="string">"@countly/countly-mcp-server"</span>],
+      <span class="key">"env"</span>: {
+        <span class="key">"COUNTLY_SERVER_URL"</span>: <span class="string">"https://your-server.count.ly"</span>,
+        <span class="key">"COUNTLY_AUTH_TOKEN"</span>: <span class="string">"your-api-key"</span>
+      }
+    }
+  }
+}</pre>
+      </div>
+
+      <h3>Claude Desktop Integration</h3>
+      <p>Configure Claude Desktop to connect with Countly:</p>
+      <div class="example-box">
+        <pre>{
+  <span class="key">"mcpServers"</span>: {
+    <span class="key">"countly"</span>: {
+      <span class="key">"command"</span>: <span class="string">"npx"</span>,
+      <span class="key">"args"</span>: [<span class="string">"-y"</span>, <span class="string">"@countly/countly-mcp-server"</span>],
+      <span class="key">"env"</span>: {
+        <span class="key">"COUNTLY_SERVER_URL"</span>: <span class="string">"https://your-server.count.ly"</span>,
+        <span class="key">"COUNTLY_AUTH_TOKEN"</span>: <span class="string">"your-api-key"</span>
+      }
+    }
+  }
+}</pre>
+      </div>
+
+      <h3>HTTP/SSE Connection</h3>
+      <p>Connect via HTTP with custom headers (recommended):</p>
+      <div class="example-box">
+        <pre><span class="key">POST</span> ${mcpEndpoint}
+<span class="key">X-Countly-Server-Url:</span> <span class="string">https://your-server.count.ly</span>
+<span class="key">X-Countly-Auth-Token:</span> <span class="string">your-api-key</span>
+<span class="key">Content-Type:</span> <span class="string">application/json</span></pre>
+      </div>
+
+      <p>Or use URL parameters:</p>
+      <div class="example-box">
+        <pre><span class="key">POST</span> ${mcpEndpoint}?server_url=https://your-server.count.ly&auth_token=your-api-key
+<span class="key">Content-Type:</span> <span class="string">application/json</span></pre>
+      </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="section">
+        <h2>🛠️ Available Analytics Tools</h2>
+        
+        <div class="tools-grid">
+        <div class="tool-item">
+          <strong>📊 Analytics</strong>
+          <p>Sessions, users, events, locations, carriers, and device data</p>
+        </div>
+        <div class="tool-item">
+          <strong>💥 Crash Analytics</strong>
+          <p>Crash reports, statistics, and error tracking</p>
+        </div>
+        <div class="tool-item">
+          <strong>📱 App Management</strong>
+          <p>Create and manage applications</p>
+        </div>
+        <div class="tool-item">
+          <strong>👥 User Management</strong>
+          <p>Dashboard users and permissions</p>
+        </div>
+        <div class="tool-item">
+          <strong>🔔 Alerts</strong>
+          <p>Configure and manage alert rules</p>
+        </div>
+        <div class="tool-item">
+          <strong>🎯 Events</strong>
+          <p>Query and analyze custom events</p>
+        </div>
+        <div class="tool-item">
+          <strong>👁️ Views</strong>
+          <p>Page and screen analytics</p>
+        </div>
+        <div class="tool-item">
+          <strong>📝 Notes</strong>
+          <p>Create and manage annotations</p>
+        </div>
+        <div class="tool-item">
+          <strong>🗄️ Database</strong>
+          <p>Execute database queries</p>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+        <h2>🔧 Configuration Options</h2>
+        
+        <div class="config-list">
+        <ul>
+          <li><strong>Environment Variables:</strong> <code>COUNTLY_SERVER_URL</code>, <code>COUNTLY_AUTH_TOKEN</code></li>
+          <li><strong>HTTP Headers:</strong> <code>X-Countly-Server-Url</code>, <code>X-Countly-Auth-Token</code></li>
+          <li><strong>URL Parameters:</strong> <code>?server_url=...&auth_token=...</code></li>
+          <li><strong>Configuration File:</strong> <code>countly_token.txt</code> for authentication</li>
+        </ul>
+      </div>
+      </div>
+
+      <div class="section">
+        <h2>📚 Documentation & Resources</h2>
+        
+        <div class="docs-links">
+        <a class="doc-link" href="https://github.com/Countly/countly-mcp-server" target="_blank">📦 GitHub</a>
+        <a class="doc-link" href="https://www.npmjs.com/package/@countly/countly-mcp-server" target="_blank">📦 npm Package</a>
+        <a class="doc-link" href="https://support.count.ly" target="_blank">📖 Documentation</a>
+        <a class="doc-link" href="https://countly.com" target="_blank">🌐 Countly.com</a>
+      </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-content">
+        <p>Server started: <code>${new Date().toISOString()}</code></p>
+        <p style="margin-top: 10px;">© ${new Date().getFullYear()} Countly — Privacy-focused digital analytics</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`);
+          return;
+        }
+        
+        // All other endpoints - return 404 with helpful message
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
           error: 'Not Found',
           message: 'This server only handles MCP protocol requests',
           availableEndpoints: {
+            root: '/',
             mcp: mcpEndpoint,
-            health: '/health'
+            health: '/health',
+            manifest: '/.well-known/mcp-manifest.json'
           },
-          info: 'Other endpoints on this server are available for other applications'
+          hint: 'Visit / in your browser for connection instructions'
         }));
         })().catch(error => {
           console.error('Error handling request:', error);
@@ -368,6 +1277,8 @@ class CountlyMCPServer {
       // Graceful shutdown
       process.on('SIGTERM', () => {
         console.error('Received SIGTERM, shutting down gracefully...');
+        analytics.trackSession('end');
+        analytics.flush();
         httpServer.close(() => {
           console.error('HTTP server closed.');
           process.exit(0);
@@ -376,6 +1287,8 @@ class CountlyMCPServer {
       
       process.on('SIGINT', () => {
         console.error('Received SIGINT, shutting down gracefully...');
+        analytics.trackSession('end');
+        analytics.flush();
         httpServer.close(() => {
           console.error('HTTP server closed.');
           process.exit(0);

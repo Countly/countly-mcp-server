@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_EVENT TOOL
@@ -56,7 +57,16 @@ export async function handleCreateEvent(context: ToolContext, args: any): Promis
     event: JSON.stringify(eventData),
   };
 
-  const response = await context.httpClient.get('/i/data-manager/event', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/data-manager/event', { params }),
+
+
+    'Failed to execute request to /i/data-manager/event'
+
+
+  );
   
   return {
     content: [

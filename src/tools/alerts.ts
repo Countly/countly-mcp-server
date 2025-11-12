@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_ALERT TOOL
@@ -64,13 +65,10 @@ export const createAlertToolDefinition = {
             type: ['string', 'null'], 
             description: 'Optional filter key. For crashes: "App Version". For events: custom segment name. For rating: "Rating". For nps: "NPS scale". Set to null if no filter' 
           },
-          filterValue: { 
-            oneOf: [
-              { type: 'string' },
-              { type: 'array', items: { type: 'string' } },
-              { type: 'null' }
-            ],
-            description: 'Optional filter value. For crashes: array of version strings (e.g. ["22:02:0"]). For rating: array of numbers 1-5. For nps: "detractor"/"passive"/"promoter". For events: string value. Set to null if no filter' 
+          filterValue: {
+            type: ['string', 'array', 'null'],
+            items: { type: 'string' },
+            description: 'Optional filter value. For crashes: array of version strings (e.g. ["22:02:0"]). For rating: array of numbers 1-5. For nps: "detractor"/"passive"/"promoter". For events: string value. Set to null if no filter'
           },
           alertBy: { 
             type: 'string',
@@ -117,7 +115,10 @@ export async function handleCreateAlert(context: ToolContext, args: any): Promis
     alert_config: typeof alert_config === 'string' ? alert_config : JSON.stringify(alert_config),
   };
 
-  const response = await context.httpClient.get('/i/alert/save', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/alert/save', { params }),
+    'Failed to create/update alert'
+  );
   
   return {
     content: [
@@ -160,7 +161,10 @@ export async function handleDeleteAlert(context: ToolContext, args: any): Promis
     alertID: alert_id,
   };
 
-  const response = await context.httpClient.get('/i/alert/delete', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/alert/delete', { params }),
+    'Failed to delete alert'
+  );
   
   return {
     content: [
@@ -200,7 +204,10 @@ export async function handleListAlerts(context: ToolContext, args: any): Promise
     app_id,
   };
 
-  const response = await context.httpClient.get('/o/alert/list', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/alert/list', { params }),
+    'Failed to list alerts'
+  );
   
   return {
     content: [

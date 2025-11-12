@@ -28,14 +28,53 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
+- **134 Tools** across 30 categories for comprehensive Countly operations
+- **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
+- **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
+- **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
+- **Flexible Authentication**: Environment variables, HTTP headers, URL parameters, or token files
+- **Plugin-Aware**: Automatically detects and enables tools based on available Countly plugins
+- **Docker Support**: Pre-built Docker images with multi-architecture support (amd64, arm64)
+- **Anonymous Analytics**: Optional usage tracking (disabled by default) to help improve the server
+-
+
+## MCP Capabilities
+
+This server implements the full MCP specification with support for:
+
+### Tools (134 available)
+Execute Countly operations like analytics queries, app management, crash analysis, etc.
+
+### Resources
+Read-only access to Countly data for AI context:
+- `countly://app/{app_id}/config` - Application configuration and metadata
+- `countly://app/{app_id}/events` - Event definitions and schemas  
+- `countly://app/{app_id}/overview` - Current analytics overview with key metrics
+
+Resources provide AI assistants with context without requiring tool calls, making conversations more efficient.
+
+### Prompts
+Pre-built analysis templates exposed as slash commands:
+- `analyze_crash_trends` - Analyze crash and error patterns
+- `generate_engagement_report` - Comprehensive user engagement analysis
+- `compare_app_versions` - Compare performance between versions
+- `user_retention_analysis` - Analyze retention patterns and cohorts
+- `funnel_optimization` - Conversion funnel analysis and suggestions
+- `event_health_check` - Event tracking implementation quality check
+- `identify_churn_risk` - Find users showing decreased engagement
+- `performance_dashboard` - Comprehensive performance overview
+
+Prompts guide AI assistants through complex multi-step workflows automatically.
+
 - 🔐 Multiple authentication methods (HTTP headers, environment variables, file-based)
 - 📊 Comprehensive Countly API access
-- �️ Fine-grained tools configuration with CRUD operation control per category
-- �🐳 Docker support with production-ready configuration
+- ⚙️ Fine-grained tools configuration with CRUD operation control per category
+- 🐳 Docker support with production-ready configuration
 - 🔄 Support for both stdio and HTTP transports
 - 🏥 Built-in health checks
 - 🔒 Secure token handling with cryptographically secure session IDs
 - 🌐 Multi-client support with per-client credential passing
+- 🚨 **Enhanced error handling** with detailed API error messages
 
 ## Quick Start
 
@@ -118,14 +157,19 @@ The server supports multiple authentication methods (in priority order):
    - Supported by VS Code MCP extension and other HTTP clients
    - See [VS Code MCP Configuration](examples/vscode-mcp.md) for details
 
-2. **Tool Arguments**
+2. **URL Parameters** (alternative for HTTP/SSE transport)
+   - Pass as query string: `?server_url=https://your-server.count.ly&auth_token=your-api-key`
+   - Useful for quick testing or tools that don't support custom headers
+   - Less secure than headers, use headers when possible
+
+3. **Tool Arguments**
    - Passed as `countly_auth_token` parameter in individual tool calls
 
-3. **Environment Variable**
+4. **Environment Variable**
    - Set `COUNTLY_AUTH_TOKEN` in environment
    - Recommended for stdio transport mode
 
-4. **Token File** (recommended for production)
+5. **Token File** (recommended for production)
    - Set `COUNTLY_AUTH_TOKEN_FILE` pointing to a file containing the token
    - Useful with Docker secrets
 
@@ -139,10 +183,43 @@ The server supports multiple authentication methods (in priority order):
 | `COUNTLY_AUTH_TOKEN` | No* | - | Authentication token (direct) |
 | `COUNTLY_AUTH_TOKEN_FILE` | No* | - | Path to file containing auth token |
 | `COUNTLY_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
+| `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
 
 *At least one authentication method must be configured
+
+### Analytics Tracking (Optional)
+
+The MCP server includes optional anonymous usage analytics to help improve the product. Analytics are **disabled by default** and can be enabled via the `ENABLE_ANALYTICS=true` environment variable.
+
+**What is tracked:**
+- Transport type used (stdio vs HTTP)
+- Tool execution metrics (success/failure, duration, tool names)
+- Authentication methods used (headers, env, file, args)
+- HTTP endpoint access patterns
+- Error occurrences (type and message, NO sensitive data)
+- Server start/stop events
+
+**What is NOT tracked:**
+- Authentication tokens or credentials
+- Server URLs or domains
+- User data or analytics content
+- Personal information
+- IP addresses or client identifiers
+
+**Privacy & Device ID:**
+All analytics are aggregated under a single device ID "mcp" to ensure complete anonymity. No server-specific or user-specific information is collected.
+
+**To enable:**
+```bash
+export ENABLE_ANALYTICS=true
+```
+
+Or in your `.env` file:
+```
+ENABLE_ANALYTICS=true
+```
 
 ### Tools Configuration
 
@@ -340,11 +417,16 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides over 40 tools for comprehensive Countly integration:
+The server provides 134 tools across 30 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
+- **`ping`** - Check if Countly server is healthy and reachable
+- **`get_version`** - Check what version of Countly is running on the server
+- **`get_plugins`** - Get list of installed plugins on the server
 - **`search`** - Search for relevant content in Countly data
 - **`fetch`** - Retrieve specific documents by ID
+- **`list_jobs`** - List all background jobs running on the Countly server with pagination and sorting
+- **`get_job_runs`** - Get run history and details for a specific background job by name
 
 ### App Management
 - **`list_apps`** - List all applications
@@ -360,6 +442,9 @@ The server provides over 40 tools for comprehensive Countly integration:
 - **`get_events_overview`** - Events overview and totals
 - **`get_top_events`** - Most frequently occurring events
 - **`get_slipping_away_users`** - Identify inactive app users
+- **`get_session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
+- **`get_user_loyalty`** - User loyalty data showing session count distribution across loyalty buckets (1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, 500+)
+- **`get_session_durations`** - Session duration distribution across duration buckets (0-10 sec, 11-30 sec, 31-60 sec, 1-3 min, 3-10 min, 10-30 min, 30-60 min, 1+ hour)
 
 ### Events
 - **`create_event`** - Define event with metadata and configuration
@@ -402,6 +487,126 @@ The server provides over 40 tools for comprehensive Countly integration:
 - **`edit_crash_comment`** - Edit crash comment
 - **`delete_crash_comment`** - Delete crash comment
 
+### Drill Segmentation (requires `drill` plugin)
+- **`get_segmentation_meta`** - Get available properties for segmentation
+- **`run_segmentation_query`** - Run drill query with filters and time buckets
+- **`list_drill_bookmarks`** - List saved segmentation queries
+- **`create_drill_bookmark`** - Save a segmentation query
+- **`delete_drill_bookmark`** - Delete a saved query
+
+### User Profiles (requires `users` plugin)
+- **`query_user_profiles`** - Query users with MongoDB filters
+- **`breakdown_user_profiles`** - Break down user counts by properties
+- **`get_user_profile_details`** - Get specific user details by UID
+- **`add_user_note`** - Add notes to user profiles
+
+### Cohorts (requires `cohorts` plugin)
+- **`list_cohorts`** - List all user cohorts with filtering
+- **`get_cohort`** - Get detailed cohort information
+- **`create_cohort`** - Create behavioral cohort based on user actions
+- **`update_cohort`** - Update cohort configuration
+- **`delete_cohort`** - Delete a cohort
+
+### Funnels (requires `funnels` plugin)
+- **`list_funnels`** - List all conversion funnels
+- **`get_funnel`** - Get funnel configuration details
+- **`get_funnel_data`** - Get funnel analytics data with filtering
+- **`get_funnel_step_users`** - Get users who reached a specific step
+- **`get_funnel_dropoff_users`** - Get users who dropped off between steps
+- **`create_funnel`** - Create conversion funnel with event sequence
+- **`update_funnel`** - Update funnel configuration
+- **`delete_funnel`** - Delete a funnel
+
+### Formulas (requires `formulas` plugin)
+- **`run_formula`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
+- **`list_formulas`** - List all saved formulas
+- **`delete_formula`** - Delete a saved formula
+
+### Live/Concurrent Users (requires `concurrent_users` plugin)
+- **`get_live_users`** - Get current online user count and new users at this moment
+- **`get_live_metrics`** - Get breakdown by countries, devices and carriers for users currently online
+- **`get_live_last_hour`** - Get minute-by-minute data for the last hour (60 data points)
+- **`get_live_last_day`** - Get hour-by-hour data for the last day (24 data points)
+- **`get_live_last_30_days`** - Get daily data for the last 30 days (30 data points)
+- **`get_live_overall`** - Get maximum values for online users (peak concurrent usage records)
+
+### Retention (requires `retention_segments` plugin)
+- **`get_retention`** - Get retention data showing consecutive event streaks. Supports three types: Full (strict - breaks on first skip), Classic (Day N - specific days independently), Unbounded (lenient - any return counts)
+
+### Remote Config (requires `remote-config` plugin)
+- **`list_remote_configs`** - List all remote config parameters and conditions
+- **`add_remote_config_condition`** - Add user segmentation condition using MongoDB queries
+- **`update_remote_config_condition`** - Update existing condition criteria
+- **`delete_remote_config_condition`** - Delete a condition (if not in use)
+- **`add_remote_config_parameter`** - Add parameter with default and conditional values
+- **`update_remote_config_parameter`** - Update parameter values, conditions, or status
+- **`delete_remote_config_parameter`** - Delete a parameter
+
+### A/B Testing (requires `ab-testing` plugin)
+- **`list_ab_experiments`** - List all A/B testing experiments with statuses and results
+- **`get_ab_experiment_detail`** - Get detailed experiment info including variants and statistical significance
+- **`create_ab_experiment`** - Create new experiment with variants, user targeting, and goals
+- **`start_ab_experiment`** - Start experiment to begin collecting data
+- **`stop_ab_experiment`** - Stop running experiment
+- **`delete_ab_experiment`** - Delete experiment and all its data
+
+### Logger (requires `logger` plugin)
+- **`list_sdk_logs`** - List incoming data logs sent by SDK to the server for debugging and monitoring
+
+### SDKs (requires `sdks` plugin)
+- **`get_sdk_stats`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
+- **`get_sdk_config`** - Get SDK configuration settings controlling SDK behavior and enabled features
+
+### Compliance Hub (requires `compliance-hub` plugin)
+- **`get_consent_stats`** - Get aggregated consent statistics showing which consents users gave and when
+- **`list_user_consents`** - List specific users and their consent status
+- **`search_consent_history`** - Search consent history records with detailed audit trail
+
+### Filtering Rules (requires `blocks` plugin)
+- **`list_filtering_rules`** - List all blocking rules that filter incoming requests
+- **`create_filtering_rule`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
+- **`update_filtering_rule`** - Update existing blocking rule configuration
+- **`delete_filtering_rule`** - Delete a blocking rule
+
+### Datapoint (requires `server-stats` plugin)
+- **`get_datapoint_statistics`** - Get data points collected per app per datapoint type. Data points measure collected data and are tied to server specs and billing.
+- **`get_top_datapoint_apps`** - Get top apps ranked by data point collection for understanding data usage and billing
+- **`get_datapoint_punch_card`** - Get hourly data point breakdown punchcard showing server load patterns for capacity planning
+
+### Server Logs (requires `errorlogs` plugin)
+- **`list_server_log_files`** - List available server log files (only available in non-Docker deployments)
+- **`get_server_log_contents`** - Get contents of a specific server log file for debugging and monitoring (only available in non-Docker deployments)
+
+### Email Reports (requires `reports` plugin)
+- **`list_email_reports`** - List all email reports configured for an app
+- **`create_core_email_report`** - Create a core email report with metrics like analytics, events, crashes, and star-rating
+- **`create_dashboard_email_report`** - Create a dashboard email report for specific dashboards
+- **`update_email_report`** - Update an existing email report configuration
+- **`preview_email_report`** - Preview an email report to see what it will look like before sending
+- **`send_email_report`** - Manually trigger sending an email report immediately
+- **`delete_email_report`** - Delete an email report configuration
+
+### Dashboards (requires `dashboards` plugin)
+- **`list_dashboards`** - List all available dashboards (with optional schema-only parameter)
+- **`get_dashboard_data`** - Get widgets and data for a specific dashboard with time period filtering
+- **`create_dashboard`** - Create a new dashboard with sharing settings, auto-refresh configuration, and theme
+- **`update_dashboard`** - Update dashboard configuration (name, sharing, refresh rate, theme)
+- **`delete_dashboard`** - Delete a dashboard by ID
+- **`add_dashboard_widget`** - Add a widget to a dashboard with full configuration (title, feature, widget type, apps, metrics, visualization)
+- **`update_dashboard_widget`** - Update widget position and size in the grid layout
+- **`remove_dashboard_widget`** - Remove a widget from a dashboard
+
+### Times of Day (requires `times-of-day` plugin)
+- **`get_times_of_day`** - Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.
+
+### Hooks (requires `hooks` plugin)
+- **`list_hooks`** - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.
+- **`test_hook`** - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
+- **`create_hook`** - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
+- **`update_hook`** - Update an existing webhook/hook configuration.
+- **`delete_hook`** - Delete a webhook/hook by its ID.
+- **`get_internal_events`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
+
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
 ## Health Check
@@ -419,6 +624,26 @@ Response:
   "timestamp": "2025-10-10T12:00:00.000Z"
 }
 ```
+
+## Server Discovery
+
+The server provides a `.well-known` discovery endpoint for automated configuration (HTTP mode only):
+
+```bash
+curl http://localhost:3000/.well-known/mcp-manifest.json
+```
+
+This manifest provides server metadata including:
+- Server name, version, and description
+- Supported MCP protocol version
+- Available endpoints (MCP, health, etc.)
+- Supported transports (stdio, HTTP/SSE)
+- Server capabilities (tool count, categories, features)
+- Authentication methods
+- Documentation links
+- Repository information
+
+This endpoint can be used by MCP clients for automatic server discovery and capability detection.
 
 ## MCP Endpoint
 

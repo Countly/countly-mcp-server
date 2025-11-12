@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // GET_ALL_DASHBOARD_USERS TOOL
@@ -19,7 +20,16 @@ export async function handleGetAllDashboardUsers(context: ToolContext, _: any): 
     ...context.getAuthParams(),
   };
 
-  const response = await context.httpClient.get('/o/users/all', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/users/all', { params }),
+
+
+    'Failed to execute request to /o/users/all'
+
+
+  );
   
   return {
     content: [

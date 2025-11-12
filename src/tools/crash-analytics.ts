@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // RESOLVE_CRASH TOOL
@@ -32,7 +33,16 @@ export async function handleResolveCrash(context: ToolContext, args: any): Promi
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/resolve', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/resolve', { params }),
+
+
+    'Failed to execute request to /i/crashes/resolve'
+
+
+  );
   
   return {
     content: [
@@ -76,7 +86,16 @@ export async function handleUnresolveCrash(context: ToolContext, args: any): Pro
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/unresolve', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/unresolve', { params }),
+
+
+    'Failed to execute request to /i/crashes/unresolve'
+
+
+  );
   
   return {
     content: [
@@ -127,7 +146,16 @@ export async function handleViewCrash(context: ToolContext, args: any): Promise<
     period,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [
@@ -171,7 +199,16 @@ export async function handleHideCrash(context: ToolContext, args: any): Promise<
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/hide', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/hide', { params }),
+
+
+    'Failed to execute request to /i/crashes/hide'
+
+
+  );
   
   return {
     content: [
@@ -215,7 +252,16 @@ export async function handleShowCrash(context: ToolContext, args: any): Promise<
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/show', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/show', { params }),
+
+
+    'Failed to execute request to /i/crashes/show'
+
+
+  );
   
   return {
     content: [
@@ -264,7 +310,16 @@ export async function handleAddCrashComment(context: ToolContext, args: any): Pr
     }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/add_comment', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/add_comment', { params }),
+
+
+    'Failed to execute request to /i/crashes/add_comment'
+
+
+  );
   
   return {
     content: [
@@ -315,7 +370,16 @@ export async function handleEditCrashComment(context: ToolContext, args: any): P
     }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/edit_comment', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/edit_comment', { params }),
+
+
+    'Failed to execute request to /i/crashes/edit_comment'
+
+
+  );
   
   return {
     content: [
@@ -364,7 +428,16 @@ export async function handleDeleteCrashComment(context: ToolContext, args: any):
     }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/delete_comment', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/delete_comment', { params }),
+
+
+    'Failed to execute request to /i/crashes/delete_comment'
+
+
+  );
   
   return {
     content: [
@@ -418,7 +491,16 @@ export async function handleListCrashGroups(context: ToolContext, args: any): Pr
     iDisplayLength: limit,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [
@@ -467,7 +549,16 @@ export async function handleGetCrashStatistics(context: ToolContext, args: any):
     period,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [

@@ -1,4 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_APP_USER TOOL
@@ -81,7 +82,16 @@ export async function handleCreateAppUser(context: ToolContext, args: any): Prom
     data: typeof data === 'string' ? data : JSON.stringify(data),
   };
 
-  const response = await context.httpClient.post('/i/app_users/create', null, { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.post('/i/app_users/create', null, { params }),
+
+
+    'Failed to execute request to /i/app_users/create'
+
+
+  );
   
   return {
     content: [
@@ -171,7 +181,16 @@ export async function handleEditAppUser(context: ToolContext, args: any): Promis
     update: typeof update === 'string' ? update : JSON.stringify(update),
   };
 
-  const response = await context.httpClient.post('/i/app_users/update', null, { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.post('/i/app_users/update', null, { params }),
+
+
+    'Failed to execute request to /i/app_users/update'
+
+
+  );
   
   return {
     content: [
@@ -224,7 +243,16 @@ export async function handleDeleteAppUser(context: ToolContext, args: any): Prom
     force,
   };
 
-  const response = await context.httpClient.post('/i/app_users/delete', null, { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.post('/i/app_users/delete', null, { params }),
+
+
+    'Failed to execute request to /i/app_users/delete'
+
+
+  );
   
   return {
     content: [

@@ -1,4 +1,5 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 import { ToolContext, ToolResult } from './types.js';
 
@@ -100,12 +101,21 @@ appData.timezone = timezone;
 appData.category = category;
 }
   
-  const response = await context.httpClient.get('/i/apps/create', {
+  const response = await safeApiCall(
+
+  
+    () => context.httpClient.get('/i/apps/create', {
     params: {
       ...context.getAuthParams(),
       args: JSON.stringify(appData),
     },
-  });
+  }),
+
+  
+    'Failed to execute request to /i/apps/create'
+
+  
+  );
   
   return {
     content: [
@@ -162,13 +172,22 @@ updateData.category = category;
   // Include app_id in the args for updates
   updateData.app_id = targetAppId;
   
-  const response = await context.httpClient.get('/i/apps/update', {
+  const response = await safeApiCall(
+
+  
+    () => context.httpClient.get('/i/apps/update', {
     params: {
       ...context.getAuthParams(),
       app_id: targetAppId,
       args: JSON.stringify(updateData),
     },
-  });
+  }),
+
+  
+    'Failed to execute request to /i/apps/update'
+
+  
+  );
   
   return {
     content: [
@@ -204,12 +223,21 @@ export async function handleDeleteApp(context: ToolContext, args: any): Promise<
   const { app_id, app_name } = args;
   const targetAppId = await context.resolveAppId({ app_id, app_name });
   
-  const response = await context.httpClient.get('/i/apps/delete', {
+  const response = await safeApiCall(
+
+  
+    () => context.httpClient.get('/i/apps/delete', {
     params: {
       ...context.getAuthParams(),
       args: JSON.stringify({ app_id: targetAppId }),
     },
-  });
+  }),
+
+  
+    'Failed to execute request to /i/apps/delete'
+
+  
+  );
   
   return {
     content: [
@@ -245,12 +273,21 @@ export async function handleResetApp(context: ToolContext, args: any): Promise<T
   const { app_id, app_name } = args;
   const targetAppId = await context.resolveAppId({ app_id, app_name });
   
-  const response = await context.httpClient.get('/i/apps/reset', {
+  const response = await safeApiCall(
+
+  
+    () => context.httpClient.get('/i/apps/reset', {
     params: {
       ...context.getAuthParams(),
       args: JSON.stringify({ app_id: targetAppId, period: 'reset' }),
     },
-  });
+  }),
+
+  
+    'Failed to execute request to /i/apps/reset'
+
+  
+  );
   
   return {
     content: [
