@@ -9,10 +9,20 @@ export interface ToolsConfig {
   [category: string]: Set<CrudOperation>;
 }
 
+export interface ToolCategoryConfig {
+  operations: Record<string, CrudOperation>;
+  requiresPlugin?: string; // Optional plugin name required for this category
+  availableByDefault?: boolean; // If false, requires plugin check (default: true)
+}
+
 /**
  * Tool categories and their operations mapping
+ * 
+ * Categories can be marked with:
+ * - requiresPlugin: Name of the plugin required (e.g., "alerts", "crashes")
+ * - availableByDefault: If false, requires checking /o/system/plugins first
  */
-export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOperation> }> = {
+export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   core: {
     operations: {
       'ping': 'R',
@@ -20,7 +30,8 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'get_plugins': 'R',
       'search': 'R',
       'fetch': 'R',
-    }
+    },
+    availableByDefault: true,
   },
   apps: {
     operations: {
@@ -30,7 +41,8 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'update_app': 'U',
       'delete_app': 'D',
       'reset_app': 'D',
-    }
+    },
+    availableByDefault: true,
   },
   analytics: {
     operations: {
@@ -40,7 +52,8 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'get_events_overview': 'R',
       'get_top_events': 'R',
       'get_slipping_away_users': 'R',
-    }
+    },
+    availableByDefault: true,
   },
   crashes: {
     operations: {
@@ -54,33 +67,41 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'unresolve_crash': 'U',
       'hide_crash': 'U',
       'show_crash': 'U',
-    }
+    },
+    requiresPlugin: 'crashes',
+    availableByDefault: false,
   },
   notes: {
     operations: {
       'list_notes': 'R',
       'create_note': 'C',
       'delete_note': 'D',
-    }
+    },
+    availableByDefault: true,
   },
   events: {
     operations: {
       'create_event': 'C',
-    }
+    },
+    availableByDefault: true,
   },
   alerts: {
     operations: {
       'list_alerts': 'R',
       'create_alert': 'C', // Also handles updates
       'delete_alert': 'D',
-    }
+    },
+    requiresPlugin: 'alerts',
+    availableByDefault: false,
   },
   views: {
     operations: {
       'get_views_table': 'R',
       'get_view_segments': 'R',
       'get_views_data': 'R',
-    }
+    },
+    requiresPlugin: 'views',
+    availableByDefault: false,
   },
   database: {
     operations: {
@@ -90,19 +111,23 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
       'aggregate_collection': 'R',
       'get_collection_indexes': 'R',
       'get_db_statistics': 'R',
-    }
+    },
+    requiresPlugin: 'dbviewer',
+    availableByDefault: false,
   },
   dashboard_users: {
     operations: {
       'get_all_dashboard_users': 'R',
-    }
+    },
+    availableByDefault: true,
   },
   app_users: {
     operations: {
       'create_app_user': 'C',
       'edit_app_user': 'U',
       'delete_app_user': 'D',
-    }
+    },
+    availableByDefault: true,
   },
 };
 
@@ -215,4 +240,95 @@ export function getConfigSummary(config: ToolsConfig): string {
   }
   
   return lines.join('\n');
+}
+
+/**
+ * Check if a category requires plugin verification
+ */
+export function requiresPluginCheck(category: string): boolean {
+  const categoryConfig = TOOL_CATEGORIES[category];
+  return categoryConfig?.availableByDefault === false;
+}
+
+/**
+ * Get the required plugin name for a category
+ */
+export function getRequiredPlugin(category: string): string | undefined {
+  return TOOL_CATEGORIES[category]?.requiresPlugin;
+}
+
+/**
+ * Check if a category is available based on installed plugins
+ */
+export function isCategoryAvailable(category: string, installedPlugins: string[]): boolean {
+  const categoryConfig = TOOL_CATEGORIES[category];
+  
+  if (!categoryConfig) {
+    return false;
+  }
+  
+  // If available by default, no plugin check needed
+  if (categoryConfig.availableByDefault !== false) {
+    return true;
+  }
+  
+  // Check if required plugin is installed
+  const requiredPlugin = categoryConfig.requiresPlugin;
+  if (!requiredPlugin) {
+    // No plugin specified but not available by default - should not happen
+    return false;
+  }
+  
+  return installedPlugins.includes(requiredPlugin);
+}
+
+/**
+ * Filter tool definitions based on configuration and available plugins
+ */
+export function filterToolsByPlugins<T extends { name: string }>(
+  tools: T[],
+  config: ToolsConfig,
+  installedPlugins: string[]
+): T[] {
+  return tools.filter(tool => {
+    // First check if tool is allowed by config
+    if (!isToolAllowed(tool.name, config)) {
+      return false;
+    }
+    
+    // Find which category this tool belongs to
+    for (const [category, categoryData] of Object.entries(TOOL_CATEGORIES)) {
+      if (tool.name in categoryData.operations) {
+        // Check if category is available based on plugins
+        return isCategoryAvailable(category, installedPlugins);
+      }
+    }
+    
+    // If tool is not in any category, allow it by default
+    return true;
+  });
+}
+
+/**
+ * Get list of categories that require plugin checks
+ */
+export function getCategoriesRequiringPluginCheck(): string[] {
+  return Object.entries(TOOL_CATEGORIES)
+    .filter(([_, config]) => config.availableByDefault === false)
+    .map(([category, _]) => category);
+}
+
+/**
+ * Get mapping of categories to their required plugins
+ */
+export function getPluginRequirements(): Record<string, string> {
+  const requirements: Record<string, string> = {};
+  
+  for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
+    if (config.requiresPlugin) {
+      requirements[category] = config.requiresPlugin;
+    }
+  }
+  
+  return requirements;
 }

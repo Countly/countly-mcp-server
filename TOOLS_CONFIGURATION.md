@@ -21,6 +21,27 @@ Special values:
 - **CRUD**, **ALL**, or **\*** = All operations enabled (default)
 - **NONE** or empty = Disable category completely
 
+## Plugin-Based Tool Availability
+
+Some tool categories require specific Countly plugins to be installed on your server. The MCP server will automatically check plugin availability via the `/o/system/plugins` endpoint and only expose tools for installed plugins.
+
+### Categories Requiring Plugins
+
+The following categories are **only available if their corresponding plugin is installed**:
+
+- **alerts** → requires `alerts` plugin
+- **crashes** → requires `crashes` plugin  
+- **views** → requires `views` plugin
+- **database** → requires `dbviewer` plugin
+
+### Categories Available by Default
+
+These categories are always available without plugin checks:
+
+- **core**, **apps**, **analytics**, **notes**, **events**, **dashboard_users**, **app_users**
+
+**Note**: You should call the `get_plugins` tool first to check which plugins are available before attempting to use plugin-dependent tools.
+
 ## Tool Categories
 
 ### core
@@ -61,6 +82,8 @@ Special values:
 - U: edit_crash_comment, resolve_crash, unresolve_crash, hide_crash, show_crash
 - D: delete_crash_comment
 
+**⚠️ Requires Plugin**: `crashes` plugin must be installed on Countly server
+
 ### notes
 **Tools**: `list_notes`, `create_note`, `delete_note`
 
@@ -83,17 +106,23 @@ Special values:
 - R: list_alerts
 - D: delete_alert
 
+**⚠️ Requires Plugin**: `alerts` plugin must be installed on Countly server
+
 ### views
 **Tools**: `get_views_table`, `get_view_segments`, `get_views_data`
 
 **Operations**:
 - R: All views tools (read-only)
 
+**⚠️ Requires Plugin**: `views` plugin must be installed on Countly server
+
 ### database
 **Tools**: `query_database`, `list_databases`, `get_document`, `aggregate_collection`, `get_collection_indexes`, `get_db_statistics`
 
 **Operations**:
 - R: All database tools (read-only)
+
+**⚠️ Requires Plugin**: `dbviewer` plugin must be installed on Countly server
 
 ### dashboard_users
 **Tools**: `get_all_dashboard_users`
@@ -187,6 +216,57 @@ cp .env.tools.example .env
 ```
 
 Or set them directly in your MCP client configuration (e.g., Claude Desktop, VS Code).
+
+## Checking Plugin Availability
+
+Before using plugin-dependent tools, you should check which plugins are installed:
+
+```javascript
+// First, check available plugins
+const pluginsResponse = await tools.get_plugins({});
+// Response: { plugins: ['crashes', 'push', 'views', 'star-rating', ...] }
+
+// Now you know which tool categories are available:
+// - crashes tools: ✓ available (crashes plugin present)
+// - alerts tools: ✗ not available (alerts plugin not in list)
+// - views tools: ✓ available (views plugin present)
+// - database tools: ✗ not available (dbviewer plugin not in list)
+```
+
+The server will automatically filter out tools for categories whose plugins are not installed, so you won't see them in the available tools list. However, checking `get_plugins` first allows you to:
+
+1. **Inform users** which features are available
+2. **Avoid errors** by not attempting to use unavailable tools
+3. **Adjust workflows** based on server capabilities
+
+### Recommended Usage Pattern
+
+```javascript
+// 1. Check server health and capabilities
+await tools.ping({});
+await tools.get_version({});
+const { plugins } = await tools.get_plugins({});
+
+// 2. Use core features (always available)
+const apps = await tools.list_apps({});
+
+// 3. Use plugin-dependent features only if available
+if (plugins.includes('crashes')) {
+  const crashes = await tools.list_crash_groups({ app_name: 'MyApp' });
+}
+
+if (plugins.includes('alerts')) {
+  const alerts = await tools.list_alerts({ app_name: 'MyApp' });
+}
+
+if (plugins.includes('views')) {
+  const views = await tools.get_views_table({ app_name: 'MyApp' });
+}
+
+if (plugins.includes('dbviewer')) {
+  const databases = await tools.list_databases({});
+}
+```
 
 ## Verification
 

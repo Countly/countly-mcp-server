@@ -399,4 +399,122 @@ describe('Tools Configuration', () => {
       expect(isToolAllowed('list_apps', config)).toBe(true);
     });
   });
+
+  describe('Plugin-based filtering', () => {
+    it('should identify categories requiring plugin checks', async () => {
+      const { requiresPluginCheck, getCategoriesRequiringPluginCheck } = await import('../src/lib/tools-config.js');
+      
+      expect(requiresPluginCheck('alerts')).toBe(true);
+      expect(requiresPluginCheck('crashes')).toBe(true);
+      expect(requiresPluginCheck('views')).toBe(true);
+      expect(requiresPluginCheck('core')).toBe(false);
+      expect(requiresPluginCheck('apps')).toBe(false);
+      
+      const categoriesRequiringCheck = getCategoriesRequiringPluginCheck();
+      expect(categoriesRequiringCheck).toContain('alerts');
+      expect(categoriesRequiringCheck).toContain('crashes');
+      expect(categoriesRequiringCheck).toContain('views');
+      expect(categoriesRequiringCheck).toContain('database');
+      expect(categoriesRequiringCheck).not.toContain('core');
+      expect(categoriesRequiringCheck).not.toContain('apps');
+    });
+
+    it('should get required plugin names', async () => {
+      const { getRequiredPlugin, getPluginRequirements } = await import('../src/lib/tools-config.js');
+      
+      expect(getRequiredPlugin('alerts')).toBe('alerts');
+      expect(getRequiredPlugin('crashes')).toBe('crashes');
+      expect(getRequiredPlugin('views')).toBe('views');
+      expect(getRequiredPlugin('database')).toBe('dbviewer');
+      expect(getRequiredPlugin('core')).toBeUndefined();
+      
+      const requirements = getPluginRequirements();
+      expect(requirements).toHaveProperty('alerts', 'alerts');
+      expect(requirements).toHaveProperty('crashes', 'crashes');
+      expect(requirements).toHaveProperty('views', 'views');
+      expect(requirements).toHaveProperty('database', 'dbviewer');
+      expect(requirements).not.toHaveProperty('core');
+    });
+
+    it('should check category availability based on plugins', async () => {
+      const { isCategoryAvailable } = await import('../src/lib/tools-config.js');
+      
+      const installedPlugins = ['crashes', 'push', 'views', 'dbviewer'];
+      
+      // Categories requiring plugins
+      expect(isCategoryAvailable('crashes', installedPlugins)).toBe(true);
+      expect(isCategoryAvailable('views', installedPlugins)).toBe(true);
+      expect(isCategoryAvailable('database', installedPlugins)).toBe(true);
+      expect(isCategoryAvailable('alerts', installedPlugins)).toBe(false); // not installed
+      
+      // Categories available by default
+      expect(isCategoryAvailable('core', installedPlugins)).toBe(true);
+      expect(isCategoryAvailable('apps', installedPlugins)).toBe(true);
+      expect(isCategoryAvailable('analytics', installedPlugins)).toBe(true);
+    });
+
+    it('should filter tools based on plugins', async () => {
+      const { filterToolsByPlugins } = await import('../src/lib/tools-config.js');
+      
+      const mockTools = [
+        { name: 'list_apps' },
+        { name: 'list_alerts' },
+        { name: 'list_crash_groups' },
+        { name: 'get_views_table' },
+        { name: 'get_dashboard_data' },
+        { name: 'query_database' },
+      ];
+      
+      const config = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'CRUD' });
+      
+      // With crashes, views, and dbviewer plugins
+      const plugins1 = ['crashes', 'views', 'dbviewer'];
+      const filtered1 = filterToolsByPlugins(mockTools, config, plugins1);
+      expect(filtered1.map(t => t.name)).toContain('list_apps');
+      expect(filtered1.map(t => t.name)).toContain('list_crash_groups');
+      expect(filtered1.map(t => t.name)).toContain('get_views_table');
+      expect(filtered1.map(t => t.name)).toContain('query_database');
+      expect(filtered1.map(t => t.name)).toContain('get_dashboard_data');
+      expect(filtered1.map(t => t.name)).not.toContain('list_alerts');
+      
+      // With alerts plugin only
+      const plugins2 = ['alerts'];
+      const filtered2 = filterToolsByPlugins(mockTools, config, plugins2);
+      expect(filtered2.map(t => t.name)).toContain('list_apps');
+      expect(filtered2.map(t => t.name)).toContain('list_alerts');
+      expect(filtered2.map(t => t.name)).toContain('get_dashboard_data');
+      expect(filtered2.map(t => t.name)).not.toContain('list_crash_groups');
+      expect(filtered2.map(t => t.name)).not.toContain('get_views_table');
+      expect(filtered2.map(t => t.name)).not.toContain('query_database');
+      
+      // With no optional plugins
+      const plugins3: string[] = [];
+      const filtered3 = filterToolsByPlugins(mockTools, config, plugins3);
+      expect(filtered3.map(t => t.name)).toContain('list_apps');
+      expect(filtered3.map(t => t.name)).toContain('get_dashboard_data');
+      expect(filtered3.map(t => t.name)).not.toContain('list_alerts');
+      expect(filtered3.map(t => t.name)).not.toContain('list_crash_groups');
+      expect(filtered3.map(t => t.name)).not.toContain('get_views_table');
+      expect(filtered3.map(t => t.name)).not.toContain('query_database');
+    });
+
+    it('should combine config and plugin filtering', async () => {
+      const { filterToolsByPlugins } = await import('../src/lib/tools-config.js');
+      
+      const mockTools = [
+        { name: 'list_alerts' },
+        { name: 'create_alert' },
+        { name: 'delete_alert' },
+      ];
+      
+      // Allow only read operations
+      const config = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'R' });
+      const plugins = ['alerts']; // Plugin is available
+      
+      const filtered = filterToolsByPlugins(mockTools, config, plugins);
+      expect(filtered.map(t => t.name)).toContain('list_alerts'); // R operation
+      expect(filtered.map(t => t.name)).not.toContain('create_alert'); // C operation
+      expect(filtered.map(t => t.name)).not.toContain('delete_alert'); // D operation
+    });
+  });
 });
