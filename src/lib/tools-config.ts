@@ -246,6 +246,15 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'sdks',
     availableByDefault: false,
   },
+  compliance_hub: {
+    operations: {
+      'get_consent_stats': 'R',
+      'list_user_consents': 'R',
+      'search_consent_history': 'R',
+    },
+    requiresPlugin: 'compliance-hub',
+    availableByDefault: false,
+  },
 };
 
 /**

@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 98 tools across 22 categories for comprehensive Countly integration:
+The server provides 101 tools across 23 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -513,6 +513,11 @@ The server provides 98 tools across 22 categories for comprehensive Countly inte
 ### SDKs (requires `sdks` plugin)
 - **`get_sdk_stats`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
 - **`get_sdk_config`** - Get SDK configuration settings controlling SDK behavior and enabled features
+
+### Compliance Hub (requires `compliance-hub` plugin)
+- **`get_consent_stats`** - Get aggregated consent statistics showing which consents users gave and when
+- **`list_user_consents`** - List specific users and their consent status
+- **`search_consent_history`** - Search consent history records with detailed audit trail
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

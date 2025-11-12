@@ -113,6 +113,11 @@ import { sdksToolDefinitions, sdksToolHandlers, sdksToolMetadata, SDKsTools } fr
 
 export { sdksToolDefinitions, sdksToolHandlers, sdksToolMetadata, SDKsTools };
 
+// Compliance Hub
+import { complianceHubToolDefinitions, complianceHubToolHandlers, complianceHubToolMetadata, ComplianceHubTools } from './compliance-hub.js';
+
+export { complianceHubToolDefinitions, complianceHubToolHandlers, complianceHubToolMetadata, ComplianceHubTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -144,6 +149,7 @@ export function getAllToolDefinitions() {
     ...abTestingToolDefinitions,
     ...loggerToolDefinitions,
     ...sdksToolDefinitions,
+    ...complianceHubToolDefinitions,
   ];
 }
 
@@ -175,6 +181,7 @@ export function getAllToolHandlers() {
     ...abTestingToolHandlers,
     ...loggerToolHandlers,
     ...sdksToolHandlers,
+    ...complianceHubToolHandlers,
   };
 }
 
@@ -206,5 +213,6 @@ export function getAllToolMetadata() {
     abTestingToolMetadata,
     loggerToolMetadata,
     sdksToolMetadata,
+    complianceHubToolMetadata,
   ];
 }
