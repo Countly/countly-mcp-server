@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2025-11-12
 
 ### Added
+- **MCP Resources Support**: Implemented full resources capability for providing read-only context to AI assistants
+  - `resources/list`: List all available resources across applications
+  - `resources/read`: Read specific resource content by URI
+  - Resource types: app configuration (`countly://app/{id}/config`), event schemas (`countly://app/{id}/events`), analytics overview (`countly://app/{id}/overview`)
+  - Resources provide AI context without requiring tool calls, improving efficiency
+
+- **MCP Prompts Support**: Implemented full prompts capability with 8 pre-built analysis templates
+  - `prompts/list`: List all available prompt templates
+  - `prompts/get`: Get specific prompt with arguments
+  - Prompt templates:
+    * `analyze_crash_trends`: Analyze crash and error patterns over time
+    * `generate_engagement_report`: Comprehensive user engagement analysis
+    * `compare_app_versions`: Compare performance metrics between versions
+    * `user_retention_analysis`: Analyze retention patterns and cohort behavior
+    * `funnel_optimization`: Conversion funnel analysis with optimization suggestions
+    * `event_health_check`: Event tracking implementation quality check
+    * `identify_churn_risk`: Find users showing signs of decreased engagement
+    * `performance_dashboard`: Comprehensive application performance overview
+  - Prompts can be exposed as slash commands in MCP clients for guided workflows
+
 - **Hooks Module** (6 tools): Webhook and automation management based on `hooks` plugin
   - `list_hooks`: List all webhooks/hooks configured for an app
   - `test_hook`: Test hook configuration with mock data before creating

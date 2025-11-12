@@ -15,8 +15,37 @@
         "http-sse"
     ],
     "capabilities": {
-        "tools": 134,
-        "categories": 30,
+        "tools": {
+            "count": 134,
+            "categories": 30,
+            "listChanged": true
+        },
+        "resources": {
+            "supported": true,
+            "subscribe": false,
+            "listChanged": false,
+            "types": [
+                "app-config",
+                "event-schemas",
+                "analytics-overview"
+            ],
+            "uri_scheme": "countly://"
+        },
+        "prompts": {
+            "supported": true,
+            "count": 8,
+            "listChanged": false,
+            "templates": [
+                "analyze_crash_trends",
+                "generate_engagement_report",
+                "compare_app_versions",
+                "user_retention_analysis",
+                "funnel_optimization",
+                "event_health_check",
+                "identify_churn_risk",
+                "performance_dashboard"
+            ]
+        },
         "features": [
             "analytics",
             "crash-analytics",
@@ -27,7 +56,9 @@
             "dashboards",
             "alerts",
             "hooks",
-            "database-operations"
+            "database-operations",
+            "resources",
+            "prompts"
         ]
     },
     "authentication": {

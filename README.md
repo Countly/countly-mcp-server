@@ -28,6 +28,44 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
+- **134 Tools** across 30 categories for comprehensive Countly operations
+- **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
+- **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
+- **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
+- **Flexible Authentication**: Environment variables, HTTP headers, URL parameters, or token files
+- **Plugin-Aware**: Automatically detects and enables tools based on available Countly plugins
+- **Docker Support**: Pre-built Docker images with multi-architecture support (amd64, arm64)
+- **Anonymous Analytics**: Optional usage tracking (disabled by default) to help improve the server
+-
+
+## MCP Capabilities
+
+This server implements the full MCP specification with support for:
+
+### Tools (134 available)
+Execute Countly operations like analytics queries, app management, crash analysis, etc.
+
+### Resources
+Read-only access to Countly data for AI context:
+- `countly://app/{app_id}/config` - Application configuration and metadata
+- `countly://app/{app_id}/events` - Event definitions and schemas  
+- `countly://app/{app_id}/overview` - Current analytics overview with key metrics
+
+Resources provide AI assistants with context without requiring tool calls, making conversations more efficient.
+
+### Prompts
+Pre-built analysis templates exposed as slash commands:
+- `analyze_crash_trends` - Analyze crash and error patterns
+- `generate_engagement_report` - Comprehensive user engagement analysis
+- `compare_app_versions` - Compare performance between versions
+- `user_retention_analysis` - Analyze retention patterns and cohorts
+- `funnel_optimization` - Conversion funnel analysis and suggestions
+- `event_health_check` - Event tracking implementation quality check
+- `identify_churn_risk` - Find users showing decreased engagement
+- `performance_dashboard` - Comprehensive performance overview
+
+Prompts guide AI assistants through complex multi-step workflows automatically.
+
 - 🔐 Multiple authentication methods (HTTP headers, environment variables, file-based)
 - 📊 Comprehensive Countly API access
 - ⚙️ Fine-grained tools configuration with CRUD operation control per category

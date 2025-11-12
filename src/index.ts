@@ -16,6 +16,10 @@ import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   McpError,
   CallToolRequest,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -26,6 +30,8 @@ import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { buildConfig } from './lib/config.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
+import { listResources, readResource } from './lib/resources.js';
+import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
   getAllToolDefinitions, 
   getAllToolMetadata,
@@ -74,11 +80,20 @@ class CountlyMCPServer {
           tools: {
             listChanged: true,
           },
+          resources: {
+            subscribe: false,
+            listChanged: false,
+          },
+          prompts: {
+            listChanged: false,
+          },
         },
       }
     );
 
     this.setupToolHandlers();
+    this.setupResourceHandlers();
+    this.setupPromptHandlers();
     
     // Initialize config from environment variables using lib/config.ts
     // Auth token can be loaded from environment or overridden per-request from client metadata
@@ -239,9 +254,153 @@ class CountlyMCPServer {
     });
   }
 
+  private setupResourceHandlers() {
+    // Handle resources/list requests
+    this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+      try {
+        // Unify auth token resolution for resources
+        const metadata = (request as any)?._meta || (request as any)?.meta;
+        const args = (request as any)?.params || {};
+        let authToken = resolveAuthToken({ metadata, args });
+        if (!authToken && this.config.authToken) {
+          authToken = this.config.authToken;
+        }
+        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
+          authToken = process.env.COUNTLY_AUTH_TOKEN;
+        }
+        if (authToken) {
+          this.setAuthHeader(authToken);
+        }
+        const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
+        const resources = await listResources(
+          this.httpClient,
+          this.appCache,
+          getAuthParams
+        );
+        analytics.trackHttpRequest('/resources/list', 'MCP');
+        return { resources };
+      } catch (error) {
+        analytics.trackError(
+          'resource_list_error',
+          error instanceof Error ? error.message : String(error),
+          'resources/list'
+        );
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to list resources: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+
+    // Handle resources/read requests
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      try {
+        // Unify auth token resolution for resources
+        const metadata = (request as any)?._meta || (request as any)?.meta;
+        const args = (request as any)?.params || {};
+        let authToken = resolveAuthToken({ metadata, args });
+        if (!authToken && this.config.authToken) {
+          authToken = this.config.authToken;
+        }
+        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
+          authToken = process.env.COUNTLY_AUTH_TOKEN;
+        }
+        if (authToken) {
+          this.setAuthHeader(authToken);
+        }
+        const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
+        const { uri } = request.params;
+        const content = await readResource(
+          uri,
+          this.httpClient,
+          this.appCache,
+          getAuthParams
+        );
+        analytics.trackHttpRequest('/resources/read', 'MCP');
+        return { contents: [content] };
+      } catch (error) {
+        analytics.trackError(
+          'resource_read_error',
+          error instanceof Error ? error.message : String(error),
+          'resources/read'
+        );
+        if (error instanceof Error && error.message.includes('not found')) {
+          throw new McpError(
+            -32002, // Resource not found error code
+            error.message
+          );
+        }
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to read resource: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+  }
+
+  private setupPromptHandlers() {
+    // Handle prompts/list requests
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      try {
+        const prompts = listPrompts();
+        
+        analytics.trackHttpRequest('/prompts/list', 'MCP');
+        
+        return { prompts };
+      } catch (error) {
+        analytics.trackError(
+          'prompt_list_error',
+          error instanceof Error ? error.message : String(error),
+          'prompts/list'
+        );
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to list prompts: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+
+    // Handle prompts/get requests
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      try {
+        const { name, arguments: args } = request.params;
+        
+        const result = getPrompt(name, args || {});
+        
+        analytics.trackHttpRequest('/prompts/get', 'MCP');
+        
+        return {
+          description: result.description,
+          messages: result.messages
+        };
+      } catch (error) {
+        analytics.trackError(
+          'prompt_get_error',
+          error instanceof Error ? error.message : String(error),
+          'prompts/get'
+        );
+        
+        if (error instanceof Error && error.message.includes('Unknown prompt')) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            error.message
+          );
+        }
+        
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to get prompt: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    });
+  }
+
   // Helper Methods
   private getAuthParams(): {} {
-    // Auth is now handled via headers, not query params
+    // Return auth_token as query param for endpoints that require it (e.g., /o/apps/mine)
+    if (this.config.authToken) {
+      return { auth_token: this.config.authToken };
+    }
     return {};
   }
 
@@ -355,6 +514,7 @@ class CountlyMCPServer {
           
           // Get filtered tools based on configuration
           const filteredTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
+          const prompts = listPrompts();
           
           const manifest = {
             name: 'countly-mcp-server',
@@ -366,12 +526,29 @@ class CountlyMCPServer {
             },
             endpoints: {
               mcp: mcpEndpoint,
-              health: '/health'
+              health: '/health',
+              manifest: '/.well-known/mcp-manifest.json'
             },
             transports: ['stdio', 'http-sse'],
             capabilities: {
-              tools: filteredTools.length,
-              categories: [...new Set(filteredTools.map((t: { name: string }) => t.name.split('_')[0]))].length,
+              tools: {
+                count: filteredTools.length,
+                categories: [...new Set(filteredTools.map((t: { name: string }) => t.name.split('_')[0]))].length,
+                listChanged: true
+              },
+              resources: {
+                supported: true,
+                subscribe: false,
+                listChanged: false,
+                types: ['app-config', 'event-schemas', 'analytics-overview'],
+                uri_scheme: 'countly://'
+              },
+              prompts: {
+                supported: true,
+                count: prompts.length,
+                listChanged: false,
+                templates: prompts.map(p => p.name)
+              },
               features: [
                 'analytics',
                 'crash-analytics',
@@ -382,7 +559,9 @@ class CountlyMCPServer {
                 'dashboards',
                 'alerts',
                 'hooks',
-                'database-operations'
+                'database-operations',
+                'resources',
+                'prompts'
               ]
             },
             authentication: {
