@@ -161,6 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation**: Updated README with all new modules and tool descriptions
 - **Configuration**: Added plugin-based tool filtering and availability checks
 - **Home Page**: Added informational home page with basic project information and links
+- **Server Discovery**: Added `.well-known/mcp-manifest.json` endpoint for automated server discovery and capability detection
 
 ### Fixed
 - **Security Updates**: Updated SECURITY.md with vulnerability levels and reward structure

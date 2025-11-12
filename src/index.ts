@@ -321,7 +321,7 @@ class CountlyMCPServer {
           const pathname = parsedUrl.pathname;
           
           // Only set CORS headers for our endpoints
-          if (pathname === mcpEndpoint || pathname === '/health') {
+          if (pathname === mcpEndpoint || pathname === '/health' || pathname === '/.well-known/mcp-manifest.json') {
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
             res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -345,6 +345,70 @@ class CountlyMCPServer {
             status: 'healthy',
             timestamp: new Date().toISOString()
           }));
+          return;
+        }
+        
+        // MCP manifest discovery endpoint
+        if (pathname === '/.well-known/mcp-manifest.json') {
+          analytics.trackHttpRequest('/.well-known/mcp-manifest.json', req.method || 'GET');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          
+          // Get filtered tools based on configuration
+          const filteredTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
+          
+          const manifest = {
+            name: 'countly-mcp-server',
+            version: '1.0.1',
+            description: 'Model Context Protocol server for Countly Analytics Platform',
+            protocol: {
+              version: '2025-06-18',
+              name: 'Model Context Protocol'
+            },
+            endpoints: {
+              mcp: mcpEndpoint,
+              health: '/health'
+            },
+            transports: ['stdio', 'http-sse'],
+            capabilities: {
+              tools: filteredTools.length,
+              categories: [...new Set(filteredTools.map((t: { name: string }) => t.name.split('_')[0]))].length,
+              features: [
+                'analytics',
+                'crash-analytics',
+                'app-management',
+                'user-management',
+                'events',
+                'views',
+                'dashboards',
+                'alerts',
+                'hooks',
+                'database-operations'
+              ]
+            },
+            authentication: {
+              methods: [
+                'environment-variables',
+                'http-headers',
+                'url-parameters',
+                'token-file'
+              ],
+              required: true
+            },
+            documentation: {
+              readme: 'https://github.com/countly/countly-mcp-server/blob/main/README.md',
+              tools: 'https://github.com/countly/countly-mcp-server/blob/main/TOOLS_CONFIGURATION.md',
+              contributing: 'https://github.com/countly/countly-mcp-server/blob/main/CONTRIBUTING.md'
+            },
+            repository: {
+              type: 'git',
+              url: 'https://github.com/countly/countly-mcp-server'
+            },
+            license: 'MIT',
+            vendor: 'Countly',
+            homepage: 'https://count.ly'
+          };
+          
+          res.end(JSON.stringify(manifest, null, 2));
           return;
         }
         
@@ -856,6 +920,12 @@ class CountlyMCPServer {
             <span class="badge">Health Check</span>
             <p>Monitoring endpoint for Docker health checks and uptime verification</p>
           </div>
+          
+          <div class="endpoint-card">
+            <strong>/.well-known/mcp-manifest.json</strong>
+            <span class="badge">Discovery</span>
+            <p>Server capabilities manifest for automated discovery and configuration</p>
+          </div>
         </div>
       </div>
     </div>
@@ -1005,7 +1075,8 @@ class CountlyMCPServer {
           availableEndpoints: {
             root: '/',
             mcp: mcpEndpoint,
-            health: '/health'
+            health: '/health',
+            manifest: '/.well-known/mcp-manifest.json'
           },
           hint: 'Visit / in your browser for connection instructions'
         }));

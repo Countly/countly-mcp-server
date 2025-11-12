@@ -587,6 +587,26 @@ Response:
 }
 ```
 
+## Server Discovery
+
+The server provides a `.well-known` discovery endpoint for automated configuration (HTTP mode only):
+
+```bash
+curl http://localhost:3000/.well-known/mcp-manifest.json
+```
+
+This manifest provides server metadata including:
+- Server name, version, and description
+- Supported MCP protocol version
+- Available endpoints (MCP, health, etc.)
+- Supported transports (stdio, HTTP/SSE)
+- Server capabilities (tool count, categories, features)
+- Authentication methods
+- Documentation links
+- Repository information
+
+This endpoint can be used by MCP clients for automatic server discovery and capability detection.
+
 ## MCP Endpoint
 
 When running in HTTP mode, the MCP protocol endpoint is available at:

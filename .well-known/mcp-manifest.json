@@ -1,0 +1,54 @@
+{
+    "name": "countly-mcp-server",
+    "version": "1.0.1",
+    "description": "Model Context Protocol server for Countly Analytics Platform",
+    "protocol": {
+        "version": "2025-06-18",
+        "name": "Model Context Protocol"
+    },
+    "endpoints": {
+        "mcp": "/mcp",
+        "health": "/health"
+    },
+    "transports": [
+        "stdio",
+        "http-sse"
+    ],
+    "capabilities": {
+        "tools": 134,
+        "categories": 30,
+        "features": [
+            "analytics",
+            "crash-analytics",
+            "app-management",
+            "user-management",
+            "events",
+            "views",
+            "dashboards",
+            "alerts",
+            "hooks",
+            "database-operations"
+        ]
+    },
+    "authentication": {
+        "methods": [
+            "environment-variables",
+            "http-headers",
+            "url-parameters",
+            "token-file"
+        ],
+        "required": true
+    },
+    "documentation": {
+        "readme": "https://github.com/countly/countly-mcp-server/blob/main/README.md",
+        "tools": "https://github.com/countly/countly-mcp-server/blob/main/TOOLS_CONFIGURATION.md",
+        "contributing": "https://github.com/countly/countly-mcp-server/blob/main/CONTRIBUTING.md"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/countly/countly-mcp-server"
+    },
+    "license": "MIT",
+    "vendor": "Countly",
+    "homepage": "https://count.ly"
+}
