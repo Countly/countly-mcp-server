@@ -284,6 +284,19 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'errorlogs',
     availableByDefault: false,
   },
+  email_reports: {
+    operations: {
+      'list_email_reports': 'R',
+      'create_core_email_report': 'C',
+      'create_dashboard_email_report': 'C',
+      'update_email_report': 'U',
+      'preview_email_report': 'R',
+      'send_email_report': 'C',
+      'delete_email_report': 'D',
+    },
+    requiresPlugin: 'reports',
+    availableByDefault: false,
+  },
 };
 
 /**

@@ -43,6 +43,7 @@ describe('Tools Configuration', () => {
       'filtering_rules',
       'datapoint',
       'server_logs',
+      'email_reports',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
@@ -75,6 +76,7 @@ describe('Tools Configuration', () => {
       filtering_rules: 4,
       datapoint: 3,
       server_logs: 2,
+      email_reports: 7,
     };
 
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -93,12 +95,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 112 tools', () => {
+    it('should have total of 119 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(112);
+      expect(totalTools).toBe(119);
     });
   });
 
@@ -458,6 +460,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('filtering_rules');
       expect(categoriesRequiringCheck).toContain('datapoint');
       expect(categoriesRequiringCheck).toContain('server_logs');
+      expect(categoriesRequiringCheck).toContain('email_reports');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -484,6 +487,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('filtering_rules')).toBe('blocks');
       expect(getRequiredPlugin('datapoint')).toBe('server-stats');
       expect(getRequiredPlugin('server_logs')).toBe('errorlogs');
+      expect(getRequiredPlugin('email_reports')).toBe('reports');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();

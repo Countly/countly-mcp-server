@@ -133,6 +133,11 @@ import { serverLogsToolDefinitions, serverLogsToolHandlers, serverLogsToolMetada
 
 export { serverLogsToolDefinitions, serverLogsToolHandlers, serverLogsToolMetadata, ServerLogsTools };
 
+// Email Reports
+import { emailReportsToolDefinitions, emailReportsToolHandlers, emailReportsToolMetadata, EmailReportsTools } from './email-reports.js';
+
+export { emailReportsToolDefinitions, emailReportsToolHandlers, emailReportsToolMetadata, EmailReportsTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -168,6 +173,7 @@ export function getAllToolDefinitions() {
     ...filteringRulesToolDefinitions,
     ...datapointToolDefinitions,
     ...serverLogsToolDefinitions,
+    ...emailReportsToolDefinitions,
   ];
 }
 
@@ -203,6 +209,7 @@ export function getAllToolHandlers() {
     ...filteringRulesToolHandlers,
     ...datapointToolHandlers,
     ...serverLogsToolHandlers,
+    ...emailReportsToolHandlers,
   };
 }
 
@@ -238,5 +245,6 @@ export function getAllToolMetadata() {
     filteringRulesToolMetadata,
     datapointToolMetadata,
     serverLogsToolMetadata,
+    emailReportsToolMetadata,
   ];
 }

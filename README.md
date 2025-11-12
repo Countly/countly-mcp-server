@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 112 tools across 26 categories for comprehensive Countly integration:
+The server provides 119 tools across 27 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -538,6 +538,15 @@ The server provides 112 tools across 26 categories for comprehensive Countly int
 ### Server Logs (requires `errorlogs` plugin)
 - **`list_server_log_files`** - List available server log files (only available in non-Docker deployments)
 - **`get_server_log_contents`** - Get contents of a specific server log file for debugging and monitoring (only available in non-Docker deployments)
+
+### Email Reports (requires `reports` plugin)
+- **`list_email_reports`** - List all email reports configured for an app
+- **`create_core_email_report`** - Create a core email report with metrics like analytics, events, crashes, and star-rating
+- **`create_dashboard_email_report`** - Create a dashboard email report for specific dashboards
+- **`update_email_report`** - Update an existing email report configuration
+- **`preview_email_report`** - Preview an email report to see what it will look like before sending
+- **`send_email_report`** - Manually trigger sending an email report immediately
+- **`delete_email_report`** - Delete an email report configuration
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
