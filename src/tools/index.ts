@@ -73,6 +73,11 @@ import { cohortsToolDefinitions, cohortsToolHandlers, cohortsToolMetadata, Cohor
 
 export { cohortsToolDefinitions, cohortsToolHandlers, cohortsToolMetadata, CohortsTools };
 
+// Funnels
+import { funnelsToolDefinitions, funnelsToolHandlers, funnelsToolMetadata, FunnelsTools } from './funnels.js';
+
+export { funnelsToolDefinitions, funnelsToolHandlers, funnelsToolMetadata, FunnelsTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -96,6 +101,7 @@ export function getAllToolDefinitions() {
     ...drillToolDefinitions,
     ...userProfilesToolDefinitions,
     ...cohortsToolDefinitions,
+    ...funnelsToolDefinitions,
   ];
 }
 
@@ -119,6 +125,7 @@ export function getAllToolHandlers() {
     ...drillToolHandlers,
     ...userProfilesToolHandlers,
     ...cohortsToolHandlers,
+    ...funnelsToolHandlers,
   };
 }
 
@@ -142,5 +149,6 @@ export function getAllToolMetadata() {
     drillToolMetadata,
     userProfilesToolMetadata,
     cohortsToolMetadata,
+    funnelsToolMetadata,
   ];
 }

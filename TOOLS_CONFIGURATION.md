@@ -36,6 +36,7 @@ The following categories are **only available if their corresponding plugin is i
 - **drill** → requires `drill` plugin
 - **user_profiles** → requires `users` plugin
 - **cohorts** → requires `cohorts` plugin
+- **funnels** → requires `funnels` plugin
 
 ### Categories Available by Default
 
@@ -434,6 +435,105 @@ async function cohortExamples() {
   await tools.delete_cohort({
     app_name: 'MyApp',
     cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c'
+  });
+}
+```
+
+### funnels
+**Tools**: `list_funnels`, `get_funnel`, `get_funnel_data`, `get_funnel_step_users`, `get_funnel_dropoff_users`, `create_funnel`, `update_funnel`, `delete_funnel`
+
+**Requires plugin**: `funnels`
+
+Manage conversion funnels to track user progression through sequential events. Analyze drop-off rates, identify bottlenecks, and get user lists for specific steps.
+
+**Examples:**
+```typescript
+async function funnelExamples() {
+  // List all funnels
+  const funnels = await tools.list_funnels({
+    app_name: 'MyApp',
+    limit: 10
+  });
+  
+  // Get specific funnel details
+  const funnel = await tools.get_funnel({
+    app_name: 'MyApp',
+    funnel_id: '3a3adcf59207776125297286960504ff'
+  });
+  
+  // Create a purchase funnel
+  await tools.create_funnel({
+    app_name: 'MyApp',
+    name: 'E-commerce Purchase Flow',
+    description: 'Track user journey from product view to purchase',
+    type: 'session-independent',  // or 'same-session'
+    steps: [
+      '[CLY]_session',
+      'Product Viewed',
+      'Added to Cart',
+      'Checkout Started',
+      'Purchase Completed'
+    ],
+    queries: [
+      '{"up.p":{"$in":["Android"]}}',  // Filter: Android users only for first step
+      '{}',
+      '{}',
+      '{}',
+      '{}'
+    ],
+    query_texts: [
+      'Platform = Android',
+      '',
+      '',
+      '',
+      ''
+    ],
+    step_groups: [
+      {c: 'and', g: 0},
+      {c: 'and', g: 1},
+      {c: 'and', g: 2},
+      {c: 'and', g: 3},
+      {c: 'and', g: 4}
+    ]
+  });
+  
+  // Get funnel analytics data for last 30 days
+  const data = await tools.get_funnel_data({
+    app_name: 'MyApp',
+    funnel_id: '3a3adcf59207776125297286960504ff',
+    period: '30days',
+    filter: '{"up.country":"US"}'  // Additional filter
+  });
+  
+  // Get users who reached step 2 (Added to Cart)
+  const stepUsers = await tools.get_funnel_step_users({
+    app_name: 'MyApp',
+    funnel_id: '3a3adcf59207776125297286960504ff',
+    step: 2,
+    period: '30days'
+  });
+  
+  // Get users who dropped off between step 2 and 3
+  const dropoffUsers = await tools.get_funnel_dropoff_users({
+    app_name: 'MyApp',
+    funnel_id: '3a3adcf59207776125297286960504ff',
+    from_step: 2,
+    to_step: 3,
+    period: '30days'
+  });
+  
+  // Update existing funnel
+  await tools.update_funnel({
+    app_name: 'MyApp',
+    funnel_id: '3a3adcf59207776125297286960504ff',
+    description: 'Updated funnel description',
+    type: 'same-session'  // Change to require same session
+  });
+  
+  // Delete funnel
+  await tools.delete_funnel({
+    app_name: 'MyApp',
+    funnel_id: '3a3adcf59207776125297286960504ff'
   });
 }
 ```

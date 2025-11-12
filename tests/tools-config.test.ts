@@ -31,6 +31,7 @@ describe('Tools Configuration', () => {
       'drill',
       'user_profiles',
       'cohorts',
+      'funnels',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
@@ -51,6 +52,7 @@ describe('Tools Configuration', () => {
       drill: 5,
       user_profiles: 4,
       cohorts: 5,
+      funnels: 8,
     };
 
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -69,12 +71,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 61 tools', () => {
+    it('should have total of 69 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(61);
+      expect(totalTools).toBe(69);
     });
   });
 
@@ -422,6 +424,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('drill');
       expect(categoriesRequiringCheck).toContain('user_profiles');
       expect(categoriesRequiringCheck).toContain('cohorts');
+      expect(categoriesRequiringCheck).toContain('funnels');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -436,6 +439,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('drill')).toBe('drill');
       expect(getRequiredPlugin('user_profiles')).toBe('users');
       expect(getRequiredPlugin('cohorts')).toBe('cohorts');
+      expect(getRequiredPlugin('funnels')).toBe('funnels');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();
@@ -446,6 +450,7 @@ describe('Tools Configuration', () => {
       expect(requirements).toHaveProperty('drill', 'drill');
       expect(requirements).toHaveProperty('user_profiles', 'users');
       expect(requirements).toHaveProperty('cohorts', 'cohorts');
+      expect(requirements).toHaveProperty('funnels', 'funnels');
       expect(requirements).not.toHaveProperty('core');
     });
 

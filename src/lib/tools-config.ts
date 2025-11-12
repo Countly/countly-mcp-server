@@ -161,6 +161,20 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'cohorts',
     availableByDefault: false,
   },
+  funnels: {
+    operations: {
+      'list_funnels': 'R',
+      'get_funnel': 'R',
+      'get_funnel_data': 'R',
+      'get_funnel_step_users': 'R',
+      'get_funnel_dropoff_users': 'R',
+      'create_funnel': 'C',
+      'update_funnel': 'U',
+      'delete_funnel': 'D',
+    },
+    requiresPlugin: 'funnels',
+    availableByDefault: false,
+  },
 };
 
 /**
