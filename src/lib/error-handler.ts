@@ -1,3 +1,9 @@
+// Helper to robustly check for plain objects
+function isPlainObject(obj: any): boolean {
+  return typeof obj === 'object' &&
+    obj !== null &&
+    Object.prototype.toString.call(obj) === '[object Object]';
+}
 /**
  * Error handling utilities for API requests
  * Provides better error messages by extracting details from API responses
@@ -35,11 +41,7 @@ export function extractErrorDetails(error: unknown): {
       if (responseData) {
         if (typeof responseData === 'string') {
           message += `: ${responseData}`;
-        } else if (
-          typeof responseData === 'object' &&
-          responseData !== null &&
-          Object.prototype.toString.call(responseData) === '[object Object]'
-        ) {
+        } else if (isPlainObject(responseData)) {
           // Robust check for plain objects (not Date, RegExp, Array, etc.)
           const data = responseData as any;
           if (data.error) {
