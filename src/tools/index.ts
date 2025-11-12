@@ -123,6 +123,11 @@ import { filteringRulesToolDefinitions, filteringRulesToolHandlers, filteringRul
 
 export { filteringRulesToolDefinitions, filteringRulesToolHandlers, filteringRulesToolMetadata, FilteringRulesTools };
 
+// Datapoint
+import { datapointToolDefinitions, datapointToolHandlers, datapointToolMetadata, DatapointTools } from './datapoint.js';
+
+export { datapointToolDefinitions, datapointToolHandlers, datapointToolMetadata, DatapointTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -156,6 +161,7 @@ export function getAllToolDefinitions() {
     ...sdksToolDefinitions,
     ...complianceHubToolDefinitions,
     ...filteringRulesToolDefinitions,
+    ...datapointToolDefinitions,
   ];
 }
 
@@ -189,6 +195,7 @@ export function getAllToolHandlers() {
     ...sdksToolHandlers,
     ...complianceHubToolHandlers,
     ...filteringRulesToolHandlers,
+    ...datapointToolHandlers,
   };
 }
 
@@ -222,5 +229,6 @@ export function getAllToolMetadata() {
     sdksToolMetadata,
     complianceHubToolMetadata,
     filteringRulesToolMetadata,
+    datapointToolMetadata,
   ];
 }

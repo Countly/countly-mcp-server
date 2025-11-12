@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 105 tools across 24 categories for comprehensive Countly integration:
+The server provides 108 tools across 25 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -524,6 +524,11 @@ The server provides 105 tools across 24 categories for comprehensive Countly int
 - **`create_filtering_rule`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
 - **`update_filtering_rule`** - Update existing blocking rule configuration
 - **`delete_filtering_rule`** - Delete a blocking rule
+
+### Datapoint (requires `server-stats` plugin)
+- **`get_datapoint_statistics`** - Get data points collected per app per datapoint type. Data points measure collected data and are tied to server specs and billing.
+- **`get_top_datapoint_apps`** - Get top apps ranked by data point collection for understanding data usage and billing
+- **`get_datapoint_punch_card`** - Get hourly data point breakdown punchcard showing server load patterns for capacity planning
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

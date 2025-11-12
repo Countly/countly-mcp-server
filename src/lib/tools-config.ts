@@ -265,6 +265,15 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'blocks',
     availableByDefault: false,
   },
+  datapoint: {
+    operations: {
+      'get_datapoint_statistics': 'R',
+      'get_top_datapoint_apps': 'R',
+      'get_datapoint_punch_card': 'R',
+    },
+    requiresPlugin: 'server-stats',
+    availableByDefault: false,
+  },
 };
 
 /**
