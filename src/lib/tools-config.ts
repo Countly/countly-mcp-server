@@ -238,6 +238,14 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'logger',
     availableByDefault: false,
   },
+  sdks: {
+    operations: {
+      'get_sdk_stats': 'R',
+      'get_sdk_config': 'R',
+    },
+    requiresPlugin: 'sdks',
+    availableByDefault: false,
+  },
 };
 
 /**

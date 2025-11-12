@@ -108,6 +108,11 @@ import { loggerToolDefinitions, loggerToolHandlers, loggerToolMetadata, LoggerTo
 
 export { loggerToolDefinitions, loggerToolHandlers, loggerToolMetadata, LoggerTools };
 
+// SDKs
+import { sdksToolDefinitions, sdksToolHandlers, sdksToolMetadata, SDKsTools } from './sdks.js';
+
+export { sdksToolDefinitions, sdksToolHandlers, sdksToolMetadata, SDKsTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -138,6 +143,7 @@ export function getAllToolDefinitions() {
     ...remoteConfigToolDefinitions,
     ...abTestingToolDefinitions,
     ...loggerToolDefinitions,
+    ...sdksToolDefinitions,
   ];
 }
 
@@ -168,6 +174,7 @@ export function getAllToolHandlers() {
     ...remoteConfigToolHandlers,
     ...abTestingToolHandlers,
     ...loggerToolHandlers,
+    ...sdksToolHandlers,
   };
 }
 
@@ -198,5 +205,6 @@ export function getAllToolMetadata() {
     remoteConfigToolMetadata,
     abTestingToolMetadata,
     loggerToolMetadata,
+    sdksToolMetadata,
   ];
 }

@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 96 tools across 21 categories for comprehensive Countly integration:
+The server provides 98 tools across 22 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -509,6 +509,10 @@ The server provides 96 tools across 21 categories for comprehensive Countly inte
 
 ### Logger (requires `logger` plugin)
 - **`list_sdk_logs`** - List incoming data logs sent by SDK to the server for debugging and monitoring
+
+### SDKs (requires `sdks` plugin)
+- **`get_sdk_stats`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
+- **`get_sdk_config`** - Get SDK configuration settings controlling SDK behavior and enabled features
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
