@@ -103,6 +103,11 @@ import { abTestingToolDefinitions, abTestingToolHandlers, abTestingToolMetadata,
 
 export { abTestingToolDefinitions, abTestingToolHandlers, abTestingToolMetadata, ABTestingTools };
 
+// Logger
+import { loggerToolDefinitions, loggerToolHandlers, loggerToolMetadata, LoggerTools } from './logger.js';
+
+export { loggerToolDefinitions, loggerToolHandlers, loggerToolMetadata, LoggerTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -132,6 +137,7 @@ export function getAllToolDefinitions() {
     ...retentionToolDefinitions,
     ...remoteConfigToolDefinitions,
     ...abTestingToolDefinitions,
+    ...loggerToolDefinitions,
   ];
 }
 
@@ -161,6 +167,7 @@ export function getAllToolHandlers() {
     ...retentionToolHandlers,
     ...remoteConfigToolHandlers,
     ...abTestingToolHandlers,
+    ...loggerToolHandlers,
   };
 }
 
@@ -190,5 +197,6 @@ export function getAllToolMetadata() {
     retentionToolMetadata,
     remoteConfigToolMetadata,
     abTestingToolMetadata,
+    loggerToolMetadata,
   ];
 }

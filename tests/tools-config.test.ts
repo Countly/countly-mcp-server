@@ -37,6 +37,7 @@ describe('Tools Configuration', () => {
       'retention',
       'remote_config',
       'ab_testing',
+      'logger',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
@@ -63,6 +64,7 @@ describe('Tools Configuration', () => {
       retention: 1,
       remote_config: 7,
       ab_testing: 6,
+      logger: 1,
     };
 
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -81,12 +83,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 95 tools', () => {
+    it('should have total of 96 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(95);
+      expect(totalTools).toBe(96);
     });
   });
 
@@ -440,6 +442,7 @@ describe('Tools Configuration', () => {
       expect(categoriesRequiringCheck).toContain('retention');
       expect(categoriesRequiringCheck).toContain('remote_config');
       expect(categoriesRequiringCheck).toContain('ab_testing');
+      expect(categoriesRequiringCheck).toContain('logger');
       expect(categoriesRequiringCheck).not.toContain('core');
       expect(categoriesRequiringCheck).not.toContain('apps');
     });
@@ -460,6 +463,7 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('retention')).toBe('retention_segments');
       expect(getRequiredPlugin('remote_config')).toBe('remote-config');
       expect(getRequiredPlugin('ab_testing')).toBe('ab-testing');
+      expect(getRequiredPlugin('logger')).toBe('logger');
       expect(getRequiredPlugin('core')).toBeUndefined();
       
       const requirements = getPluginRequirements();

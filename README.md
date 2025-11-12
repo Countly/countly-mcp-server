@@ -379,7 +379,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 95 tools across 20 categories for comprehensive Countly integration:
+The server provides 96 tools across 21 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`search`** - Search for relevant content in Countly data
@@ -506,6 +506,9 @@ The server provides 95 tools across 20 categories for comprehensive Countly inte
 - **`start_ab_experiment`** - Start experiment to begin collecting data
 - **`stop_ab_experiment`** - Stop running experiment
 - **`delete_ab_experiment`** - Delete experiment and all its data
+
+### Logger (requires `logger` plugin)
+- **`list_sdk_logs`** - List incoming data logs sent by SDK to the server for debugging and monitoring
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

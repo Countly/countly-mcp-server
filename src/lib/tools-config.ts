@@ -231,6 +231,13 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'ab-testing',
     availableByDefault: false,
   },
+  logger: {
+    operations: {
+      'list_sdk_logs': 'R',
+    },
+    requiresPlugin: 'logger',
+    availableByDefault: false,
+  },
 };
 
 /**
