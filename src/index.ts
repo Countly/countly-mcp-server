@@ -50,16 +50,80 @@ interface HttpConfig {
   cors?: boolean;
 }
 
+interface ToolCallHistory {
+  toolName: string;
+  args: any;
+  timestamp: number;
+  result?: any;
+}
+
+class LoopDetector {
+  private history: ToolCallHistory[] = [];
+  private readonly maxHistorySize = 20;
+  private readonly loopThreshold = 3; // Number of similar calls to trigger warning
+  private readonly timeWindow = 30000; // 30 seconds window
+
+  addCall(toolName: string, args: any): { isLoop: boolean; warning?: string } {
+    const now = Date.now();
+    
+    // Clean old entries
+    this.history = this.history.filter(call => now - call.timestamp < this.timeWindow);
+    
+    // Create a normalized args signature for comparison
+    const argsSignature = this.normalizeArgs(args);
+    
+    // Count similar calls in recent history
+    const similarCalls = this.history.filter(call => {
+      const callArgsSignature = this.normalizeArgs(call.args);
+      return call.toolName === toolName && callArgsSignature === argsSignature;
+    });
+    
+    // Add current call to history
+    this.history.push({ toolName, args, timestamp: now });
+    
+    // Keep history size manageable
+    if (this.history.length > this.maxHistorySize) {
+      this.history = this.history.slice(-this.maxHistorySize);
+    }
+    
+    // Check for potential loop
+    if (similarCalls.length >= this.loopThreshold) {
+      return {
+        isLoop: true,
+        warning: `⚠️ Potential infinite loop detected: Tool "${toolName}" has been called ${similarCalls.length + 1} times with similar parameters in the last ${this.timeWindow / 1000} seconds. Consider trying a different approach or checking your query parameters.`
+      };
+    }
+    
+    return { isLoop: false };
+  }
+  
+  private normalizeArgs(args: any): string {
+    if (!args || typeof args !== 'object') {
+      return '';
+    }
+    
+    // Create a normalized string representation of args
+    // Sort keys and stringify to detect similar calls
+    try {
+      return JSON.stringify(args, Object.keys(args).sort());
+    } catch {
+      return String(args);
+    }
+  }
+}
+
 class CountlyMCPServer {
   private server: Server;
   private config: CountlyConfig;
   private httpClient: AxiosInstance;
   private appCache: AppCache;
   private toolsConfig: ToolsConfig;
+  private loopDetector: LoopDetector;
 
   constructor(testMode: boolean = false) {
     this.appCache = new AppCache();
     this.toolsConfig = loadToolsConfig(process.env);
+    this.loopDetector = new LoopDetector();
     
     // Initialize analytics (disabled by default, enabled via ENABLE_ANALYTICS=true)
     const analyticsEnabled = process.env.ENABLE_ANALYTICS === 'true';
@@ -218,6 +282,14 @@ class CountlyMCPServer {
         }
         
         const instance = toolInstances[instanceKey];
+        
+        // Check for potential infinite loops before executing the tool
+        const loopCheck = this.loopDetector.addCall(name, args);
+        if (loopCheck.isLoop) {
+          console.warn(loopCheck.warning);
+          // Still allow the call but log the warning
+        }
+        
         const result = await instance[methodName](args);
         
         // Track successful tool execution
