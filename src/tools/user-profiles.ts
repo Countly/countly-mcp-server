@@ -8,7 +8,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const queryUserProfilesToolDefinition = {
   name: 'query_user_profiles',
-  description: 'Query user profiles using MongoDB query. Check drill segmentation_meta for available user properties (without "up." prefix here)',
+  description: 'Query user profiles using MongoDB query. Check drill get_available_fields for available user properties (without "up." prefix here)',
   inputSchema: {
     type: 'object',
     properties: {

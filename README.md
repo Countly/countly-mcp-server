@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **134 Tools** across 30 categories for comprehensive Countly operations
+- **135 Tools** across 30 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (134 available)
+### Tools (135 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -244,7 +244,7 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 **Available Categories:**
 - `CORE` - Core tools (search, fetch) (2 tools)
 - `APPS` - Application management (6 tools)
-- `ANALYTICS` - Analytics data retrieval (6 tools)
+- `ANALYTICS` - Analytics data retrieval (7 tools)
 - `CRASHES` - Crash analytics and management (10 tools)
 - `NOTES` - Notes management (3 tools)
 - `EVENTS` - Event configuration (1 tool)
@@ -254,7 +254,7 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 - `DASHBOARD_USERS` - Dashboard user management (1 tool)
 - `APP_USERS` - App user management (3 tools)
 
-**Total: 44 tools across 11 categories**
+**Total: 45 tools across 11 categories**
 
 For complete documentation, examples, and per-tool CRUD mappings, see **[TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md)**.
 
@@ -488,8 +488,8 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`delete_crash_comment`** - Delete crash comment
 
 ### Drill Segmentation (requires `drill` plugin)
-- **`get_segmentation_meta`** - Get available properties for segmentation
-- **`run_segmentation_query`** - Run drill query with filters and time buckets
+- **`get_available_fields`** - Get available properties for segmentation
+- **`run_query`** - Run drill query with filters and time buckets
 - **`list_drill_bookmarks`** - List saved segmentation queries
 - **`create_drill_bookmark`** - Save a segmentation query
 - **`delete_drill_bookmark`** - Delete a saved query

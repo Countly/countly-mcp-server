@@ -17,7 +17,7 @@ export const getAnalyticsDataToolDefinition = {
         type: 'string',
         enum: [
           'locations', 'sessions', 'users', 'carriers',
-          'devices', 'device_details', 'app_versions', 'cities', 'get_events',
+          'devices', 'device_details', 'app_versions', 'cities',
           'browser', 'density', 'langs', 'sources'
         ],
         description: 'Data retrieval method'
@@ -139,7 +139,7 @@ params.period = period;
 
 export const getEventsDataToolDefinition = {
   name: 'get_events_data',
-  description: 'Get events analytics data. If no app is specified, will show available apps to choose from.',
+  description: 'Get events analytics data. Note: Events prefixed with [CLY]_ are internal Countly events and are not available through this tool. If no app is specified, will show available apps to choose from.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -573,6 +573,103 @@ export async function handleGetSessionDurations(context: ToolContext, args: any)
 }
 
 // ============================================================================
+// LIST_EVENTS TOOL
+// ============================================================================
+
+export const listEventsToolDefinition = {
+  name: 'list_events',
+  description: 'List all events and their segments for an application',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+    },
+    anyOf: [
+      { required: ['app_id'] },
+      { required: ['app_name'] }
+    ],
+  },
+};
+
+export async function handleListEvents(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    method: 'get_events',
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o', { params }),
+    'Failed to execute request to get events list'
+  );
+
+  let resultText = `Events list for app ${app_id}:\n\n`;
+
+  if (response.data && Array.isArray(response.data)) {
+    resultText += `**Total Events:** ${response.data.length}\n\n`;
+
+    response.data.forEach((event: any, index: number) => {
+      resultText += `**${index + 1}. ${event.key || 'Unnamed Event'}**\n`;
+      if (event.name) {
+        resultText += `   Name: ${event.name}\n`;
+      }
+      if (event.description) {
+        resultText += `   Description: ${event.description}\n`;
+      }
+      if (event.category) {
+        resultText += `   Category: ${event.category}\n`;
+      }
+      if (event.segments && Array.isArray(event.segments)) {
+        resultText += `   Segments (${event.segments.length}):\n`;
+        event.segments.forEach((segment: any) => {
+          const typeDesc = getSegmentTypeDescription(segment.type);
+          resultText += `     - ${segment.name}: ${typeDesc}`;
+          if (segment.description) {
+            resultText += ` (${segment.description})`;
+          }
+          if (segment.required) {
+            resultText += ` [Required]`;
+          }
+          resultText += `\n`;
+        });
+      }
+      resultText += `\n`;
+    });
+  } else {
+    resultText += JSON.stringify(response.data, null, 2);
+  }
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: resultText,
+      },
+    ],
+  };
+}
+
+function getSegmentTypeDescription(type: string): string {
+  switch (type) {
+    case 's':
+      return 'string';
+    case 'n':
+      return 'number';
+    case 'b':
+      return 'boolean';
+    case 'd':
+      return 'date';
+    case 'l':
+      return 'list';
+    default:
+      return type;
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -586,6 +683,7 @@ export const analyticsToolDefinitions = [
   getSessionFrequencyToolDefinition,
   getUserLoyaltyToolDefinition,
   getSessionDurationsToolDefinition,
+  listEventsToolDefinition,
 ];
 
 export const analyticsToolHandlers = {
@@ -598,6 +696,7 @@ export const analyticsToolHandlers = {
   'get_session_frequency': 'getSessionFrequency',
   'get_user_loyalty': 'getUserLoyalty',
   'get_session_durations': 'getSessionDurations',
+  'list_events': 'listEvents',
 } as const;
 
 export class AnalyticsTools {
@@ -637,6 +736,10 @@ export class AnalyticsTools {
 
   async getSessionDurations(args: any): Promise<ToolResult> {
     return handleGetSessionDurations(this.context, args);
+  }
+
+  async listEvents(args: any): Promise<ToolResult> {
+    return handleListEvents(this.context, args);
   }
 }
 

@@ -6,9 +6,9 @@ import { safeApiCall } from '../lib/error-handler.js';
 // GET SEGMENTATION METADATA TOOL
 // ============================================================================
 
-export const getSegmentationMetaToolDefinition = {
-  name: 'get_segmentation_meta',
-  description: 'Get all user properties and event segments with their types for drill queries. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list',
+export const getAvailableFieldsToolDefinition = {
+  name: 'get_available_fields',
+  description: 'List available fields for events and user properties. User properties must be prepended with "up." in queries. When working with a specific event, always include the event parameter to get event-specific segments. Types: d=date, n=number, s=string, l=list',
   inputSchema: {
     type: 'object',
     properties: {
@@ -22,14 +22,14 @@ export const getSegmentationMetaToolDefinition = {
       },
       event: {
         type: 'string',
-        description: 'Optional event key to get event segments metadata in addition to user properties'
+        description: 'Event key to get event-specific segments in addition to user properties. Always include this when analyzing a specific event.'
       },
     },
     required: [],
   },
 };
 
-export async function handleGetSegmentationMeta(context: ToolContext, args: any): Promise<ToolResult> {
+export async function handleGetAvailableFields(context: ToolContext, args: any): Promise<ToolResult> {
   const appId = await context.resolveAppId(args);
   const event = args.event;
 
@@ -105,13 +105,99 @@ function getTypeDescription(type: string): string {
   }
 }
 
-// ============================================================================
-// RUN SEGMENTATION QUERY TOOL
-// ============================================================================
+// Helper function to extract all field names from a query object
+function extractFieldsFromQuery(obj: any, prefix = ''): Set<string> {
+  const fields = new Set<string>();
+  
+  if (typeof obj !== 'object' || obj === null) {
+    return fields;
+  }
+  
+  if (Array.isArray(obj)) {
+    obj.forEach(item => {
+      const itemFields = extractFieldsFromQuery(item, prefix);
+      itemFields.forEach(field => fields.add(field));
+    });
+    return fields;
+  }
+  
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    fields.add(fullKey);
+    const nestedFields = extractFieldsFromQuery(value, fullKey);
+    nestedFields.forEach(field => fields.add(field));
+  }
+  
+  return fields;
+}
 
-export const runSegmentationQueryToolDefinition = {
-  name: 'run_segmentation_query',
-  description: 'Run a drill segmentation query with MongoDB query object. Can optionally break down by projection key (segment or user property)',
+function shouldAutoPrefixProperty(key: string): boolean {
+  // Don't prefix aggregation fields
+  if (AGGREGATION_FIELDS.has(key)) {
+    return false;
+  }
+  // Don't prefix if already has a prefix (contains dot)
+  if (key.includes('.')) {
+    return false;
+  }
+  // Auto-prefix everything else with up.
+  return true;
+}
+
+function correctPropertyName(key: string): string {
+  // Correct common property name mistakes
+  const corrections: Record<string, string> = {
+    'manufacture': 'mnf',
+    'manufacturer': 'mnf',
+    'device': 'd',
+    'devicetype': 'dt',
+    'platform': 'p',
+    'country': 'cc',
+    'city': 'cty',
+    'region': 'rgn',
+    'appversion': 'av',
+    'app_version': 'av',
+    'browser': 'brw',
+    'browserversion': 'brwv',
+    'language': 'la',
+    'locale': 'lo',
+    'source': 'src',
+    'carrier': 'c',
+    'resolution': 'r',
+    'orientation': 'ornt',
+    'screen_density': 'dnst',
+    'first_seen': 'fs',
+    'last_seen': 'ls',
+    'session_count': 'sc',
+    'total_session_duration': 'tsd',
+    'engagement_score': 'engagement_score',
+    'has_hinge': 'hh',
+  };
+  
+  return corrections[key.toLowerCase()] || key;
+}
+
+function autoPrefixQueryObject(obj: any): any {
+  if (typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => autoPrefixQueryObject(item));
+  }
+  
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const correctedKey = correctPropertyName(key);
+    const processedKey = shouldAutoPrefixProperty(correctedKey) ? `up.${correctedKey}` : correctedKey;
+    result[processedKey] = autoPrefixQueryObject(value);
+  }
+  return result;
+}
+
+export const runQueryToolDefinition = {
+  name: 'run_query',
+  description: 'Run a drill segmentation query with MongoDB query object. Automatically validates field names against available metadata before executing the query and provides warnings for invalid fields. Can optionally break down by projection key (segment or user property). Supports comprehensive user properties including: first_seen (fs), last_seen (ls), total_session_duration (tsd), session_count (sc), device (d), device_type (dt), manufacturer (mnf), orientation (ornt), city (cty), region (rgn), country_code (cc), platform (p), platform_version (pv), app_version (av), carrier (c), resolution (r), screen_density (dnst), browser (brw), browser_version (brwv), language (la), locale (lo), source (src), source_channel (src_ch), name, username, email, organization, phone, gender, byear, age, engagement_score, hour, dow, has_hinge (hh), and app version components (av_major, av_minor, av_patch, av_prerel, av_build).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -129,7 +215,7 @@ export const runSegmentationQueryToolDefinition = {
       },
       query_object: {
         type: 'string',
-        description: 'MongoDB query object as JSON string (e.g., \'{"up.country":"US"}\' or \'{}\'). Use "up." prefix for user properties',
+        description: 'MongoDB query object as JSON string. Use "up." prefix for user properties. Available user properties include: fs (first_seen, date), ls (last_seen, date), tsd (total_session_duration, number), sc (session_count, number), d (device, list), dt (device_type, list), mnf (manufacturer, list), ornt (orientation, list), cty (city, list), rgn (region, list), cc (country_code, list), p (platform, list), pv (platform_version, list), av (app_version, list), av_major (app_version_major, number), av_minor (app_version_minor, number), av_patch (app_version_patch, number), av_prerel (app_version_prerelease, list), av_build (app_version_build, list), c (carrier, list), r (resolution, list), dnst (screen_density, list), brw (browser, list), brwv (browser_version, list), la (language, list), lo (locale, list), src (source, list), src_ch (source_channel, list), name (name, string), username (username, string), email (email, string), organization (organization, string), phone (phone, string), gender (gender, list), byear (byear, number), age (age, number), engagement_score (engagement_score, number), hour (hour, list), dow (dow, list), hh (has_hinge, list). Example: \'{"up.p":"android","up.cc":"US"}\' or \'{}\'',
       },
       period: {
         type: 'string',
@@ -142,14 +228,17 @@ export const runSegmentationQueryToolDefinition = {
       },
       projection_key: {
         type: 'string',
-        description: 'Optional segment or user property to break down by (e.g., "av" for app version, "up.country" for user country). Provide as JSON array string like \'["av"]\' or \'["up.country"]\'',
+        description: 'Optional segment or user property to break down by. User properties will be automatically prefixed with "up.". Available user properties include: fs (first_seen, date), ls (last_seen, date), tsd (total_session_duration, number), sc (session_count, number), d (device, list), dt (device_type, list), mnf (manufacturer, list), ornt (orientation, list), cty (city, list), rgn (region, list), cc (country_code, list), p (platform, list), pv (platform_version, list), av (app_version, list), av_major (app_version_major, number), av_minor (app_version_minor, number), av_patch (app_version_patch, number), av_prerel (app_version_prerelease, list), av_build (app_version_build, list), c (carrier, list), r (resolution, list), dnst (screen_density, list), brw (browser, list), brwv (browser_version, list), la (language, list), lo (locale, list), src (source, list), src_ch (source_channel, list), name (name, string), username (username, string), email (email, string), organization (organization, string), phone (phone, string), gender (gender, list), byear (byear, number), age (age, number), engagement_score (engagement_score, number), hour (hour, list), dow (dow, list), hh (has_hinge, list). Provide as JSON array string like \'["av"]\', \'["cc","p"]\', or \'["up.p"]\'',
       },
     },
     required: [],
   },
 };
 
-export async function handleRunSegmentationQuery(context: ToolContext, args: any): Promise<ToolResult> {
+// Known aggregation fields that don't need any prefix in drill queries
+const AGGREGATION_FIELDS = new Set(['c', 's', 'dur', 'did', 'ts']);
+
+export async function handleRunQuery(context: ToolContext, args: any): Promise<ToolResult> {
   const appId = await context.resolveAppId(args);
   
   const event = args.event;
@@ -158,19 +247,119 @@ export async function handleRunSegmentationQuery(context: ToolContext, args: any
   const bucket = withDefault(args.bucket, 'daily');
   const projectionKey = args.projection_key;
 
-  // Validate query object is valid JSON
+  // Initialize warnings array
+  const warnings: string[] = [];
+
+  // FIRST: Fetch segmentation metadata to validate fields before query construction
+  const availableFields = new Set<string>();
   try {
-    JSON.parse(queryObject);
+    const metaParams: any = {
+      ...context.getAuthParams(),
+      app_id: appId,
+      method: 'segmentation_meta',
+    };
+    
+    if (event) {
+      metaParams.event = event;
+    }
+    
+    const metaResponse = await safeApiCall(
+      () => context.httpClient.get('/o', { params: metaParams }),
+      'Failed to get segmentation metadata for validation'
+    );
+    
+    if (metaResponse.data) {
+      const data = metaResponse.data;
+      
+      // Add user properties (with up. prefix)
+      if (data.up) {
+        for (const key of Object.keys(data.up)) {
+          availableFields.add(`up.${key}`);
+        }
+      }
+      
+      // Add event segments (if event was specified)
+      if (event && data.sg) {
+        for (const key of Object.keys(data.sg)) {
+          availableFields.add(key);
+        }
+      }
+      
+      // Add known system fields that are always available
+      const systemFields = ['c', 's', 'dur', 'did', 'ts', 'av', 'cc', 'platform'];
+      systemFields.forEach(field => availableFields.add(field));
+    }
+  } catch (error) {
+    warnings.push(`Could not fetch metadata for field validation: ${error}`);
+  }
+
+  // SECOND: Validate raw input parameters against metadata
+  try {
+    const parsedQuery = JSON.parse(queryObject);
+    const rawQueryFields = extractFieldsFromQuery(parsedQuery);
+    
+    for (const field of rawQueryFields) {
+      // Check if it's already prefixed or a system field
+      if (!availableFields.has(field) && !AGGREGATION_FIELDS.has(field) && !field.includes('.')) {
+        warnings.push(`Query field "${field}" may not be available. Available user properties: ${Array.from(availableFields).filter(f => f.startsWith('up.')).map(f => f.substring(3)).join(', ')}`);
+      }
+      // Also check prefixed user properties
+      if (field.startsWith('up.') && !availableFields.has(field)) {
+        warnings.push(`User property "${field}" may not be available. Available user properties: ${Array.from(availableFields).filter(f => f.startsWith('up.')).map(f => f.substring(3)).join(', ')}`);
+      }
+    }
+  } catch {
+    // Invalid JSON will be caught later
+  }
+
+  // Validate projection key
+  if (projectionKey) {
+    try {
+      const parsedProjection = JSON.parse(projectionKey);
+      if (Array.isArray(parsedProjection)) {
+        for (const field of parsedProjection) {
+          if (typeof field === 'string' && !availableFields.has(field) && !AGGREGATION_FIELDS.has(field) && !field.includes('.')) {
+            warnings.push(`Projection field "${field}" may not be available. Available user properties: ${Array.from(availableFields).filter(f => f.startsWith('up.')).map(f => f.substring(3)).join(', ')}`);
+          }
+          // Also check prefixed user properties
+          if (typeof field === 'string' && field.startsWith('up.') && !availableFields.has(field)) {
+            warnings.push(`User property "${field}" may not be available. Available user properties: ${Array.from(availableFields).filter(f => f.startsWith('up.')).map(f => f.substring(3)).join(', ')}`);
+          }
+        }
+      }
+    } catch {
+      // Invalid JSON will be caught later
+    }
+  }
+
+  // THIRD: Construct the query with auto-prefixing
+  let processedQueryObject = queryObject;
+  try {
+    const parsedQuery = JSON.parse(queryObject);
+    const processedQuery = autoPrefixQueryObject(parsedQuery);
+    processedQueryObject = JSON.stringify(processedQuery);
   } catch {
     throw new Error(`Invalid query_object JSON: ${queryObject}`);
   }
 
-  // Validate projection key if provided
+  // Validate projection key if provided and auto-prefix user properties
+  let processedProjectionKey = projectionKey;
   if (projectionKey) {
     try {
       const parsed = JSON.parse(projectionKey);
-      if (!Array.isArray(parsed)) {
-        throw new Error('projection_key must be a JSON array');
+      if (Array.isArray(parsed)) {
+        // Auto-prefix user properties with "up." unless they're known system properties or already prefixed
+        const processed = parsed.map(key => {
+          if (typeof key === 'string') {
+            const correctedKey = correctPropertyName(key);
+            if (shouldAutoPrefixProperty(correctedKey)) {
+              return `up.${correctedKey}`;
+            }
+            return correctedKey;
+          }
+          return key;
+        });
+        processedProjectionKey = JSON.stringify(processed);
       }
     } catch {
       throw new Error(`Invalid projection_key JSON: ${projectionKey}`);
@@ -181,7 +370,7 @@ export async function handleRunSegmentationQuery(context: ToolContext, args: any
     ...context.getAuthParams(),
     app_id: appId,
     method: 'segmentation',
-    queryObject,
+    queryObject: processedQueryObject,
     period,
     bucket,
   };
@@ -190,8 +379,8 @@ export async function handleRunSegmentationQuery(context: ToolContext, args: any
     params.event = event;
   }
 
-  if (projectionKey) {
-    params.projectionKey = projectionKey;
+  if (processedProjectionKey) {
+    params.projectionKey = processedProjectionKey;
   }
 
   const response = await safeApiCall(
@@ -200,13 +389,23 @@ export async function handleRunSegmentationQuery(context: ToolContext, args: any
   );
 
   let resultText = 'Segmentation query results:\n\n';
+  
+  // Add warnings if any
+  if (warnings.length > 0) {
+    resultText += '**Warnings:**\n';
+    warnings.forEach(warning => {
+      resultText += `  ⚠️ ${warning}\n`;
+    });
+    resultText += '\n';
+  }
+  
   resultText += `**Query Details:**\n`;
   resultText += `  - Event: ${event || 'All sessions/users'}\n`;
-  resultText += `  - Query: ${queryObject}\n`;
+  resultText += `  - Query: ${processedQueryObject}\n`;
   resultText += `  - Period: ${period}\n`;
   resultText += `  - Bucket: ${bucket}\n`;
-  if (projectionKey) {
-    resultText += `  - Breakdown by: ${projectionKey}\n`;
+  if (processedProjectionKey) {
+    resultText += `  - Breakdown by: ${processedProjectionKey}\n`;
   }
   resultText += '\n';
   resultText += `**Results:**\n`;
@@ -482,16 +681,16 @@ export async function handleDeleteDrillBookmark(context: ToolContext, args: any)
 // ============================================================================
 
 export const drillToolDefinitions = [
-  getSegmentationMetaToolDefinition,
-  runSegmentationQueryToolDefinition,
+  getAvailableFieldsToolDefinition,
+  runQueryToolDefinition,
   listDrillBookmarksToolDefinition,
   createDrillBookmarkToolDefinition,
   deleteDrillBookmarkToolDefinition,
 ];
 
 export const drillToolHandlers = {
-  'get_segmentation_meta': 'get_segmentation_meta',
-  'run_segmentation_query': 'run_segmentation_query',
+  'get_available_fields': 'get_available_fields',
+  'run_query': 'run_query',
   'list_drill_bookmarks': 'list_drill_bookmarks',
   'create_drill_bookmark': 'create_drill_bookmark',
   'delete_drill_bookmark': 'delete_drill_bookmark',
@@ -500,12 +699,12 @@ export const drillToolHandlers = {
 export class DrillTools {
   constructor(private context: ToolContext) {}
 
-  async get_segmentation_meta(args: any): Promise<ToolResult> {
-    return handleGetSegmentationMeta(this.context, args);
+  async get_available_fields(args: any): Promise<ToolResult> {
+    return handleGetAvailableFields(this.context, args);
   }
 
-  async run_segmentation_query(args: any): Promise<ToolResult> {
-    return handleRunSegmentationQuery(this.context, args);
+  async run_query(args: any): Promise<ToolResult> {
+    return handleRunQuery(this.context, args);
   }
 
   async list_drill_bookmarks(args: any): Promise<ToolResult> {

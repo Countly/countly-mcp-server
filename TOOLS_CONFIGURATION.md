@@ -137,16 +137,16 @@ These categories are always available without plugin checks:
 **Note**: Returns management/admin users who access the Countly dashboard. These are the users who log into Countly to analyze data, configure settings, and manage applications.
 
 ### drill
-**Tools**: `get_segmentation_meta`, `run_segmentation_query`, `list_drill_bookmarks`, `create_drill_bookmark`, `delete_drill_bookmark`
+**Tools**: `get_available_fields`, `run_query`, `list_drill_bookmarks`, `create_drill_bookmark`, `delete_drill_bookmark`
 
 **Operations**:
-- R: get_segmentation_meta, run_segmentation_query, list_drill_bookmarks
+- R: get_available_fields, run_query, list_drill_bookmarks
 - C: create_drill_bookmark
 - D: delete_drill_bookmark
 
 **Notes**:
-- `get_segmentation_meta`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
-- `run_segmentation_query`: Run drill segmentation queries with MongoDB query objects. Can break down by projection key (segment or user property). Supports buckets: hourly, daily, weekly, monthly
+- `get_available_fields`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
+- `run_query`: Run drill segmentation queries with MongoDB query objects. Can break down by projection key (segment or user property). Supports buckets: hourly, daily, weekly, monthly
 - `list_drill_bookmarks`: List all saved drill bookmarks for a specific event
 - `create_drill_bookmark`: Create a new bookmark to save a query for later reuse in the dashboard
 - `delete_drill_bookmark`: Delete an existing drill bookmark
@@ -291,13 +291,13 @@ if (plugins.includes('dbviewer')) {
 
 if (plugins.includes('drill')) {
   // Get user properties and event segments metadata
-  const meta = await tools.get_segmentation_meta({ 
+  const meta = await tools.get_available_fields({ 
     app_name: 'MyApp',
     event: 'Account Created' 
   });
   
   // Run segmentation query
-  const results = await tools.run_segmentation_query({
+  const results = await tools.run_query({
     app_name: 'MyApp',
     event: 'Account Created',
     query_object: '{"up.country":"US"}',
