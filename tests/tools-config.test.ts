@@ -108,6 +108,53 @@ describe('Tools Configuration', () => {
     });
   });
 
+  describe('Tool definitions validation', () => {
+    it('should not have duplicate tool names', () => {
+      // This test ensures that all MCP tools have unique names.
+      // Duplicate tool names can cause VSCode to only load one of the tools
+      // and may result in unpredictable behavior or missing functionality.
+      const allTools = getAllToolDefinitions();
+      const toolNames = allTools.map(tool => tool.name);
+      const uniqueNames = new Set(toolNames);
+      
+      expect(toolNames.length).toBe(uniqueNames.size);
+      
+      // If this test fails, find the duplicates
+      if (toolNames.length !== uniqueNames.size) {
+        const duplicates = toolNames.filter((name, index) => toolNames.indexOf(name) !== index);
+        const uniqueDuplicates = [...new Set(duplicates)];
+        throw new Error(`Found duplicate tool names: ${uniqueDuplicates.join(', ')}`);
+      }
+    });
+
+    it('should have all tools from definitions in TOOL_CATEGORIES', () => {
+      const allTools = getAllToolDefinitions();
+      const toolNames = allTools.map(tool => tool.name);
+      
+      const allCategoryTools = new Set<string>();
+      for (const [_category, config] of Object.entries(TOOL_CATEGORIES)) {
+        for (const toolName of Object.keys(config.operations)) {
+          allCategoryTools.add(toolName);
+        }
+      }
+      
+      for (const toolName of toolNames) {
+        expect(allCategoryTools.has(toolName)).toBe(true);
+      }
+    });
+
+    it('should not have any extra tools in TOOL_CATEGORIES', () => {
+      const allTools = getAllToolDefinitions();
+      const toolNames = new Set(allTools.map(tool => tool.name));
+      
+      for (const [_category, config] of Object.entries(TOOL_CATEGORIES)) {
+        for (const toolName of Object.keys(config.operations)) {
+          expect(toolNames.has(toolName)).toBe(true);
+        }
+      }
+    });
+  });
+
   describe('Specific tool categorizations', () => {
   it('should categorize get_all_dashboard_users in dashboard_users category', () => {
     expect(TOOL_CATEGORIES.dashboard_users.operations['get_all_dashboard_users']).toBe('R');
@@ -537,7 +584,7 @@ describe('Tools Configuration', () => {
         { name: 'list_alerts' },
         { name: 'list_crash_groups' },
         { name: 'get_views_table' },
-        { name: 'get_dashboard_data' },
+        { name: 'get_analytics_dashboard' },
         { name: 'query_database' },
       ];
       
@@ -550,7 +597,7 @@ describe('Tools Configuration', () => {
       expect(filtered1.map(t => t.name)).toContain('list_crash_groups');
       expect(filtered1.map(t => t.name)).toContain('get_views_table');
       expect(filtered1.map(t => t.name)).toContain('query_database');
-      expect(filtered1.map(t => t.name)).toContain('get_dashboard_data');
+      expect(filtered1.map(t => t.name)).toContain('get_analytics_dashboard');
       expect(filtered1.map(t => t.name)).not.toContain('list_alerts');
       
       // With alerts plugin only
@@ -558,7 +605,7 @@ describe('Tools Configuration', () => {
       const filtered2 = filterToolsByPlugins(mockTools, config, plugins2);
       expect(filtered2.map(t => t.name)).toContain('list_apps');
       expect(filtered2.map(t => t.name)).toContain('list_alerts');
-      expect(filtered2.map(t => t.name)).toContain('get_dashboard_data');
+      expect(filtered2.map(t => t.name)).toContain('get_analytics_dashboard');
       expect(filtered2.map(t => t.name)).not.toContain('list_crash_groups');
       expect(filtered2.map(t => t.name)).not.toContain('get_views_table');
       expect(filtered2.map(t => t.name)).not.toContain('query_database');
@@ -567,7 +614,7 @@ describe('Tools Configuration', () => {
       const plugins3: string[] = [];
       const filtered3 = filterToolsByPlugins(mockTools, config, plugins3);
       expect(filtered3.map(t => t.name)).toContain('list_apps');
-      expect(filtered3.map(t => t.name)).toContain('get_dashboard_data');
+      expect(filtered3.map(t => t.name)).toContain('get_analytics_dashboard');
       expect(filtered3.map(t => t.name)).not.toContain('list_alerts');
       expect(filtered3.map(t => t.name)).not.toContain('list_crash_groups');
       expect(filtered3.map(t => t.name)).not.toContain('get_views_table');

@@ -49,7 +49,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   analytics: {
     operations: {
       'get_analytics_data': 'R',
-      'get_dashboard_data': 'R',
+      'get_analytics_dashboard': 'R',
       'get_events_data': 'R',
       'get_events_overview': 'R',
       'get_top_events': 'R',

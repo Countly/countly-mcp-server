@@ -438,7 +438,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 
 ### Analytics & Dashboards
 - **`get_analytics_data`** - General analytics data retrieval
-- **`get_dashboard_data`** - Dashboard overview
+- **`get_analytics_dashboard`** - Dashboard overview
 - **`get_events_overview`** - Events overview and totals
 - **`get_top_events`** - Most frequently occurring events
 - **`get_slipping_away_users`** - Identify inactive app users

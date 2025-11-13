@@ -79,11 +79,11 @@ params.segmentation = segmentation;
 }
 
 // ============================================================================
-// GET_DASHBOARD_DATA TOOL
+// GET_ANALYTICS_DASHBOARD TOOL
 // ============================================================================
 
-export const getDashboardDataToolDefinition = {
-  name: 'get_dashboard_data',
+export const getAnalyticsDashboardToolDefinition = {
+  name: 'get_analytics_dashboard',
   description: 'Get aggregated dashboard data for an app. If no app is specified, will show available apps to choose from.',
   inputSchema: {
     type: 'object',
@@ -578,7 +578,7 @@ export async function handleGetSessionDurations(context: ToolContext, args: any)
 
 export const analyticsToolDefinitions = [
   getAnalyticsDataToolDefinition,
-  getDashboardDataToolDefinition,
+  getAnalyticsDashboardToolDefinition,
   getEventsDataToolDefinition,
   getEventsOverviewToolDefinition,
   getTopEventsToolDefinition,
@@ -590,7 +590,7 @@ export const analyticsToolDefinitions = [
 
 export const analyticsToolHandlers = {
   'get_analytics_data': 'getAnalyticsData',
-  'get_dashboard_data': 'getDashboardData',
+  'get_analytics_dashboard': 'getAnalyticsDashboard',
   'get_events_data': 'getEventsData',
   'get_events_overview': 'getEventsOverview',
   'get_top_events': 'getTopEvents',
@@ -607,7 +607,7 @@ export class AnalyticsTools {
     return handleGetAnalyticsData(this.context, args);
   }
 
-  async getDashboardData(args: any): Promise<ToolResult> {
+  async getAnalyticsDashboard(args: any): Promise<ToolResult> {
     return handleGetDashboardData(this.context, args);
   }
 
