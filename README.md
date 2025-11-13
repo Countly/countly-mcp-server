@@ -605,7 +605,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`create_hook`** - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
 - **`update_hook`** - Update an existing webhook/hook configuration.
 - **`delete_hook`** - Delete a webhook/hook by its ID.
-- **`get_internal_events`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
+- **`get_internal_triggers`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

@@ -325,7 +325,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'create_hook': 'C',
       'update_hook': 'U',
       'delete_hook': 'D',
-      'get_internal_events': 'R',
+      'get_internal_triggers': 'R',
     },
     requiresPlugin: 'hooks',
     availableByDefault: false,

@@ -344,16 +344,16 @@ async function handleDeleteHook(args: z.infer<typeof deleteHookTool.inputSchema>
 }
 
 /**
- * Tool: get_internal_events
+ * Tool: get_internal_triggers
  * Get list of available internal events that can trigger hooks
  */
-export const getInternalEventsTool = {
-  name: 'get_internal_events',
+export const getInternalTriggersTool = {
+  name: 'get_internal_triggers',
   description: 'Get list of available internal Countly events that can be used as triggers for hooks',
   inputSchema: z.object({}),
 };
 
-async function handleGetInternalEvents(_args: z.infer<typeof getInternalEventsTool.inputSchema>, _context: ToolContext) {
+async function handleGetInternalTriggers(_args: z.infer<typeof getInternalTriggersTool.inputSchema>, _context: ToolContext) {
   const internalEvents = [
     { event: '/i/apps/create', description: 'When a new app is created' },
     { event: '/i/apps/update', description: 'When an app is updated' },
@@ -397,7 +397,7 @@ export const hooksTools = [
   createHookTool,
   updateHookTool,
   deleteHookTool,
-  getInternalEventsTool,
+  getInternalTriggersTool,
 ];
 
 // Export handlers map
@@ -407,5 +407,5 @@ export const hooksHandlers = {
   create_hook: handleCreateHook,
   update_hook: handleUpdateHook,
   delete_hook: handleDeleteHook,
-  get_internal_events: handleGetInternalEvents,
+  get_internal_triggers: handleGetInternalTriggers,
 };

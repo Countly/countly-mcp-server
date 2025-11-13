@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `create_hook`: Create webhooks with multiple trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect)
   - `update_hook`: Update existing webhook configurations
   - `delete_hook`: Delete webhooks by ID
-  - `get_internal_events`: Get list of 23 available internal Countly events for triggers
+  - `get_internal_triggers`: Get list of 23 available internal Countly events for triggers
 
 - **Times of Day Module** (1 tool): User behavior pattern analysis based on `times-of-day` plugin
   - `get_times_of_day`: Analyze when users are most active throughout the day/week in their local time
