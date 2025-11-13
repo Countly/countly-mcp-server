@@ -7,7 +7,8 @@ import {
   filterTools,
   getConfigSummary,
 } from '../src/lib/tools-config.js';
-import { getAllToolDefinitions } from '../src/tools/index.js';
+import { getAllToolDefinitions, getAllToolMetadata } from '../src/tools/index.js';
+import { ToolContext } from '../src/tools/types.js';
 
 /**
  * Tools Configuration Tests
@@ -638,6 +639,82 @@ describe('Tools Configuration', () => {
       expect(filtered.map(t => t.name)).toContain('list_alerts'); // R operation
       expect(filtered.map(t => t.name)).not.toContain('create_alert'); // C operation
       expect(filtered.map(t => t.name)).not.toContain('delete_alert'); // D operation
+    });
+  });
+});
+
+/**
+ * Tool Handler Validation Tests
+ * Ensures that all tool handlers map to existing methods on their respective classes
+ */
+describe('Tool Handler Validation', () => {
+  // Create a minimal mock context for testing
+  const mockContext: ToolContext = {
+    resolveAppId: async () => 'test-app-id',
+    getAuthParams: () => ({}),
+    httpClient: {} as any,
+    appCache: {
+      getAll: () => [],
+      findById: () => null,
+      findByName: () => null,
+      resolveAppName: () => 'test-app-id',
+      clear: () => {},
+      size: () => 0,
+      isExpired: () => false,
+      update: () => {},
+    } as any,
+    getApps: async () => [],
+  };
+
+  describe('Handler Method Existence', () => {
+    it('should have all handler methods defined on their respective tool classes', () => {
+      const toolMetadataList = getAllToolMetadata();
+
+      for (const metadata of toolMetadataList) {
+        // Create an instance of the tool class
+        const instance = new metadata.toolClass(mockContext);
+
+        // Check each handler mapping
+        for (const [_toolName, methodName] of Object.entries(metadata.handlers)) {
+          const method = (instance as any)[methodName];
+          expect(typeof method).toBe('function');
+          expect(method).toBeDefined();
+        }
+      }
+    });
+
+    it('should not have any undefined handler methods', () => {
+      const toolMetadataList = getAllToolMetadata();
+
+      for (const metadata of toolMetadataList) {
+        // Create an instance of the tool class
+        const instance = new metadata.toolClass(mockContext);
+
+        // Check that no handler points to undefined methods
+        for (const [_toolName, methodName] of Object.entries(metadata.handlers)) {
+          const method = (instance as any)[methodName];
+          expect(method).not.toBeUndefined();
+          expect(method).not.toBeNull();
+        }
+      }
+    });
+  });
+
+  describe('Handler Mapping Structure', () => {
+    it('should have handlers as objects with string keys and string values', () => {
+      const toolMetadataList = getAllToolMetadata();
+
+      for (const metadata of toolMetadataList) {
+        expect(typeof metadata.handlers).toBe('object');
+        expect(metadata.handlers).not.toBeNull();
+
+        for (const [toolName, methodName] of Object.entries(metadata.handlers)) {
+          expect(typeof toolName).toBe('string');
+          expect(typeof methodName).toBe('string');
+          expect(toolName.length).toBeGreaterThan(0);
+          expect(methodName.length).toBeGreaterThan(0);
+        }
+      }
     });
   });
 });

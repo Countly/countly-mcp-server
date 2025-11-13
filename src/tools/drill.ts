@@ -490,11 +490,11 @@ export const drillToolDefinitions = [
 ];
 
 export const drillToolHandlers = {
-  'get_segmentation_meta': 'handleGetSegmentationMeta',
-  'run_segmentation_query': 'handleRunSegmentationQuery',
-  'list_drill_bookmarks': 'handleListDrillBookmarks',
-  'create_drill_bookmark': 'handleCreateDrillBookmark',
-  'delete_drill_bookmark': 'handleDeleteDrillBookmark',
+  'get_segmentation_meta': 'get_segmentation_meta',
+  'run_segmentation_query': 'run_segmentation_query',
+  'list_drill_bookmarks': 'list_drill_bookmarks',
+  'create_drill_bookmark': 'create_drill_bookmark',
+  'delete_drill_bookmark': 'delete_drill_bookmark',
 } as const;
 
 export class DrillTools {

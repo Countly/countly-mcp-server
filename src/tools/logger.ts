@@ -63,8 +63,8 @@ export const loggerToolDefinitions = [
 ];
 
 export const loggerToolHandlers = {
-  list_sdk_logs: handleListSDKLogs,
-};
+  'list_sdk_logs': 'list_sdk_logs',
+} as const;
 
 // ============================================================================
 // TOOL CLASS

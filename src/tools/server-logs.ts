@@ -112,9 +112,9 @@ export const serverLogsToolDefinitions = [
  * Export tool handlers map
  */
 export const serverLogsToolHandlers = {
-  [listServerLogFilesTool.name]: handleListServerLogFiles,
-  [getServerLogContentsTool.name]: handleGetServerLogContents,
-};
+  'list_server_log_files': 'listServerLogFiles',
+  'get_server_log_contents': 'getServerLogContents',
+} as const;
 
 /**
  * Server Logs Tools Class

@@ -481,14 +481,14 @@ export const emailReportsToolDefinitions = [
  * Export tool handlers map
  */
 export const emailReportsToolHandlers = {
-  [listEmailReportsTool.name]: handleListEmailReports,
-  [createCoreEmailReportTool.name]: handleCreateCoreEmailReport,
-  [createDashboardEmailReportTool.name]: handleCreateDashboardEmailReport,
-  [updateEmailReportTool.name]: handleUpdateEmailReport,
-  [previewEmailReportTool.name]: handlePreviewEmailReport,
-  [sendEmailReportTool.name]: handleSendEmailReport,
-  [deleteEmailReportTool.name]: handleDeleteEmailReport,
-};
+  'list_email_reports': 'listEmailReports',
+  'create_core_email_report': 'createCoreEmailReport',
+  'create_dashboard_email_report': 'createDashboardEmailReport',
+  'update_email_report': 'updateEmailReport',
+  'preview_email_report': 'previewEmailReport',
+  'send_email_report': 'sendEmailReport',
+  'delete_email_report': 'deleteEmailReport',
+} as const;
 
 /**
  * Email Reports Tools Class
