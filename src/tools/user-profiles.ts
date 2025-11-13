@@ -277,10 +277,10 @@ export const userProfilesToolDefinitions = [
 ];
 
 export const userProfilesToolHandlers = {
-  'query_user_profiles': 'handleQueryUserProfiles',
-  'breakdown_user_profiles': 'handleBreakdownUserProfiles',
-  'get_user_profile_details': 'handleGetUserProfileDetails',
-  'add_user_note': 'handleAddUserNote',
+  'query_user_profiles': 'query_user_profiles',
+  'breakdown_user_profiles': 'breakdown_user_profiles',
+  'get_user_profile_details': 'get_user_profile_details',
+  'add_user_note': 'add_user_note',
 } as const;
 
 export class UserProfilesTools {

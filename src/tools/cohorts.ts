@@ -493,11 +493,11 @@ export const cohortsToolDefinitions = [
 ];
 
 export const cohortsToolHandlers = {
-  list_cohorts: 'handleListCohorts',
-  get_cohort: 'handleGetCohort',
-  create_cohort: 'handleCreateCohort',
-  update_cohort: 'handleUpdateCohort',
-  delete_cohort: 'handleDeleteCohort',
+  'list_cohorts': 'list_cohorts',
+  'get_cohort': 'get_cohort',
+  'create_cohort': 'create_cohort',
+  'update_cohort': 'update_cohort',
+  'delete_cohort': 'delete_cohort',
 } as const;
 
 export class CohortsTools {

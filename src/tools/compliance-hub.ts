@@ -221,10 +221,10 @@ export const complianceHubToolDefinitions = [
 ];
 
 export const complianceHubToolHandlers = {
-  get_consent_stats: handleGetConsentStats,
-  list_user_consents: handleListUserConsents,
-  search_consent_history: handleSearchConsentHistory,
-};
+  'get_consent_stats': 'get_consent_stats',
+  'list_user_consents': 'list_user_consents',
+  'search_consent_history': 'search_consent_history',
+} as const;
 
 // ============================================================================
 // TOOL CLASS

@@ -106,9 +106,9 @@ export const sdksToolDefinitions = [
 ];
 
 export const sdksToolHandlers = {
-  get_sdk_stats: handleGetSDKStats,
-  get_sdk_config: handleGetSDKConfig,
-};
+  'get_sdk_stats': 'get_sdk_stats',
+  'get_sdk_config': 'get_sdk_config',
+} as const;
 
 // ============================================================================
 // TOOL CLASS

@@ -391,15 +391,15 @@ export const dashboardsToolDefinitions = [
  * Export tool handlers map
  */
 export const dashboardsToolHandlers = {
-  [listDashboardsTool.name]: handleListDashboards,
-  [getDashboardDataTool.name]: handleGetDashboardData,
-  [createDashboardTool.name]: handleCreateDashboard,
-  [updateDashboardTool.name]: handleUpdateDashboard,
-  [deleteDashboardTool.name]: handleDeleteDashboard,
-  [addDashboardWidgetTool.name]: handleAddDashboardWidget,
-  [updateDashboardWidgetTool.name]: handleUpdateDashboardWidget,
-  [removeDashboardWidgetTool.name]: handleRemoveDashboardWidget,
-};
+  'list_dashboards': 'listDashboards',
+  'get_dashboard_data': 'getDashboardData',
+  'create_dashboard': 'createDashboard',
+  'update_dashboard': 'updateDashboard',
+  'delete_dashboard': 'deleteDashboard',
+  'add_dashboard_widget': 'addDashboardWidget',
+  'update_dashboard_widget': 'updateDashboardWidget',
+  'remove_dashboard_widget': 'removeDashboardWidget',
+} as const;
 
 /**
  * Dashboards Tools Class

@@ -276,11 +276,11 @@ export const filteringRulesToolDefinitions = [
 ];
 
 export const filteringRulesToolHandlers = {
-  list_filtering_rules: handleListFilteringRules,
-  create_filtering_rule: handleCreateFilteringRule,
-  update_filtering_rule: handleUpdateFilteringRule,
-  delete_filtering_rule: handleDeleteFilteringRule,
-};
+  'list_filtering_rules': 'list_filtering_rules',
+  'create_filtering_rule': 'create_filtering_rule',
+  'update_filtering_rule': 'update_filtering_rule',
+  'delete_filtering_rule': 'delete_filtering_rule',
+} as const;
 
 // ============================================================================
 // TOOL CLASS

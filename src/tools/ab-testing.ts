@@ -366,13 +366,13 @@ export const abTestingToolDefinitions = [
 ];
 
 export const abTestingToolHandlers = {
-  list_ab_experiments: handleListABExperiments,
-  get_ab_experiment_detail: handleGetABExperimentDetail,
-  create_ab_experiment: handleCreateABExperiment,
-  start_ab_experiment: handleStartABExperiment,
-  stop_ab_experiment: handleStopABExperiment,
-  delete_ab_experiment: handleDeleteABExperiment,
-};
+  'list_ab_experiments': 'list_ab_experiments',
+  'get_ab_experiment_detail': 'get_ab_experiment_detail',
+  'create_ab_experiment': 'create_ab_experiment',
+  'start_ab_experiment': 'start_ab_experiment',
+  'stop_ab_experiment': 'stop_ab_experiment',
+  'delete_ab_experiment': 'delete_ab_experiment',
+} as const;
 
 // ============================================================================
 // TOOL CLASS

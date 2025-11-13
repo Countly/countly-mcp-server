@@ -139,10 +139,10 @@ export const datapointToolDefinitions = [
  * Export tool handlers map
  */
 export const datapointToolHandlers = {
-  [getDatapointStatisticsTool.name]: handleGetDatapointStatistics,
-  [getTopDatapointAppsTool.name]: handleGetTopDatapointApps,
-  [getDatapointPunchCardTool.name]: handleGetDatapointPunchCard,
-};
+  'get_datapoint_statistics': 'getDatapointStatistics',
+  'get_top_datapoint_apps': 'getTopDatapointApps',
+  'get_datapoint_punch_card': 'getDatapointPunchCard',
+} as const;
 
 /**
  * Datapoint Tools Class

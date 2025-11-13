@@ -334,13 +334,13 @@ export const coreToolDefinitions = [
 ];
 
 export const coreToolHandlers = {
-  'ping': 'handlePing',
-  'get_version': 'handleGetVersion',
-  'get_plugins': 'handleGetPlugins',
-  'search': 'handleSearch',
-  'fetch': 'handleFetch',
-  'list_jobs': 'handleListJobs',
-  'get_job_runs': 'handleGetJobRuns',
+  'ping': 'ping',
+  'get_version': 'get_version',
+  'get_plugins': 'get_plugins',
+  'search': 'search',
+  'fetch': 'fetch',
+  'list_jobs': 'list_jobs',
+  'get_job_runs': 'get_job_runs',
 } as const;
 
 export class CoreTools {

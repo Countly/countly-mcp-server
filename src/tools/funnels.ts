@@ -686,14 +686,14 @@ export const funnelsToolDefinitions = [
 ];
 
 export const funnelsToolHandlers = {
-  list_funnels: 'handleListFunnels',
-  get_funnel: 'handleGetFunnel',
-  get_funnel_data: 'handleGetFunnelData',
-  get_funnel_step_users: 'handleGetFunnelStepUsers',
-  get_funnel_dropoff_users: 'handleGetFunnelDropoffUsers',
-  create_funnel: 'handleCreateFunnel',
-  update_funnel: 'handleUpdateFunnel',
-  delete_funnel: 'handleDeleteFunnel',
+  'list_funnels': 'list_funnels',
+  'get_funnel': 'get_funnel',
+  'get_funnel_data': 'get_funnel_data',
+  'get_funnel_step_users': 'get_funnel_step_users',
+  'get_funnel_dropoff_users': 'get_funnel_dropoff_users',
+  'create_funnel': 'create_funnel',
+  'update_funnel': 'update_funnel',
+  'delete_funnel': 'delete_funnel',
 } as const;
 
 export class FunnelsTools {
