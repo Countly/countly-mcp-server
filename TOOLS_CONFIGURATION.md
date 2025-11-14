@@ -70,7 +70,7 @@ These categories are always available without plugin checks:
 - D: delete_app, reset_app
 
 ### analytics
-**Tools**: `get_analytics_data`, `get_analytics_app_summary`, `get_events_data`, `get_slipping_away_users`, `get_session_frequency`, `get_user_loyalty`, `get_session_durations`, `list_events_and_segments`
+**Tools**: `get_analytics_data`, `get_analytics_app_summary`, `get_slipping_away_users`, `get_session_frequency`, `get_user_loyalty`, `get_session_durations`
 
 **Operations**:
 - R: All analytics tools (read-only)
@@ -97,10 +97,11 @@ These categories are always available without plugin checks:
 - D: delete_note
 
 ### events
-**Tools**: `create_event`
+**Tools**: `create_event`, `list_events_and_segments`, `get_events_data`
 
 **Operations**:
 - C: create_event
+- R: list_events_and_segments, get_events_data
 
 ### alerts
 **Tools**: `list_alerts`, `create_alert`, `delete_alert`

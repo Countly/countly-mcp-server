@@ -50,12 +50,10 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     operations: {
       'get_analytics_data': 'R',
       'get_analytics_app_summary': 'R',
-      'get_events_data': 'R',
       'get_slipping_away_users': 'R',
       'get_session_frequency': 'R',
       'get_user_loyalty': 'R',
       'get_session_durations': 'R',
-      'list_events_and_segments': 'R',
     },
     availableByDefault: true,
   },
@@ -86,6 +84,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   events: {
     operations: {
       'create_event': 'C',
+      'list_events_and_segments': 'R',
+      'get_events_data': 'R',
     },
     availableByDefault: true,
   },

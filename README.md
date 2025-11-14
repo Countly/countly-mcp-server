@@ -439,7 +439,6 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 ### Analytics & Dashboards
 - **`get_analytics_data`** - Analytics data breakdown by predefined methods (locations, carriers, devices, etc.). For multi-segment breakdowns, use drill tools
 - **`get_analytics_app_summary`** - General app summary and analytics overview
-- **`get_events_data`** - Time-series analytics data for specific events
 - **`get_slipping_away_users`** - Identify inactive app users
 - **`get_session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
 - **`get_user_loyalty`** - User loyalty data showing session count distribution across loyalty buckets (1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, 500+)
@@ -448,6 +447,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 ### Events
 - **`create_event`** - Define event with metadata and configuration
 - **`list_events_and_segments`** - List all events and their segments, including internal Countly events with exact database structure
+- **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
 
 ### Dashboard User Management
 - **`get_all_dashboard_users`** - List all dashboard users (admin/management users who access the Countly dashboard)

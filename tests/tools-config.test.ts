@@ -56,10 +56,10 @@ describe('Tools Configuration', () => {
     const expectedCounts = {
       core: 7,
       apps: 6,
-      analytics: 8,
+      analytics: 6,
       crashes: 10,
       notes: 3,
-      events: 1,
+      events: 3,
       alerts: 3,
       views: 3,
       database: 6,
