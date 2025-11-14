@@ -79,12 +79,12 @@ params.segmentation = segmentation;
 }
 
 // ============================================================================
-// GET_ANALYTICS_DASHBOARD TOOL
+// GET_ANALYTICS_APP_SUMMARY TOOL
 // ============================================================================
 
-export const getAnalyticsDashboardToolDefinition = {
-  name: 'get_analytics_dashboard',
-  description: 'Get aggregated dashboard data for an app. If no app is specified, will show available apps to choose from.',
+export const getAnalyticsAppSummaryToolDefinition = {
+  name: 'get_analytics_app_summary',
+  description: 'Get general summary information about an app, including analytics data. Can be used for general information requests about the app, like how is app doing, or show me info about this app, etc.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -99,7 +99,7 @@ export const getAnalyticsDashboardToolDefinition = {
   },
 };
 
-export async function handleGetDashboardData(context: ToolContext, args: any): Promise<ToolResult> {
+export async function handleGetAnalyticsAppSummary(context: ToolContext, args: any): Promise<ToolResult> {
   const app_id = await context.resolveAppId(args);
   const { period } = args;
   
@@ -127,7 +127,7 @@ params.period = period;
     content: [
       {
         type: 'text',
-        text: `Dashboard data for app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
+        text: `App summary data for app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
   };

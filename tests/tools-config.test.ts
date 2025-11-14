@@ -585,7 +585,7 @@ describe('Tools Configuration', () => {
         { name: 'list_alerts' },
         { name: 'list_crash_groups' },
         { name: 'get_views_table' },
-        { name: 'get_analytics_dashboard' },
+        { name: 'get_analytics_app_summary' },
         { name: 'query_database' },
       ];
       
@@ -598,7 +598,7 @@ describe('Tools Configuration', () => {
       expect(filtered1.map(t => t.name)).toContain('list_crash_groups');
       expect(filtered1.map(t => t.name)).toContain('get_views_table');
       expect(filtered1.map(t => t.name)).toContain('query_database');
-      expect(filtered1.map(t => t.name)).toContain('get_analytics_dashboard');
+      expect(filtered1.map(t => t.name)).toContain('get_analytics_app_summary');
       expect(filtered1.map(t => t.name)).not.toContain('list_alerts');
       
       // With alerts plugin only
@@ -606,7 +606,7 @@ describe('Tools Configuration', () => {
       const filtered2 = filterToolsByPlugins(mockTools, config, plugins2);
       expect(filtered2.map(t => t.name)).toContain('list_apps');
       expect(filtered2.map(t => t.name)).toContain('list_alerts');
-      expect(filtered2.map(t => t.name)).toContain('get_analytics_dashboard');
+      expect(filtered2.map(t => t.name)).toContain('get_analytics_app_summary');
       expect(filtered2.map(t => t.name)).not.toContain('list_crash_groups');
       expect(filtered2.map(t => t.name)).not.toContain('get_views_table');
       expect(filtered2.map(t => t.name)).not.toContain('query_database');
@@ -615,7 +615,7 @@ describe('Tools Configuration', () => {
       const plugins3: string[] = [];
       const filtered3 = filterToolsByPlugins(mockTools, config, plugins3);
       expect(filtered3.map(t => t.name)).toContain('list_apps');
-      expect(filtered3.map(t => t.name)).toContain('get_analytics_dashboard');
+      expect(filtered3.map(t => t.name)).toContain('get_analytics_app_summary');
       expect(filtered3.map(t => t.name)).not.toContain('list_alerts');
       expect(filtered3.map(t => t.name)).not.toContain('list_crash_groups');
       expect(filtered3.map(t => t.name)).not.toContain('get_views_table');

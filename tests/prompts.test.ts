@@ -97,7 +97,7 @@ describe('Prompts', () => {
       expect(result.description).toContain('EngagementApp');
       expect(result.messages[0].content.text).toContain('EngagementApp');
       expect(result.messages[0].content.text).toContain('sessions, users, events');
-      expect(result.messages[0].content.text).toContain('get_analytics_dashboard');
+      expect(result.messages[0].content.text).toContain('get_analytics_app_summary');
       expect(result.messages[0].content.text).toContain('get_user_loyalty');
     });
 
@@ -197,7 +197,7 @@ describe('Prompts', () => {
       expect(result.description).toContain('PerfApp');
       expect(result.messages[0].content.text).toContain('PerfApp');
       expect(result.messages[0].content.text).toContain('60days');
-      expect(result.messages[0].content.text).toContain('get_analytics_dashboard');
+      expect(result.messages[0].content.text).toContain('get_analytics_app_summary');
       expect(result.messages[0].content.text).toContain('get_crash_statistics');
       expect(result.messages[0].content.text).toContain('countly://app/');
     });

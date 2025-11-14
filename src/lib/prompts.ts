@@ -242,7 +242,7 @@ function generateEngagementReportPrompt(args: Record<string, string>): PromptRes
           text: `Create a comprehensive user engagement report for "${appName}" including these metrics: ${metrics}.
 
 Please:
-1. Use get_analytics_dashboard to fetch current analytics
+1. Use get_analytics_app_summary to fetch current analytics
 2. Use get_user_loyalty to understand user engagement levels
 3. Use get_session_frequency to analyze usage patterns
 4. Use get_top_events to identify key user actions
@@ -430,7 +430,7 @@ function generatePerformanceDashboardPrompt(args: Record<string, string>): Promp
           text: `Provide a comprehensive performance overview for "${appName}" over the ${timeRange} period.
 
 Please gather data from:
-1. get_analytics_dashboard for overall metrics
+1. get_analytics_app_summary for overall metrics
 2. get_crash_statistics for stability metrics
 3. get_session_durations for performance insights
 4. get_analytics_data for detailed breakdowns
