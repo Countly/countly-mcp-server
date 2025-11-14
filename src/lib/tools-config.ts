@@ -51,8 +51,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'get_analytics_data': 'R',
       'get_analytics_app_summary': 'R',
       'get_events_data': 'R',
-      'get_events_overview': 'R',
-      'get_top_events': 'R',
       'get_slipping_away_users': 'R',
       'get_session_frequency': 'R',
       'get_user_loyalty': 'R',

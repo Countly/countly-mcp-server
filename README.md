@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **135 Tools** across 30 categories for comprehensive Countly operations
+- **133 Tools** across 30 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (135 available)
+### Tools (133 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -437,11 +437,9 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`reset_app`** - Reset app data
 
 ### Analytics & Dashboards
-- **`get_analytics_data`** - General analytics data retrieval
+- **`get_analytics_data`** - Analytics data breakdown by predefined methods (locations, carriers, devices, etc.). For multi-segment breakdowns, use drill tools
 - **`get_analytics_app_summary`** - General app summary and analytics overview
 - **`get_events_data`** - Time-series analytics data for specific events
-- **`get_events_overview`** - Events overview and totals
-- **`get_top_events`** - Most frequently occurring events
 - **`get_slipping_away_users`** - Identify inactive app users
 - **`get_session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
 - **`get_user_loyalty`** - User loyalty data showing session count distribution across loyalty buckets (1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, 500+)

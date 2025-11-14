@@ -56,7 +56,7 @@ describe('Tools Configuration', () => {
     const expectedCounts = {
       core: 7,
       apps: 6,
-      analytics: 10,
+      analytics: 8,
       crashes: 10,
       notes: 3,
       events: 1,
@@ -105,7 +105,7 @@ describe('Tools Configuration', () => {
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(135);
+      expect(totalTools).toBe(133);
     });
   });
 

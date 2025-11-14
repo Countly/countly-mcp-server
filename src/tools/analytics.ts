@@ -7,7 +7,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getAnalyticsDataToolDefinition = {
   name: 'get_analytics_data',
-  description: 'Get analytics data using the main /o endpoint with various methods (sessions, users, locations, etc.)',
+  description: 'This tool allows you to break down sessions and users by specific predefined methods (locations, carriers, devices, app_versions, etc.). For breaking down by more than one segment or other segments not available here, use drill tools instead.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -187,124 +187,6 @@ params.event = event;
       {
         type: 'text',
         text: `Events data for app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
-
-// ============================================================================
-// GET_EVENTS_OVERVIEW TOOL
-// ============================================================================
-
-export const getEventsOverviewToolDefinition = {
-  name: 'get_events_overview',
-  description: 'Get summary of all events with total counts, sums, and durations for the specified period. Shows overview statistics for multiple events. For segment breakdowns or filtering by event properties, use run_query instead.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'
-      },
-    },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
-  },
-};
-
-export async function handleGetEventsOverview(context: ToolContext, args: any): Promise<ToolResult> {
-  const app_id = await context.resolveAppId(args);
-  const { period } = args;
-  
-  const params: any = {
-    ...context.getAuthParams(),
-    app_id,
-  };
-  
-  if (period) {
-params.period = period;
-}
-
-  const response = await safeApiCall(
-
-
-    () => context.httpClient.get('/o/analytics/events/overview', { params }),
-
-
-    'Failed to execute request to /o/analytics/events/overview'
-
-
-  );
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Events overview for app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
-
-// ============================================================================
-// GET_TOP_EVENTS TOOL
-// ============================================================================
-
-export const getTopEventsToolDefinition = {
-  name: 'get_top_events',
-  description: 'Get the most frequently occurring events',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'
-      },
-      limit: { type: 'number', description: 'Number of top events to retrieve', default: 10 },
-    },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
-  },
-};
-
-export async function handleGetTopEvents(context: ToolContext, args: any): Promise<ToolResult> {
-  const app_id = await context.resolveAppId(args);
-  const { period, limit = 10 } = args;
-  
-  const params: any = {
-    ...context.getAuthParams(),
-    app_id,
-    limit,
-  };
-  
-  if (period) {
-params.period = period;
-}
-
-  const response = await safeApiCall(
-
-
-    () => context.httpClient.get('/o/analytics/events/top', { params }),
-
-
-    'Failed to execute request to /o/analytics/events/top'
-
-
-  );
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Top ${limit} events for app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
   };
@@ -767,8 +649,6 @@ export const analyticsToolDefinitions = [
   getAnalyticsDataToolDefinition,
   getAnalyticsAppSummaryToolDefinition,
   getEventsDataToolDefinition,
-  getEventsOverviewToolDefinition,
-  getTopEventsToolDefinition,
   getSlippingAwayUsersToolDefinition,
   getSessionFrequencyToolDefinition,
   getUserLoyaltyToolDefinition,
@@ -780,8 +660,6 @@ export const analyticsToolHandlers = {
   'get_analytics_data': 'getAnalyticsData',
   'get_analytics_app_summary': 'getAnalyticsAppSummary',
   'get_events_data': 'getEventsData',
-  'get_events_overview': 'getEventsOverview',
-  'get_top_events': 'getTopEvents',
   'get_slipping_away_users': 'getSlippingAwayUsers',
   'get_session_frequency': 'getSessionFrequency',
   'get_user_loyalty': 'getUserLoyalty',
@@ -802,14 +680,6 @@ export class AnalyticsTools {
 
   async getEventsData(args: any): Promise<ToolResult> {
     return handleGetEventsData(this.context, args);
-  }
-
-  async getEventsOverview(args: any): Promise<ToolResult> {
-    return handleGetEventsOverview(this.context, args);
-  }
-
-  async getTopEvents(args: any): Promise<ToolResult> {
-    return handleGetTopEvents(this.context, args);
   }
 
   async getSlippingAwayUsers(args: any): Promise<ToolResult> {

@@ -162,16 +162,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `list_jobs`: List background jobs with pagination and sorting
   - `get_job_runs`: Get execution history for specific jobs
 
-- **Analytics Module Enhancements** (6 additional tools):
+- **Analytics Module Enhancements** (4 additional tools):
   - `get_user_loyalty`: Analyze user loyalty and session count distribution
   - `get_session_durations`: Analyze session duration patterns
   - `get_session_frequency`: Analyze time between user sessions
   - `get_slipping_away_users`: Identify users becoming inactive
-  - `get_top_events`: Get most frequently occurring events
-  - `get_events_overview`: Get event totals and segment overview
 
 ### Changed
-- **Tool Count**: Expanded from 27 tools to 134 tools across 30 categories
+- **Tool Count**: Expanded from 27 tools to 132 tools across 30 categories
 - **Plugin Coverage**: Added support for 21 additional Countly plugins
 - **Plugin Availability**: Automatically check plugin availability for specific tools, ensuring only compatible tools are exposed based on server configuration
 - **URL Parameter Authentication**: Added support for passing Server URL and auth token as URL parameters for flexible authentication
@@ -192,7 +190,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added 141 core tools tests for new job management features
 - Added 399 error handler tests for improved error scenarios
 - Added comprehensive transport integration tests for stdio and HTTP/SSE modes
-- Updated tool configuration tests to cover all 30 categories and 134 tools
+- Updated tool configuration tests to cover all 30 categories and 132 tools
 
 ## [1.0.1] - 2025-11-07
 
