@@ -139,7 +139,7 @@ params.period = period;
 
 export const getEventsDataToolDefinition = {
   name: 'get_events_data',
-  description: 'Get events analytics data. Note: Events prefixed with [CLY]_ are internal Countly events and are not available through this tool. If no app is specified, will show available apps to choose from.',
+  description: 'Get time-series analytics data for a specific event (daily counts, sums, durations). Use this for historical trends of a single event. For segment breakdowns or filtering by event properties, use run_query instead.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -198,7 +198,7 @@ params.event = event;
 
 export const getEventsOverviewToolDefinition = {
   name: 'get_events_overview',
-  description: 'Get overview of events data with total counts and segments',
+  description: 'Get summary of all events with total counts, sums, and durations for the specified period. Shows overview statistics for multiple events. For segment breakdowns or filtering by event properties, use run_query instead.',
   inputSchema: {
     type: 'object',
     properties: {
