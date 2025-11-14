@@ -57,7 +57,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'get_session_frequency': 'R',
       'get_user_loyalty': 'R',
       'get_session_durations': 'R',
-      'list_events': 'R',
+      'list_events_and_segments': 'R',
     },
     availableByDefault: true,
   },

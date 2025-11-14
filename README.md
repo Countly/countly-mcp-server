@@ -439,6 +439,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 ### Analytics & Dashboards
 - **`get_analytics_data`** - General analytics data retrieval
 - **`get_analytics_app_summary`** - General app summary and analytics overview
+- **`get_events_data`** - Time-series analytics data for specific events
 - **`get_events_overview`** - Events overview and totals
 - **`get_top_events`** - Most frequently occurring events
 - **`get_slipping_away_users`** - Identify inactive app users
@@ -448,6 +449,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 
 ### Events
 - **`create_event`** - Define event with metadata and configuration
+- **`list_events_and_segments`** - List all events and their segments, including internal Countly events with exact database structure
 
 ### Dashboard User Management
 - **`get_all_dashboard_users`** - List all dashboard users (admin/management users who access the Countly dashboard)

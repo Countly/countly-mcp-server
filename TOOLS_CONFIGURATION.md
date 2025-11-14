@@ -70,12 +70,12 @@ These categories are always available without plugin checks:
 - D: delete_app, reset_app
 
 ### analytics
-**Tools**: `get_analytics_data`, `get_dashboard_data`, `get_events_data`, `get_events_overview`, `get_top_events`, `get_slipping_away_users`
+**Tools**: `get_analytics_data`, `get_analytics_app_summary`, `get_events_data`, `get_events_overview`, `get_top_events`, `get_slipping_away_users`, `get_session_frequency`, `get_user_loyalty`, `get_session_durations`, `list_events_and_segments`
 
 **Operations**:
 - R: All analytics tools (read-only)
 
-**Note**: `get_slipping_away_users` retrieves app users (end-users) who are becoming inactive based on inactivity period.
+**Note**: Analytics tools provide various data insights about applications. `get_slipping_away_users` retrieves app users (end-users) who are becoming inactive based on inactivity period. `list_events_and_segments` shows both custom events and internal Countly events with their exact database structure.
 
 ### crashes
 **Tools**: `list_crash_groups`, `get_crash_statistics`, `view_crash`, `add_crash_comment`, `edit_crash_comment`, `delete_crash_comment`, `resolve_crash`, `unresolve_crash`, `hide_crash`, `show_crash`
