@@ -2,81 +2,10 @@ import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
-// GET_ANALYTICS_DATA TOOL
+// QUERY_DATA TOOL (COMBINED)
 // ============================================================================
 
-export const getAnalyticsDataToolDefinition = {
-  name: 'get_analytics_data',
-  description: 'This tool allows you to break down sessions and users by specific predefined methods (locations, carriers, devices, app_versions, etc.). For breaking down by more than one segment or other segments not available here, use drill tools instead.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      method: {
-        type: 'string',
-        enum: [
-          'locations', 'sessions', 'users', 'carriers',
-          'devices', 'device_details', 'app_versions', 'cities',
-          'browser', 'density', 'langs', 'sources'
-        ],
-        description: 'Data retrieval method'
-      },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'
-      },
-      event: { type: 'string', description: 'Event key for event-specific methods' },
-      segmentation: { type: 'string', description: 'Segmentation parameter for events' },
-    },
-    required: ['method'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
-  },
-};
 
-export async function handleGetAnalyticsData(context: ToolContext, args: any): Promise<ToolResult> {
-  const app_id = await context.resolveAppId(args);
-  const { method, period, event, segmentation } = args;
-  
-  const params: any = {
-    ...context.getAuthParams(),
-    app_id,
-    method,
-  };
-  
-  if (period) {
-params.period = period;
-}
-  if (event) {
-params.event = event;
-}
-  if (segmentation) {
-params.segmentation = segmentation;
-}
-
-  const response = await safeApiCall(
-
-
-    () => context.httpClient.get('/o', { params }),
-
-
-    'Failed to execute request to /o'
-
-
-  );
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Analytics data for ${method}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
 
 // ============================================================================
 // GET_ANALYTICS_APP_SUMMARY TOOL
@@ -398,9 +327,166 @@ export async function handleGetSessionDurations(context: ToolContext, args: any)
 // ============================================================================
 // EXPORTS
 // ============================================================================
+// QUERY_DATA TOOL (COMBINED)
+// ============================================================================
+
+export const queryDataToolDefinition = {
+  name: 'query_data',
+  description: 'Unified tool for querying analytics data. Use query_type to specify: "analytics" for predefined breakdowns (locations, devices, etc.), "events" for event totals/breakdowns, "drill" for custom segment filtering (requires drill plugin).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      query_type: {
+        type: 'string',
+        enum: ['analytics', 'events', 'drill'],
+        description: 'Type of query to perform'
+      },
+      // Analytics-specific
+      method: {
+        type: 'string',
+        enum: [
+          'locations', 'sessions', 'users', 'carriers',
+          'devices', 'device_details', 'app_versions', 'cities',
+          'browser', 'density', 'langs', 'sources'
+        ],
+        description: 'Data retrieval method (for analytics query_type)'
+      },
+      segmentation: { type: 'string', description: 'Segmentation parameter for events (for analytics query_type)' },
+      // Events-specific
+      event: { type: 'string', description: 'Event key (for events/drill query_type)' },
+      // Drill-specific
+      query_object: {
+        type: 'string',
+        description: 'MongoDB query object as JSON string (for drill query_type). Use prefixes as shown in get_queriable_fields_for_event.'
+      },
+      bucket: {
+        type: 'string',
+        description: 'Time bucket granularity (for drill query_type)',
+        enum: ['hourly', 'daily', 'weekly', 'monthly'],
+      },
+      projection_key: {
+        type: 'array',
+        description: 'Array of segments to break down by (for drill query_type)',
+        items: { type: 'string' }
+      },
+      // Common
+      period: { 
+        type: 'string', 
+        description: 'Time period. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds]'
+      },
+    },
+    required: ['query_type'],
+    anyOf: [
+      { required: ['app_id'] },
+      { required: ['app_name'] }
+    ],
+    allOf: [
+      {
+        if: { properties: { query_type: { const: 'analytics' } } },
+        then: { required: ['method'] }
+      },
+      {
+        if: { properties: { query_type: { const: 'drill' } } },
+        then: { required: ['query_object'] }
+      }
+    ]
+  },
+};
+
+export async function handleQueryData(context: ToolContext, args: any): Promise<ToolResult> {
+  const appId = await context.resolveAppId(args);
+  const { query_type, method, period, event, segmentation, query_object, bucket, projection_key } = args;
+
+  if (query_type === 'drill') {
+    // Check drill availability
+    const drillAvailable = await checkDrillAvailability(context, appId);
+    if (!drillAvailable) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Drill plugin not available on this server. Use analytics or events query types.',
+          },
+        ],
+      };
+    }
+  }
+
+  const params: any = {
+    ...context.getAuthParams(),
+    app_id: appId,
+  };
+
+  if (period) {
+    params.period = period;
+  }
+
+  let endpoint = '/o';
+  let resultPrefix = '';
+
+  if (query_type === 'analytics') {
+    params.method = method;
+    if (event) {
+      params.event = event;
+    }
+    if (segmentation) {
+      params.segmentation = segmentation;
+    }
+    resultPrefix = `Analytics data for ${method}`;
+  } else if (query_type === 'events') {
+    endpoint = '/o/analytics/events';
+    if (event) {
+      params.event = event;
+    }
+    resultPrefix = `Events data for app ${appId}`;
+  } else if (query_type === 'drill') {
+    params.method = 'segmentation';
+    params.queryObject = query_object || '{}';
+    params.bucket = bucket || 'daily';
+    if (event) {
+      params.event = event;
+    }
+    if (projection_key) {
+      params.projectionKey = projection_key;
+    }
+    resultPrefix = 'Drill query results';
+  }
+
+  const response = await safeApiCall(
+    () => context.httpClient.get(endpoint, { params }),
+    `Failed to execute ${query_type} query`
+  );
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `${resultPrefix}:\n${JSON.stringify(response.data, null, 2)}`,
+      },
+    ],
+  };
+}
+
+async function checkDrillAvailability(context: ToolContext, appId: string): Promise<boolean> {
+  try {
+    const params = {
+      ...context.getAuthParams(),
+      app_id: appId,
+      method: 'segmentation_meta',
+    };
+    await context.httpClient.get('/o', { params });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
 
 export const analyticsToolDefinitions = [
-  getAnalyticsDataToolDefinition,
+  queryDataToolDefinition,
   getAnalyticsAppSummaryToolDefinition,
   getSlippingAwayUsersToolDefinition,
   getSessionFrequencyToolDefinition,
@@ -409,7 +495,7 @@ export const analyticsToolDefinitions = [
 ];
 
 export const analyticsToolHandlers = {
-  'get_analytics_data': 'getAnalyticsData',
+  'query_data': 'queryData',
   'get_analytics_app_summary': 'getAnalyticsAppSummary',
   'get_slipping_away_users': 'getSlippingAwayUsers',
   'get_session_frequency': 'getSessionFrequency',
@@ -420,8 +506,8 @@ export const analyticsToolHandlers = {
 export class AnalyticsTools {
   constructor(private context: ToolContext) {}
 
-  async getAnalyticsData(args: any): Promise<ToolResult> {
-    return handleGetAnalyticsData(this.context, args);
+  async queryData(args: any): Promise<ToolResult> {
+    return handleQueryData(this.context, args);
   }
 
   async getAnalyticsAppSummary(args: any): Promise<ToolResult> {
@@ -445,7 +531,7 @@ export class AnalyticsTools {
   }
 }
 
-// Metadata for dynamic routing (must be after class declaration)// Metadata for dynamic routing (must be after class declaration)
+// Metadata for dynamic routing (must be after class declaration)
 export const analyticsToolMetadata = {
   instanceKey: 'analytics',
   toolClass: AnalyticsTools,

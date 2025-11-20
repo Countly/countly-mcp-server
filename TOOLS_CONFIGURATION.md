@@ -75,7 +75,7 @@ These categories are always available without plugin checks:
 **Operations**:
 - R: All analytics tools (read-only)
 
-**Note**: Analytics tools provide various data insights about applications. `get_slipping_away_users` retrieves app users (end-users) who are becoming inactive based on inactivity period. `list_events_and_segments` shows both custom events and internal Countly events with their exact database structure.
+**Note**: Analytics tools provide various data insights about applications. `get_slipping_away_users` retrieves app users (end-users) who are becoming inactive based on inactivity period. `get_events_and_segments` shows both custom events and internal Countly events with their exact database structure.
 
 ### crashes
 **Tools**: `list_crash_groups`, `get_crash_statistics`, `view_crash`, `add_crash_comment`, `edit_crash_comment`, `delete_crash_comment`, `resolve_crash`, `unresolve_crash`, `hide_crash`, `show_crash`
@@ -97,11 +97,11 @@ These categories are always available without plugin checks:
 - D: delete_note
 
 ### events
-**Tools**: `create_event`, `list_events_and_segments`, `get_events_data`
+**Tools**: `create_event`, `get_events_and_segments`, `get_events_data`
 
 **Operations**:
 - C: create_event
-- R: list_events_and_segments, get_events_data
+- R: get_events_and_segments, get_events_data
 
 ### alerts
 **Tools**: `list_alerts`, `create_alert`, `delete_alert`
@@ -138,15 +138,15 @@ These categories are always available without plugin checks:
 **Note**: Returns management/admin users who access the Countly dashboard. These are the users who log into Countly to analyze data, configure settings, and manage applications.
 
 ### drill
-**Tools**: `get_available_fields`, `run_query`, `list_drill_bookmarks`, `create_drill_bookmark`, `delete_drill_bookmark`
+**Tools**: `get_queriable_fields_for_event`, `run_query`, `list_drill_bookmarks`, `create_drill_bookmark`, `delete_drill_bookmark`
 
 **Operations**:
-- R: get_available_fields, run_query, list_drill_bookmarks
+- R: get_queriable_fields_for_event, run_query, list_drill_bookmarks
 - C: create_drill_bookmark
 - D: delete_drill_bookmark
 
 **Notes**:
-- `get_available_fields`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
+- `get_queriable_fields_for_event`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
 - `run_query`: Run drill segmentation queries with MongoDB query objects. Can break down by projection key (segment or user property). Supports buckets: hourly, daily, weekly, monthly
 - `list_drill_bookmarks`: List all saved drill bookmarks for a specific event
 - `create_drill_bookmark`: Create a new bookmark to save a query for later reuse in the dashboard
@@ -292,7 +292,7 @@ if (plugins.includes('dbviewer')) {
 
 if (plugins.includes('drill')) {
   // Get user properties and event segments metadata
-  const meta = await tools.get_available_fields({ 
+  const meta = await tools.get_queriable_fields_for_event({ 
     app_name: 'MyApp',
     event: 'Account Created' 
   });

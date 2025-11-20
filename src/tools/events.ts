@@ -2,11 +2,11 @@ import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
-// LIST_EVENTS_AND_SEGMENTS TOOL
+// GET_EVENTS_AND_SEGMENTS TOOL
 // ============================================================================
 
-export const listEventsAndSegmentsToolDefinition = {
-  name: 'list_events_and_segments',
+export const getEventsAndSegmentsToolDefinition = {
+  name: 'get_events_and_segments',
   description: 'List all events and their segments for an application. This shows exactly how events appear in the database, including both custom events and internal Countly events.',
   inputSchema: {
     type: 'object',
@@ -21,7 +21,7 @@ export const listEventsAndSegmentsToolDefinition = {
   },
 };
 
-export async function handleListEventsAndSegments(context: ToolContext, args: any): Promise<ToolResult> {
+export async function handleGetEventsAndSegments(context: ToolContext, args: any): Promise<ToolResult> {
   const app_id = await context.resolveAppId(args);
 
   const params = {
@@ -171,65 +171,6 @@ export async function handleListEventsAndSegments(context: ToolContext, args: an
   };
 }
 
-// ============================================================================
-// GET_EVENTS_DATA TOOL
-// ============================================================================
-
-export const getEventsDataToolDefinition = {
-  name: 'get_events_data',
-  description: 'Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      app_id: { type: 'string', description: 'Application ID (optional - if not provided, will show available apps)' },
-      app_name: { type: 'string', description: 'Application name (optional - if not provided, will show available apps)' },
-      period: {
-        type: 'string',
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'
-      },
-      event: { type: 'string', description: 'Specific event key to filter by' },
-    },
-    required: [],
-  },
-};
-
-export async function handleGetEventsData(context: ToolContext, args: any): Promise<ToolResult> {
-  const app_id = await context.resolveAppId(args);
-  const { period, event } = args;
-
-  const params: any = {
-    ...context.getAuthParams(),
-    app_id,
-  };
-
-  if (period) {
-params.period = period;
-}
-  if (event) {
-params.event = event;
-}
-
-  const response = await safeApiCall(
-
-
-    () => context.httpClient.get('/o/analytics/events', { params }),
-
-
-    'Failed to execute request to /o/analytics/events'
-
-
-  );
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Events data for app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
-
 function getSegmentTypeDescription(type: string): string {
   switch (type) {
     case 's':
@@ -330,14 +271,12 @@ export async function handleCreateEvent(context: ToolContext, args: any): Promis
 
 export const eventsToolDefinitions = [
   createEventToolDefinition,
-  listEventsAndSegmentsToolDefinition,
-  getEventsDataToolDefinition,
+  getEventsAndSegmentsToolDefinition,
 ];
 
 export const eventsToolHandlers = {
   'create_event': 'createEvent',
-  'list_events_and_segments': 'listEventsAndSegments',
-  'get_events_data': 'getEventsData',
+  'get_events_and_segments': 'getEventsAndSegments',
 } as const;
 
 export class EventsTools {
@@ -347,12 +286,8 @@ export class EventsTools {
     return handleCreateEvent(this.context, args);
   }
 
-  async listEventsAndSegments(args: any): Promise<ToolResult> {
-    return handleListEventsAndSegments(this.context, args);
-  }
-
-  async getEventsData(args: any): Promise<ToolResult> {
-    return handleGetEventsData(this.context, args);
+  async getEventsAndSegments(args: any): Promise<ToolResult> {
+    return handleGetEventsAndSegments(this.context, args);
   }
 }
 

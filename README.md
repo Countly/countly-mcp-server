@@ -446,7 +446,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 
 ### Events
 - **`create_event`** - Define event with metadata and configuration
-- **`list_events_and_segments`** - List all events and their segments, including internal Countly events with exact database structure
+- **`get_events_and_segments`** - List all events and their segments, including internal Countly events with exact database structure
 - **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
 
 ### Dashboard User Management
@@ -488,7 +488,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`delete_crash_comment`** - Delete crash comment
 
 ### Drill Segmentation (requires `drill` plugin)
-- **`get_available_fields`** - Get available properties for segmentation
+- **`get_queriable_fields_for_event`** - Get available properties for segmentation
 - **`run_query`** - Run drill query with filters and time buckets
 - **`list_drill_bookmarks`** - List saved segmentation queries
 - **`create_drill_bookmark`** - Save a segmentation query

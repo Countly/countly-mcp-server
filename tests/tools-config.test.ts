@@ -59,13 +59,13 @@ describe('Tools Configuration', () => {
       analytics: 6,
       crashes: 10,
       notes: 3,
-      events: 3,
+      events: 1,
       alerts: 3,
       views: 3,
       database: 6,
       dashboard_users: 1,
       app_users: 3,
-      drill: 5,
+      drill: 4,
       user_profiles: 4,
       cohorts: 5,
       funnels: 8,
@@ -105,7 +105,7 @@ describe('Tools Configuration', () => {
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(133);
+      expect(totalTools).toBe(130);
     });
   });
 

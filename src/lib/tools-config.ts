@@ -48,7 +48,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   },
   analytics: {
     operations: {
-      'get_analytics_data': 'R',
+      'query_data': 'R',
       'get_analytics_app_summary': 'R',
       'get_slipping_away_users': 'R',
       'get_session_frequency': 'R',
@@ -84,8 +84,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   events: {
     operations: {
       'create_event': 'C',
-      'list_events_and_segments': 'R',
-      'get_events_data': 'R',
     },
     availableByDefault: true,
   },
@@ -135,11 +133,10 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   },
   drill: {
     operations: {
-      'get_available_fields': 'R',
-      'run_query': 'R',
       'list_drill_bookmarks': 'R',
       'create_drill_bookmark': 'C',
       'delete_drill_bookmark': 'D',
+      'get_metadata': 'R',
     },
     requiresPlugin: 'drill',
     availableByDefault: false,
