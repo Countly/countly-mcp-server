@@ -15,10 +15,6 @@ export const listABExperimentsToolDefinition = {
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
       skipCalculation: { type: 'boolean', description: 'Skip calculation of results for better performance', default: true },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -63,10 +59,6 @@ export const getABExperimentDetailToolDefinition = {
       experiment_id: { type: 'string', description: 'Experiment ID to retrieve details for' },
     },
     required: ['experiment_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -162,10 +154,6 @@ export const createABExperimentToolDefinition = {
       improvementRate: { type: 'string', default: '10', description: 'Minimum improvement percentage to auto-conclude' },
     },
     required: ['name', 'description', 'target_users', 'variants'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -229,10 +217,6 @@ export const startABExperimentToolDefinition = {
       experiment_id: { type: 'string', description: 'Experiment ID to start' },
     },
     required: ['experiment_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -275,10 +259,6 @@ export const stopABExperimentToolDefinition = {
       experiment_id: { type: 'string', description: 'Experiment ID to stop' },
     },
     required: ['experiment_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -321,10 +301,6 @@ export const deleteABExperimentToolDefinition = {
       experiment_id: { type: 'string', description: 'Experiment ID to delete' },
     },
     required: ['experiment_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

@@ -16,10 +16,6 @@ export const resolveCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to resolve' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -69,10 +65,6 @@ export const unresolveCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to unresolve' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -127,10 +119,6 @@ export const viewCrashToolDefinition = {
       },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -182,10 +170,6 @@ export const hideCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to hide' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -235,10 +219,6 @@ export const showCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to show' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -289,10 +269,6 @@ export const addCrashCommentToolDefinition = {
       comment: { type: 'string', description: 'Comment text to add' },
     },
     required: ['crash_id', 'comment'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -348,10 +324,6 @@ export const editCrashCommentToolDefinition = {
       comment: { type: 'string', description: 'New comment text' },
     },
     required: ['crash_id', 'comment_id', 'comment'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -407,10 +379,6 @@ export const deleteCrashCommentToolDefinition = {
       comment_id: { type: 'string', description: 'ID of the comment to delete' },
     },
     required: ['crash_id', 'comment_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -470,10 +438,6 @@ export const listCrashGroupsToolDefinition = {
       skip: { type: 'number', description: 'Number of records to skip for pagination', default: 0 },
       limit: { type: 'number', description: 'Maximum number of records to return', default: 10 },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -530,10 +494,6 @@ export const getCrashStatisticsToolDefinition = {
         default: '30days' 
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

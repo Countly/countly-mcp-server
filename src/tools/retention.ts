@@ -39,10 +39,6 @@ export const getRetentionToolDefinition = {
         description: 'Whether to save this retention report for later access. Defaults to false.'
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

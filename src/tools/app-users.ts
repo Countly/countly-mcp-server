@@ -65,10 +65,6 @@ export const createAppUserToolDefinition = {
         required: ['did']
       },
     },
-    anyOf: [
-      { required: ['app_id', 'data'] },
-      { required: ['app_name', 'data'] }
-    ],
   },
 };
 
@@ -163,10 +159,6 @@ export const editAppUserToolDefinition = {
         additionalProperties: true
       }
     },
-    anyOf: [
-      { required: ['app_id', 'query', 'update'] },
-      { required: ['app_name', 'query', 'update'] }
-    ],
   },
 };
 
@@ -225,10 +217,6 @@ export const deleteAppUserToolDefinition = {
         default: false 
       },
     },
-    anyOf: [
-      { required: ['app_id', 'query'] },
-      { required: ['app_name', 'query'] }
-    ],
   },
 };
 

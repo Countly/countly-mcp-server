@@ -83,10 +83,6 @@ export const getSlippingAwayUsersToolDefinition = {
       limit: { type: 'number', description: 'Maximum number of users to return', default: 50 },
       skip: { type: 'number', description: 'Number of users to skip for pagination', default: 0 },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -147,10 +143,6 @@ export const getSessionFrequencyToolDefinition = {
         default: '30days'
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -214,10 +206,6 @@ export const getUserLoyaltyToolDefinition = {
         description: 'Optional MongoDB query as JSON string to filter users (e.g., \'{"country":"US"}\' or \'{}\'). Defaults to \'{}\' (all users).' 
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -278,10 +266,6 @@ export const getSessionDurationsToolDefinition = {
         description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]"). Defaults to "30days".'
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -378,10 +362,6 @@ export const queryDataToolDefinition = {
       },
     },
     required: ['query_type'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
     allOf: [
       {
         if: { properties: { query_type: { const: 'analytics' } } },

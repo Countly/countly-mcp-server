@@ -20,10 +20,6 @@ export const createNoteToolDefinition = {
       category: { type: 'string', description: 'Optional category (e.g., "sessionHomeWidget" to display on session dashboard graph)' },
       emails: { type: 'array', items: { type: 'string' }, description: 'Optional array of email addresses' },
     },
-    anyOf: [
-      { required: ['app_id', 'note', 'ts', 'noteType', 'color'] },
-      { required: ['app_name', 'note', 'ts', 'noteType', 'color'] }
-    ],
   },
 };
 
@@ -99,10 +95,6 @@ export const listNotesToolDefinition = {
         default: '30days' 
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

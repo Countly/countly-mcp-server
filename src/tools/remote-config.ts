@@ -14,10 +14,6 @@ export const listRemoteConfigsToolDefinition = {
       app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -66,10 +62,6 @@ export const addRemoteConfigConditionToolDefinition = {
       },
     },
     required: ['condition'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -119,10 +111,6 @@ export const updateRemoteConfigConditionToolDefinition = {
       },
     },
     required: ['condition_id', 'condition'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -169,10 +157,6 @@ export const deleteRemoteConfigConditionToolDefinition = {
       },
     },
     required: ['condition_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -218,10 +202,6 @@ export const addRemoteConfigParameterToolDefinition = {
       },
     },
     required: ['parameter'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -271,10 +251,6 @@ export const updateRemoteConfigParameterToolDefinition = {
       },
     },
     required: ['parameter_id', 'parameter'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -321,10 +297,6 @@ export const deleteRemoteConfigParameterToolDefinition = {
       },
     },
     required: ['parameter_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

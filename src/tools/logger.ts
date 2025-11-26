@@ -19,10 +19,6 @@ export const listSDKLogsToolDefinition = {
         default: {}
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

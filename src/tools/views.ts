@@ -27,10 +27,6 @@ export const getViewsTableToolDefinition = {
         default: ['u','n','t','s','e','d','b','br','uvc']
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -90,10 +86,6 @@ export const getViewSegmentsToolDefinition = {
         default: '30days' 
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -157,10 +149,6 @@ export const getViewsDataToolDefinition = {
       segment: { type: 'string', description: 'Optional segment key to filter by', default: '' },
       segmentVal: { type: 'string', description: 'Optional segment value to filter by', default: '' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

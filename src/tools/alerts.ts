@@ -98,10 +98,6 @@ export const createAlertToolDefinition = {
         required: ['alertName', 'alertDataType', 'alertDataSubType', 'selectedApps', 'alertBy', 'enabled', 'compareDescribe', 'alertValues']
       },
     },
-    anyOf: [
-      { required: ['app_id', 'alert_config'] },
-      { required: ['app_name', 'alert_config'] }
-    ],
   },
 };
 
@@ -144,10 +140,6 @@ export const deleteAlertToolDefinition = {
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
       alert_id: { type: 'string', description: 'Alert ID to delete' },
     },
-    anyOf: [
-      { required: ['app_id', 'alert_id'] },
-      { required: ['app_name', 'alert_id'] }
-    ],
   },
 };
 
@@ -189,10 +181,6 @@ export const listAlertsToolDefinition = {
       app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

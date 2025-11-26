@@ -144,10 +144,6 @@ export const updateAppToolDefinition = {
       timezone: { type: 'string', description: 'Timezone (optional)' },
       category: { type: 'string', description: 'App category (optional)' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -212,10 +208,6 @@ export const deleteAppToolDefinition = {
       app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -262,10 +254,6 @@ export const resetAppToolDefinition = {
       app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

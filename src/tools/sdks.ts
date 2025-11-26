@@ -19,10 +19,6 @@ export const getSDKStatsToolDefinition = {
         default: '30days'
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -65,10 +61,6 @@ export const getSDKConfigToolDefinition = {
       app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

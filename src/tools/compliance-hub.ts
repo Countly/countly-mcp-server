@@ -19,10 +19,6 @@ export const getConsentStatsToolDefinition = {
         default: '30days'
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -86,10 +82,6 @@ export const listUserConsentsToolDefinition = {
         default: 'desc'
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -168,10 +160,6 @@ export const searchConsentHistoryToolDefinition = {
         default: 'desc'
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 

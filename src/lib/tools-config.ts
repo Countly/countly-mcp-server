@@ -84,6 +84,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   events: {
     operations: {
       'create_event': 'C',
+      'get_events_and_segments': 'R',
     },
     availableByDefault: true,
   },
@@ -137,6 +138,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'create_drill_bookmark': 'C',
       'delete_drill_bookmark': 'D',
       'get_metadata': 'R',
+      'get_queriable_fields_for_event': 'R',
     },
     requiresPlugin: 'drill',
     availableByDefault: false,
