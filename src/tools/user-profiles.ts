@@ -7,8 +7,8 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const queryUserProfilesToolDefinition = {
-  name: 'query_user_profiles',
-  description: 'Query user profiles using MongoDB query. Check drill get_queriable_fields_for_event for available user properties (without "up." prefix here)',
+  name: 'user_profiles_query',
+  description: 'Query user profiles using MongoDB query. Check drill queriable_fields_list for available user properties (without "up." prefix here)',
   inputSchema: {
     type: 'object',
     properties: {
@@ -72,7 +72,7 @@ export async function handleQueryUserProfiles(context: ToolContext, args: any): 
 // ============================================================================
 
 export const breakdownUserProfilesToolDefinition = {
-  name: 'breakdown_user_profiles',
+  name: 'user_profiles_breakdown',
   description: 'Break down user counts by specific properties (e.g., country, app version)',
   inputSchema: {
     type: 'object',
@@ -154,7 +154,7 @@ export async function handleBreakdownUserProfiles(context: ToolContext, args: an
 // ============================================================================
 
 export const getUserProfileDetailsToolDefinition = {
-  name: 'get_user_profile_details',
+  name: 'user_profiles_get',
   description: 'Get detailed information about a specific user by their UID',
   inputSchema: {
     type: 'object',
@@ -212,7 +212,7 @@ export async function handleGetUserProfileDetails(context: ToolContext, args: an
 // ============================================================================
 
 export const addUserNoteToolDefinition = {
-  name: 'add_user_note',
+  name: 'user_profiles_note_add',
   description: 'Add or update a note on a specific user profile',
   inputSchema: {
     type: 'object',
@@ -277,28 +277,28 @@ export const userProfilesToolDefinitions = [
 ];
 
 export const userProfilesToolHandlers = {
-  'query_user_profiles': 'query_user_profiles',
-  'breakdown_user_profiles': 'breakdown_user_profiles',
-  'get_user_profile_details': 'get_user_profile_details',
-  'add_user_note': 'add_user_note',
+  'user_profiles_query': 'user_profiles_query',
+  'user_profiles_breakdown': 'user_profiles_breakdown',
+  'user_profiles_get': 'user_profiles_get',
+  'user_profiles_note_add': 'user_profiles_note_add',
 } as const;
 
 export class UserProfilesTools {
   constructor(private context: ToolContext) {}
 
-  async query_user_profiles(args: any): Promise<ToolResult> {
+  async user_profiles_query(args: any): Promise<ToolResult> {
     return handleQueryUserProfiles(this.context, args);
   }
 
-  async breakdown_user_profiles(args: any): Promise<ToolResult> {
+  async user_profiles_breakdown(args: any): Promise<ToolResult> {
     return handleBreakdownUserProfiles(this.context, args);
   }
 
-  async get_user_profile_details(args: any): Promise<ToolResult> {
+  async user_profiles_get(args: any): Promise<ToolResult> {
     return handleGetUserProfileDetails(this.context, args);
   }
 
-  async add_user_note(args: any): Promise<ToolResult> {
+  async user_profiles_note_add(args: any): Promise<ToolResult> {
     return handleAddUserNote(this.context, args);
   }
 }

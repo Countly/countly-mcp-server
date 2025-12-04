@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const listABExperimentsToolDefinition = {
-  name: 'list_ab_experiments',
+  name: 'ab_experiments_list',
   description: 'List all A/B testing experiments for an application. Shows experiment names, statuses, variants, and results.',
   inputSchema: {
     type: 'object',
@@ -49,7 +49,7 @@ export async function handleListABExperiments(context: ToolContext, args: any): 
 // ============================================================================
 
 export const getABExperimentDetailToolDefinition = {
-  name: 'get_ab_experiment_detail',
+  name: 'ab_experiments_details',
   description: 'Get detailed information about a specific A/B testing experiment including variants, results, goals, and statistical significance.',
   inputSchema: {
     type: 'object',
@@ -91,7 +91,7 @@ export async function handleGetABExperimentDetail(context: ToolContext, args: an
 // ============================================================================
 
 export const createABExperimentToolDefinition = {
-  name: 'create_ab_experiment',
+  name: 'ab_experiments_create',
   description: 'Create a new A/B testing experiment with multiple variants, user targeting, and goals. Used for testing different features, UI elements, or configurations.',
   inputSchema: {
     type: 'object',
@@ -207,7 +207,7 @@ export async function handleCreateABExperiment(context: ToolContext, args: any):
 // ============================================================================
 
 export const startABExperimentToolDefinition = {
-  name: 'start_ab_experiment',
+  name: 'ab_experiments_start',
   description: 'Start an A/B testing experiment. Once started, the experiment begins collecting data and showing variants to users.',
   inputSchema: {
     type: 'object',
@@ -249,7 +249,7 @@ export async function handleStartABExperiment(context: ToolContext, args: any): 
 // ============================================================================
 
 export const stopABExperimentToolDefinition = {
-  name: 'stop_ab_experiment',
+  name: 'ab_experiments_stop',
   description: 'Stop a running A/B testing experiment. The experiment will no longer show variants to users but results remain available.',
   inputSchema: {
     type: 'object',
@@ -291,7 +291,7 @@ export async function handleStopABExperiment(context: ToolContext, args: any): P
 // ============================================================================
 
 export const deleteABExperimentToolDefinition = {
-  name: 'delete_ab_experiment',
+  name: 'ab_experiments_delete',
   description: 'Delete an A/B testing experiment. This permanently removes the experiment and all its data.',
   inputSchema: {
     type: 'object',
@@ -342,12 +342,12 @@ export const abTestingToolDefinitions = [
 ];
 
 export const abTestingToolHandlers = {
-  'list_ab_experiments': 'list_ab_experiments',
-  'get_ab_experiment_detail': 'get_ab_experiment_detail',
-  'create_ab_experiment': 'create_ab_experiment',
-  'start_ab_experiment': 'start_ab_experiment',
-  'stop_ab_experiment': 'stop_ab_experiment',
-  'delete_ab_experiment': 'delete_ab_experiment',
+  'ab_experiments_list': 'ab_experiments_list',
+  'ab_experiments_details': 'ab_experiments_details',
+  'ab_experiments_create': 'ab_experiments_create',
+  'ab_experiments_start': 'ab_experiments_start',
+  'ab_experiments_stop': 'ab_experiments_stop',
+  'ab_experiments_delete': 'ab_experiments_delete',
 } as const;
 
 // ============================================================================
@@ -357,27 +357,27 @@ export const abTestingToolHandlers = {
 export class ABTestingTools {
   constructor(private context: ToolContext) {}
 
-  async list_ab_experiments(args: any): Promise<ToolResult> {
+  async ab_experiments_list(args: any): Promise<ToolResult> {
     return handleListABExperiments(this.context, args);
   }
 
-  async get_ab_experiment_detail(args: any): Promise<ToolResult> {
+  async ab_experiments_details(args: any): Promise<ToolResult> {
     return handleGetABExperimentDetail(this.context, args);
   }
 
-  async create_ab_experiment(args: any): Promise<ToolResult> {
+  async ab_experiments_create(args: any): Promise<ToolResult> {
     return handleCreateABExperiment(this.context, args);
   }
 
-  async start_ab_experiment(args: any): Promise<ToolResult> {
+  async ab_experiments_start(args: any): Promise<ToolResult> {
     return handleStartABExperiment(this.context, args);
   }
 
-  async stop_ab_experiment(args: any): Promise<ToolResult> {
+  async ab_experiments_stop(args: any): Promise<ToolResult> {
     return handleStopABExperiment(this.context, args);
   }
 
-  async delete_ab_experiment(args: any): Promise<ToolResult> {
+  async ab_experiments_delete(args: any): Promise<ToolResult> {
     return handleDeleteABExperiment(this.context, args);
   }
 }

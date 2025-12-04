@@ -425,187 +425,187 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`get_plugins`** - Get list of installed plugins on the server
 - **`search`** - Search for relevant content in Countly data
 - **`fetch`** - Retrieve specific documents by ID
-- **`list_jobs`** - List all background jobs running on the Countly server with pagination and sorting
-- **`get_job_runs`** - Get run history and details for a specific background job by name
+- **`jobs_list`** - List all background jobs running on the Countly server with pagination and sorting
+- **`job_runs`** - Get run history and details for a specific background job by name
 
 ### App Management
-- **`list_apps`** - List all applications
-- **`get_app_by_name`** - Get app details by name
-- **`create_app`** - Create new application
-- **`update_app`** - Update app settings
-- **`delete_app`** - Delete application
-- **`reset_app`** - Reset app data
+- **`apps_list`** - List all applications
+- **`apps_get_by_name`** - Get app details by name
+- **`apps_create`** - Create new application
+- **`apps_update`** - Update app settings
+- **`apps_delete`** - Delete application
+- **`apps_reset`** - Reset app data
 
 ### Analytics & Dashboards
 - **`get_analytics_data`** - Analytics data breakdown by predefined methods (locations, carriers, devices, etc.). For multi-segment breakdowns, use drill tools
-- **`get_analytics_app_summary`** - General app summary and analytics overview
-- **`get_slipping_away_users`** - Identify inactive app users
-- **`get_session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
-- **`get_user_loyalty`** - User loyalty data showing session count distribution across loyalty buckets (1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, 500+)
-- **`get_session_durations`** - Session duration distribution across duration buckets (0-10 sec, 11-30 sec, 31-60 sec, 1-3 min, 3-10 min, 10-30 min, 30-60 min, 1+ hour)
+- **`app_analytics_summary`** - General app summary and analytics overview
+- **`slipping_users`** - Identify inactive app users
+- **`session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
+- **`user_loyalty`** - User loyalty data showing session count distribution across loyalty buckets (1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, 500+)
+- **`session_durations`** - Session duration distribution across duration buckets (0-10 sec, 11-30 sec, 31-60 sec, 1-3 min, 3-10 min, 10-30 min, 30-60 min, 1+ hour)
 
 ### Events
-- **`create_event`** - Define event with metadata and configuration
-- **`get_events_and_segments`** - List all events and their segments, including internal Countly events with exact database structure
+- **`events_create`** - Define event with metadata and configuration
+- **`events_segments`** - List all events and their segments, including internal Countly events with exact database structure
 - **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
 
 ### Dashboard User Management
-- **`get_all_dashboard_users`** - List all dashboard users (admin/management users who access the Countly dashboard)
+- **`dashboard_users`** - List all dashboard users (admin/management users who access the Countly dashboard)
 
 ### App User Management
-- **`create_app_user`** - Create app user (end-user being tracked in your application)
-- **`delete_app_user`** - Delete app user (end-user)
+- **`apps_create_user`** - Create app user (end-user being tracked in your application)
+- **`apps_delete_user`** - Delete app user (end-user)
 - **`export_app_users`** - Export app user data (end-users)
 
 ### Alerts & Notifications
-- **`create_alert`** - Create alert configuration
-- **`delete_alert`** - Delete alert
-- **`list_alerts`** - List all alerts
+- **`alerts_create`** - Create alert configuration
+- **`alerts_delete`** - Delete alert
+- **`alerts_list`** - List all alerts
 
 ### Notes
-- **`list_notes`** - List all dashboard notes
-- **`create_note`** - Create note
-- **`delete_note`** - Delete note
+- **`notes_list`** - List all dashboard notes
+- **`notes_create`** - Create note
+- **`notes_delete`** - Delete note
 
 ### Database Operations
-- **`list_databases`** - List available databases
-- **`query_database`** - Query database collections
-- **`get_document`** - Get specific document
-- **`aggregate_collection`** - Run aggregation pipelines
-- **`get_collection_indexes`** - View collection indexes
-- **`get_db_statistics`** - Database statistics
+- **`databases_list`** - List available databases
+- **`databases_query`** - Query database collections
+- **`databases_document`** - Get specific document
+- **`collections_aggregate`** - Run aggregation pipelines
+- **`collections_indexes`** - View collection indexes
+- **`databases_stats`** - Database statistics
 
 ### Crash Analytics
-- **`list_crash_groups`** - List crash groups for an app
-- **`get_crash_statistics`** - Get crash statistics and graphs
-- **`view_crash`** - View crash details
-- **`resolve_crash`** - Mark crash as resolved
-- **`unresolve_crash`** - Mark crash as unresolved
-- **`hide_crash`** - Hide crash from view
-- **`show_crash`** - Show hidden crash
-- **`add_crash_comment`** - Add comment to crash
-- **`edit_crash_comment`** - Edit crash comment
-- **`delete_crash_comment`** - Delete crash comment
+- **`crash_groups_list`** - List crash groups for an app
+- **`crashes_stats_get`** - Get crash statistics and graphs
+- **`crashes_get`** - View crash details
+- **`crashes_resolve`** - Mark crash as resolved
+- **`uncrashes_resolve`** - Mark crash as unresolved
+- **`crashes_hide`** - Hide crash from view
+- **`crashes_show`** - Show hidden crash
+- **`crashes_comment_add`** - Add comment to crash
+- **`crashes_comment_update`** - Edit crash comment
+- **`crashes_comment_delete`** - Delete crash comment
 
 ### Drill Segmentation (requires `drill` plugin)
-- **`get_queriable_fields_for_event`** - Get available properties for segmentation
+- **`queriable_fields_list`** - Get available properties for segmentation
 - **`run_query`** - Run drill query with filters and time buckets
-- **`list_drill_bookmarks`** - List saved segmentation queries
-- **`create_drill_bookmark`** - Save a segmentation query
-- **`delete_drill_bookmark`** - Delete a saved query
+- **`drill_bookmarks_list`** - List saved segmentation queries
+- **`drill_bookmarks_create`** - Save a segmentation query
+- **`drill_bookmarks_delete`** - Delete a saved query
 
 ### User Profiles (requires `users` plugin)
-- **`query_user_profiles`** - Query users with MongoDB filters
-- **`breakdown_user_profiles`** - Break down user counts by properties
-- **`get_user_profile_details`** - Get specific user details by UID
-- **`add_user_note`** - Add notes to user profiles
+- **`user_profiles_query`** - Query users with MongoDB filters
+- **`user_profiles_breakdown`** - Break down user counts by properties
+- **`user_profiles_get`** - Get specific user details by UID
+- **`user_profiles_note_add`** - Add notes to user profiles
 
 ### Cohorts (requires `cohorts` plugin)
-- **`list_cohorts`** - List all user cohorts with filtering
-- **`get_cohort`** - Get detailed cohort information
-- **`create_cohort`** - Create behavioral cohort based on user actions
-- **`update_cohort`** - Update cohort configuration
-- **`delete_cohort`** - Delete a cohort
+- **`cohorts_list`** - List all user cohorts with filtering
+- **`cohorts_details`** - Get detailed cohort information
+- **`cohorts_create`** - Create behavioral cohort based on user actions
+- **`cohorts_update`** - Update cohort configuration
+- **`cohorts_delete`** - Delete a cohort
 
 ### Funnels (requires `funnels` plugin)
-- **`list_funnels`** - List all conversion funnels
-- **`get_funnel`** - Get funnel configuration details
-- **`get_funnel_data`** - Get funnel analytics data with filtering
-- **`get_funnel_step_users`** - Get users who reached a specific step
-- **`get_funnel_dropoff_users`** - Get users who dropped off between steps
-- **`create_funnel`** - Create conversion funnel with event sequence
-- **`update_funnel`** - Update funnel configuration
-- **`delete_funnel`** - Delete a funnel
+- **`funnels_list`** - List all conversion funnels
+- **`funnels_details`** - Get funnel configuration details
+- **`funnels_details_data`** - Get funnel analytics data with filtering
+- **`funnels_details_step_users`** - Get users who reached a specific step
+- **`funnels_details_dropoff_users`** - Get users who dropped off between steps
+- **`funnels_create`** - Create conversion funnel with event sequence
+- **`funnels_update`** - Update funnel configuration
+- **`funnels_delete`** - Delete a funnel
 
 ### Formulas (requires `formulas` plugin)
-- **`run_formula`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
-- **`list_formulas`** - List all saved formulas
-- **`delete_formula`** - Delete a saved formula
+- **`formulas_run`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
+- **`formulas_list`** - List all saved formulas
+- **`formulas_delete`** - Delete a saved formula
 
 ### Live/Concurrent Users (requires `concurrent_users` plugin)
-- **`get_live_users`** - Get current online user count and new users at this moment
-- **`get_live_metrics`** - Get breakdown by countries, devices and carriers for users currently online
-- **`get_live_last_hour`** - Get minute-by-minute data for the last hour (60 data points)
-- **`get_live_last_day`** - Get hour-by-hour data for the last day (24 data points)
-- **`get_live_last_30_days`** - Get daily data for the last 30 days (30 data points)
-- **`get_live_overall`** - Get maximum values for online users (peak concurrent usage records)
+- **`live_users`** - Get current online user count and new users at this moment
+- **`live_metrics`** - Get breakdown by countries, devices and carriers for users currently online
+- **`live_last_hour`** - Get minute-by-minute data for the last hour (60 data points)
+- **`live_last_day`** - Get hour-by-hour data for the last day (24 data points)
+- **`live_last_30_days`** - Get daily data for the last 30 days (30 data points)
+- **`live_overall`** - Get maximum values for online users (peak concurrent usage records)
 
 ### Retention (requires `retention_segments` plugin)
-- **`get_retention`** - Get retention data showing consecutive event streaks. Supports three types: Full (strict - breaks on first skip), Classic (Day N - specific days independently), Unbounded (lenient - any return counts)
+- **`retention`** - Get retention data showing consecutive event streaks. Supports three types: Full (strict - breaks on first skip), Classic (Day N - specific days independently), Unbounded (lenient - any return counts)
 
 ### Remote Config (requires `remote-config` plugin)
-- **`list_remote_configs`** - List all remote config parameters and conditions
-- **`add_remote_config_condition`** - Add user segmentation condition using MongoDB queries
-- **`update_remote_config_condition`** - Update existing condition criteria
-- **`delete_remote_config_condition`** - Delete a condition (if not in use)
-- **`add_remote_config_parameter`** - Add parameter with default and conditional values
-- **`update_remote_config_parameter`** - Update parameter values, conditions, or status
-- **`delete_remote_config_parameter`** - Delete a parameter
+- **`remote_configs_list`** - List all remote config parameters and conditions
+- **`remote_config_conditions_add`** - Add user segmentation condition using MongoDB queries
+- **`remote_config_conditions_update`** - Update existing condition criteria
+- **`remote_config_conditions_delete`** - Delete a condition (if not in use)
+- **`remote_config_parameters_add`** - Add parameter with default and conditional values
+- **`remote_config_parameters_update`** - Update parameter values, conditions, or status
+- **`remote_config_parameters_delete`** - Delete a parameter
 
 ### A/B Testing (requires `ab-testing` plugin)
-- **`list_ab_experiments`** - List all A/B testing experiments with statuses and results
-- **`get_ab_experiment_detail`** - Get detailed experiment info including variants and statistical significance
-- **`create_ab_experiment`** - Create new experiment with variants, user targeting, and goals
-- **`start_ab_experiment`** - Start experiment to begin collecting data
-- **`stop_ab_experiment`** - Stop running experiment
-- **`delete_ab_experiment`** - Delete experiment and all its data
+- **`ab_experiments_list`** - List all A/B testing experiments with statuses and results
+- **`ab_experiments_details`** - Get detailed experiment info including variants and statistical significance
+- **`ab_experiments_create`** - Create new experiment with variants, user targeting, and goals
+- **`ab_experiments_start`** - Start experiment to begin collecting data
+- **`ab_experiments_stop`** - Stop running experiment
+- **`ab_experiments_delete`** - Delete experiment and all its data
 
 ### Logger (requires `logger` plugin)
-- **`list_sdk_logs`** - List incoming data logs sent by SDK to the server for debugging and monitoring
+- **`sdk_logs_list`** - List incoming data logs sent by SDK to the server for debugging and monitoring
 
 ### SDKs (requires `sdks` plugin)
-- **`get_sdk_stats`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
-- **`get_sdk_config`** - Get SDK configuration settings controlling SDK behavior and enabled features
+- **`sdk_stats_get`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
+- **`sdk_config_get`** - Get SDK configuration settings controlling SDK behavior and enabled features
 
 ### Compliance Hub (requires `compliance-hub` plugin)
-- **`get_consent_stats`** - Get aggregated consent statistics showing which consents users gave and when
-- **`list_user_consents`** - List specific users and their consent status
-- **`search_consent_history`** - Search consent history records with detailed audit trail
+- **`consents_stats`** - Get aggregated consent statistics showing which consents users gave and when
+- **`consents_list`** - List specific users and their consent status
+- **`consents_history_search`** - Search consent history records with detailed audit trail
 
 ### Filtering Rules (requires `blocks` plugin)
-- **`list_filtering_rules`** - List all blocking rules that filter incoming requests
-- **`create_filtering_rule`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
-- **`update_filtering_rule`** - Update existing blocking rule configuration
-- **`delete_filtering_rule`** - Delete a blocking rule
+- **`filtering_rules_list`** - List all blocking rules that filter incoming requests
+- **`filtering_rules_create`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
+- **`filtering_rules_update`** - Update existing blocking rule configuration
+- **`filtering_rules_delete`** - Delete a blocking rule
 
 ### Datapoint (requires `server-stats` plugin)
-- **`get_datapoint_statistics`** - Get data points collected per app per datapoint type. Data points measure collected data and are tied to server specs and billing.
-- **`get_top_datapoint_apps`** - Get top apps ranked by data point collection for understanding data usage and billing
-- **`get_datapoint_punch_card`** - Get hourly data point breakdown punchcard showing server load patterns for capacity planning
+- **`datapoints_stats`** - Get data points collected per app per datapoint type. Data points measure collected data and are tied to server specs and billing.
+- **`datapoints_top_apps`** - Get top apps ranked by data point collection for understanding data usage and billing
+- **`datapoints_punch_card`** - Get hourly data point breakdown punchcard showing server load patterns for capacity planning
 
 ### Server Logs (requires `errorlogs` plugin)
-- **`list_server_log_files`** - List available server log files (only available in non-Docker deployments)
-- **`get_server_log_contents`** - Get contents of a specific server log file for debugging and monitoring (only available in non-Docker deployments)
+- **`server_logs_files_list`** - List available server log files (only available in non-Docker deployments)
+- **`server_logs_contents`** - Get contents of a specific server log file for debugging and monitoring (only available in non-Docker deployments)
 
 ### Email Reports (requires `reports` plugin)
-- **`list_email_reports`** - List all email reports configured for an app
-- **`create_core_email_report`** - Create a core email report with metrics like analytics, events, crashes, and star-rating
-- **`create_dashboard_email_report`** - Create a dashboard email report for specific dashboards
-- **`update_email_report`** - Update an existing email report configuration
-- **`preview_email_report`** - Preview an email report to see what it will look like before sending
-- **`send_email_report`** - Manually trigger sending an email report immediately
-- **`delete_email_report`** - Delete an email report configuration
+- **`email_reports_list`** - List all email reports configured for an app
+- **`email_reports_core_create`** - Create a core email report with metrics like analytics, events, crashes, and star-rating
+- **`email_reports_dashboard_create`** - Create a dashboard email report for specific dashboards
+- **`email_reports_update`** - Update an existing email report configuration
+- **`email_reports_preview`** - Preview an email report to see what it will look like before sending
+- **`email_reports_send`** - Manually trigger sending an email report immediately
+- **`email_reports_delete`** - Delete an email report configuration
 
 ### Dashboards (requires `dashboards` plugin)
-- **`list_dashboards`** - List all available dashboards (with optional schema-only parameter)
-- **`get_dashboard_data`** - Get widgets and data for a specific dashboard with time period filtering
-- **`create_dashboard`** - Create a new dashboard with sharing settings, auto-refresh configuration, and theme
-- **`update_dashboard`** - Update dashboard configuration (name, sharing, refresh rate, theme)
-- **`delete_dashboard`** - Delete a dashboard by ID
-- **`add_dashboard_widget`** - Add a widget to a dashboard with full configuration (title, feature, widget type, apps, metrics, visualization)
-- **`update_dashboard_widget`** - Update widget position and size in the grid layout
-- **`remove_dashboard_widget`** - Remove a widget from a dashboard
+- **`dashboards_list`** - List all available dashboards (with optional schema-only parameter)
+- **`dashboards_data`** - Get widgets and data for a specific dashboard with time period filtering
+- **`dashboards_create`** - Create a new dashboard with sharing settings, auto-refresh configuration, and theme
+- **`dashboards_update`** - Update dashboard configuration (name, sharing, refresh rate, theme)
+- **`dashboards_delete`** - Delete a dashboard by ID
+- **`dashboards_widget_add`** - Add a widget to a dashboard with full configuration (title, feature, widget type, apps, metrics, visualization)
+- **`dashboards_update_widget`** - Update widget position and size in the grid layout
+- **`dashboards_widget_remove`** - Remove a widget from a dashboard
 
 ### Times of Day (requires `times-of-day` plugin)
-- **`get_times_of_day`** - Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.
+- **`times_of_day`** - Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.
 
 ### Hooks (requires `hooks` plugin)
-- **`list_hooks`** - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.
-- **`test_hook`** - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
-- **`create_hook`** - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
-- **`update_hook`** - Update an existing webhook/hook configuration.
-- **`delete_hook`** - Delete a webhook/hook by its ID.
-- **`get_internal_triggers`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
+- **`hooks_list`** - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.
+- **`hooks_test`** - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
+- **`hooks_create`** - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
+- **`hooks_update`** - Update an existing webhook/hook configuration.
+- **`hooks_delete`** - Delete a webhook/hook by its ID.
+- **`hooks_internal_triggers_get`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

@@ -11,11 +11,11 @@ import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
 /**
- * Tool: get_times_of_day
+ * Tool: times_of_day
  * Get user behavior patterns in their local time for a specific event
  */
 export const getTimesOfDayTool = {
-  name: 'get_times_of_day',
+  name: 'times_of_day',
   description: 'Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.',
   inputSchema: z.object({
     app_id: z.string()
@@ -74,5 +74,5 @@ export const timesOfDayTools = [
 
 // Export handlers map
 export const timesOfDayHandlers = {
-  get_times_of_day: handleGetTimesOfDay,
+  times_of_day: handleGetTimesOfDay,
 };

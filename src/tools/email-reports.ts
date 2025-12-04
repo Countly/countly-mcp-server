@@ -11,11 +11,11 @@ import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
 /**
- * Tool: list_email_reports
+ * Tool: email_reports_list
  * List all email reports
  */
 export const listEmailReportsTool = {
-  name: 'list_email_reports',
+  name: 'email_reports_list',
   description: 'List all email reports configured for an app',
   inputSchema: z.object({
     app_id: z.string()
@@ -51,11 +51,11 @@ async function handleListEmailReports(args: z.infer<typeof listEmailReportsTool.
 }
 
 /**
- * Tool: create_core_email_report
+ * Tool: email_reports_core_create
  * Create a core email report with metrics like analytics, events, crashes
  */
 export const createCoreEmailReportTool = {
-  name: 'create_core_email_report',
+  name: 'email_reports_core_create',
   description: 'Create a core email report with metrics like analytics, events, crashes, and star-rating',
   inputSchema: z.object({
     app_id: z.string()
@@ -143,11 +143,11 @@ async function handleCreateCoreEmailReport(args: z.infer<typeof createCoreEmailR
 }
 
 /**
- * Tool: create_dashboard_email_report
+ * Tool: email_reports_dashboard_create
  * Create a dashboard email report
  */
 export const createDashboardEmailReportTool = {
-  name: 'create_dashboard_email_report',
+  name: 'email_reports_dashboard_create',
   description: 'Create a dashboard email report for specific dashboards',
   inputSchema: z.object({
     app_id: z.string()
@@ -227,11 +227,11 @@ async function handleCreateDashboardEmailReport(args: z.infer<typeof createDashb
 }
 
 /**
- * Tool: update_email_report
+ * Tool: email_reports_update
  * Update an existing email report
  */
 export const updateEmailReportTool = {
-  name: 'update_email_report',
+  name: 'email_reports_update',
   description: 'Update an existing email report configuration',
   inputSchema: z.object({
     app_id: z.string()
@@ -336,11 +336,11 @@ async function handleUpdateEmailReport(args: z.infer<typeof updateEmailReportToo
 }
 
 /**
- * Tool: preview_email_report
+ * Tool: email_reports_preview
  * Preview an email report before sending
  */
 export const previewEmailReportTool = {
-  name: 'preview_email_report',
+  name: 'email_reports_preview',
   description: 'Preview an email report to see what it will look like before sending',
   inputSchema: z.object({
     app_id: z.string()
@@ -379,11 +379,11 @@ async function handlePreviewEmailReport(args: z.infer<typeof previewEmailReportT
 }
 
 /**
- * Tool: send_email_report
+ * Tool: email_reports_send
  * Manually trigger sending an email report
  */
 export const sendEmailReportTool = {
-  name: 'send_email_report',
+  name: 'email_reports_send',
   description: 'Manually trigger sending an email report immediately',
   inputSchema: z.object({
     app_id: z.string()
@@ -422,11 +422,11 @@ async function handleSendEmailReport(args: z.infer<typeof sendEmailReportTool.in
 }
 
 /**
- * Tool: delete_email_report
+ * Tool: email_reports_delete
  * Delete an email report
  */
 export const deleteEmailReportTool = {
-  name: 'delete_email_report',
+  name: 'email_reports_delete',
   description: 'Delete an email report configuration',
   inputSchema: z.object({
     app_id: z.string()
@@ -481,13 +481,13 @@ export const emailReportsToolDefinitions = [
  * Export tool handlers map
  */
 export const emailReportsToolHandlers = {
-  'list_email_reports': 'listEmailReports',
-  'create_core_email_report': 'createCoreEmailReport',
-  'create_dashboard_email_report': 'createDashboardEmailReport',
-  'update_email_report': 'updateEmailReport',
-  'preview_email_report': 'previewEmailReport',
-  'send_email_report': 'sendEmailReport',
-  'delete_email_report': 'deleteEmailReport',
+  'email_reports_list': 'listEmailReports',
+  'email_reports_core_create': 'createCoreEmailReport',
+  'email_reports_dashboard_create': 'createDashboardEmailReport',
+  'email_reports_update': 'updateEmailReport',
+  'email_reports_preview': 'previewEmailReport',
+  'email_reports_send': 'sendEmailReport',
+  'email_reports_delete': 'deleteEmailReport',
 } as const;
 
 /**

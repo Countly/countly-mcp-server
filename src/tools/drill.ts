@@ -7,7 +7,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getAvailableFieldsToolDefinition = {
-  name: 'get_queriable_fields_for_event',
+  name: 'queriable_fields_list',
   description: 'List all available fields for querying: user properties (use exact field names with prefixes), event segments (when event specified), and system fields (always available). Use these exact field names in run_query.',
   inputSchema: {
     type: 'object',
@@ -152,7 +152,7 @@ function getTypeDescription(type: string): string {
 // ============================================================================
 
 export const listDrillBookmarksToolDefinition = {
-  name: 'list_drill_bookmarks',
+  name: 'drill_bookmarks_list',
   description: 'List all existing drill bookmarks for a specific event',
   inputSchema: {
     type: 'object',
@@ -232,7 +232,7 @@ export async function handleListDrillBookmarks(context: ToolContext, args: any):
 // ============================================================================
 
 export const createDrillBookmarkToolDefinition = {
-  name: 'create_drill_bookmark',
+  name: 'drill_bookmarks_create',
   description: 'Create a new drill bookmark to save a query for later reuse',
   inputSchema: {
     type: 'object',
@@ -355,7 +355,7 @@ export async function handleCreateDrillBookmark(context: ToolContext, args: any)
 // ============================================================================
 
 export const deleteDrillBookmarkToolDefinition = {
-  name: 'delete_drill_bookmark',
+  name: 'drill_bookmarks_delete',
   description: 'Delete a drill bookmark',
   inputSchema: {
     type: 'object',
@@ -407,7 +407,7 @@ export async function handleDeleteDrillBookmark(context: ToolContext, args: any)
 // ============================================================================
 
 export const getMetadataToolDefinition = {
-  name: 'get_metadata',
+  name: 'metadata_get',
   description: 'Get comprehensive metadata for all events, segments, and properties in an app. Includes user properties, custom properties, campaign properties, and event-specific segments if drill plugin is available.',
   inputSchema: {
     type: 'object',
@@ -662,33 +662,33 @@ export const drillToolDefinitions = [
 ];
 
 export const drillToolHandlers = {
-  'get_queriable_fields_for_event': 'get_queriable_fields_for_event',
-  'list_drill_bookmarks': 'list_drill_bookmarks',
-  'create_drill_bookmark': 'create_drill_bookmark',
-  'delete_drill_bookmark': 'delete_drill_bookmark',
-  'get_metadata': 'get_metadata',
+  'queriable_fields_list': 'queriable_fields_list',
+  'drill_bookmarks_list': 'drill_bookmarks_list',
+  'drill_bookmarks_create': 'drill_bookmarks_create',
+  'drill_bookmarks_delete': 'drill_bookmarks_delete',
+  'metadata_get': 'metadata_get',
 } as const;
 
 export class DrillTools {
   constructor(private context: ToolContext) {}
 
-  async get_queriable_fields_for_event(args: any): Promise<ToolResult> {
+  async queriable_fields_list(args: any): Promise<ToolResult> {
     return handleGetAvailableFields(this.context, args);
   }
 
-  async list_drill_bookmarks(args: any): Promise<ToolResult> {
+  async drill_bookmarks_list(args: any): Promise<ToolResult> {
     return handleListDrillBookmarks(this.context, args);
   }
 
-  async create_drill_bookmark(args: any): Promise<ToolResult> {
+  async drill_bookmarks_create(args: any): Promise<ToolResult> {
     return handleCreateDrillBookmark(this.context, args);
   }
 
-  async delete_drill_bookmark(args: any): Promise<ToolResult> {
+  async drill_bookmarks_delete(args: any): Promise<ToolResult> {
     return handleDeleteDrillBookmark(this.context, args);
   }
 
-  async get_metadata(args: any): Promise<ToolResult> {
+  async metadata_get(args: any): Promise<ToolResult> {
     return handleGetMetadata(this.context, args);
   }
 }

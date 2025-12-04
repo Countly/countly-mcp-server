@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const listFilteringRulesToolDefinition = {
-  name: 'list_filtering_rules',
+  name: 'filtering_rules_list',
   description: 'List all filtering rules that block specific requests or data from entering the Countly server. Shows rules for blocking sessions, events, or all requests based on conditions.',
   inputSchema: {
     type: 'object',
@@ -45,7 +45,7 @@ export async function handleListFilteringRules(context: ToolContext, args: any):
 // ============================================================================
 
 export const createFilteringRuleToolDefinition = {
-  name: 'create_filtering_rule',
+  name: 'filtering_rules_create',
   description: 'Create a new filtering rule to block requests. Can block all requests, sessions, or specific events based on MongoDB query conditions (e.g., IP address, app version, device properties).',
   inputSchema: {
     type: 'object',
@@ -124,7 +124,7 @@ export async function handleCreateFilteringRule(context: ToolContext, args: any)
 // ============================================================================
 
 export const updateFilteringRuleToolDefinition = {
-  name: 'update_filtering_rule',
+  name: 'filtering_rules_update',
   description: 'Update an existing filtering rule. Can modify conditions, enable/disable rules, or change the rule type.',
   inputSchema: {
     type: 'object',
@@ -133,7 +133,7 @@ export const updateFilteringRuleToolDefinition = {
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
       block_id: { 
         type: 'string', 
-        description: 'ID of the filtering rule to update (_id from list_filtering_rules)'
+        description: 'ID of the filtering rule to update (_id from filtering_rules_list)'
       },
       type: { 
         type: 'string', 
@@ -208,7 +208,7 @@ export async function handleUpdateFilteringRule(context: ToolContext, args: any)
 // ============================================================================
 
 export const deleteFilteringRuleToolDefinition = {
-  name: 'delete_filtering_rule',
+  name: 'filtering_rules_delete',
   description: 'Delete a filtering rule. Once deleted, requests matching the rule conditions will no longer be blocked.',
   inputSchema: {
     type: 'object',
@@ -217,7 +217,7 @@ export const deleteFilteringRuleToolDefinition = {
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
       block_id: { 
         type: 'string', 
-        description: 'ID of the filtering rule to delete (_id from list_filtering_rules)'
+        description: 'ID of the filtering rule to delete (_id from filtering_rules_list)'
       },
     },
     required: ['block_id'],
@@ -260,10 +260,10 @@ export const filteringRulesToolDefinitions = [
 ];
 
 export const filteringRulesToolHandlers = {
-  'list_filtering_rules': 'list_filtering_rules',
-  'create_filtering_rule': 'create_filtering_rule',
-  'update_filtering_rule': 'update_filtering_rule',
-  'delete_filtering_rule': 'delete_filtering_rule',
+  'filtering_rules_list': 'filtering_rules_list',
+  'filtering_rules_create': 'filtering_rules_create',
+  'filtering_rules_update': 'filtering_rules_update',
+  'filtering_rules_delete': 'filtering_rules_delete',
 } as const;
 
 // ============================================================================
@@ -273,19 +273,19 @@ export const filteringRulesToolHandlers = {
 export class FilteringRulesTools {
   constructor(private context: ToolContext) {}
 
-  async list_filtering_rules(args: any): Promise<ToolResult> {
+  async filtering_rules_list(args: any): Promise<ToolResult> {
     return handleListFilteringRules(this.context, args);
   }
 
-  async create_filtering_rule(args: any): Promise<ToolResult> {
+  async filtering_rules_create(args: any): Promise<ToolResult> {
     return handleCreateFilteringRule(this.context, args);
   }
 
-  async update_filtering_rule(args: any): Promise<ToolResult> {
+  async filtering_rules_update(args: any): Promise<ToolResult> {
     return handleUpdateFilteringRule(this.context, args);
   }
 
-  async delete_filtering_rule(args: any): Promise<ToolResult> {
+  async filtering_rules_delete(args: any): Promise<ToolResult> {
     return handleDeleteFilteringRule(this.context, args);
   }
 }

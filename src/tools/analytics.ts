@@ -12,7 +12,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getAnalyticsAppSummaryToolDefinition = {
-  name: 'get_analytics_app_summary',
+  name: 'app_analytics_summary',
   description: 'Get general summary information about an app, including analytics data. Can be used for general information requests about the app, like how is app doing, or show me info about this app, etc.',
   inputSchema: {
     type: 'object',
@@ -67,7 +67,7 @@ params.period = period;
 // ============================================================================
 
 export const getSlippingAwayUsersToolDefinition = {
-  name: 'get_slipping_away_users',
+  name: 'slipping_users',
   description: 'Get users who are slipping away based on inactivity period',
   inputSchema: {
     type: 'object',
@@ -124,7 +124,7 @@ export async function handleGetSlippingAwayUsers(context: ToolContext, args: any
 // ============================================================================
 
 export const getSessionFrequencyToolDefinition = {
-  name: 'get_session_frequency',
+  name: 'session_frequency',
   description: 'Get session frequency distribution showing how many sessions fall into different time buckets. Buckets: f=0 (first session), f=1 (1-24 hours), f=2 (1 day), f=3 (2 days), f=4 (3 days), f=5 (4 days), f=6 (5 days), f=7 (6 days), f=8 (7 days), f=9 (8-14 days), f=10 (15-30 days), f=11 (30+ days)',
   inputSchema: {
     type: 'object',
@@ -194,7 +194,7 @@ export async function handleGetSessionFrequency(context: ToolContext, args: any)
 // ============================================================================
 
 export const getUserLoyaltyToolDefinition = {
-  name: 'get_user_loyalty',
+  name: 'user_loyalty',
   description: 'Get user loyalty data showing how many sessions users have had. Results are divided into loyalty buckets: 1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, and 500+ sessions.',
   inputSchema: {
     type: 'object',
@@ -254,7 +254,7 @@ export async function handleGetUserLoyalty(context: ToolContext, args: any): Pro
 // ============================================================================
 
 export const getSessionDurationsToolDefinition = {
-  name: 'get_session_durations',
+  name: 'session_durations',
   description: 'Get session duration distribution showing how long user sessions lasted. Results are divided into duration buckets: 0-10 seconds, 11-30 seconds, 31-60 seconds, 1-3 minutes, 3-10 minutes, 10-30 minutes, 30-60 minutes, and over 1 hour.',
   inputSchema: {
     type: 'object',
@@ -343,7 +343,7 @@ export const queryDataToolDefinition = {
       // Drill-specific
       query_object: {
         type: 'string',
-        description: 'MongoDB query object as JSON string (for drill query_type). Use prefixes as shown in get_queriable_fields_for_event.'
+        description: 'MongoDB query object as JSON string (for drill query_type). Use prefixes as shown in queriable_fields_list.'
       },
       bucket: {
         type: 'string',
@@ -476,11 +476,11 @@ export const analyticsToolDefinitions = [
 
 export const analyticsToolHandlers = {
   'query_data': 'queryData',
-  'get_analytics_app_summary': 'getAnalyticsAppSummary',
-  'get_slipping_away_users': 'getSlippingAwayUsers',
-  'get_session_frequency': 'getSessionFrequency',
-  'get_user_loyalty': 'getUserLoyalty',
-  'get_session_durations': 'getSessionDurations',
+  'app_analytics_summary': 'getAnalyticsAppSummary',
+  'slipping_users': 'getSlippingAwayUsers',
+  'session_frequency': 'getSessionFrequency',
+  'user_loyalty': 'getUserLoyalty',
+  'session_durations': 'getSessionDurations',
 } as const;
 
 export class AnalyticsTools {

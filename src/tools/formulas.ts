@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const runFormulaToolDefinition = {
-  name: 'run_formula',
+  name: 'formulas_run',
   description: 'Run a formula calculation on number properties using mathematical equations. Formulas can combine various metrics like sessions, events, users with filters and segments.',
   inputSchema: {
     type: 'object',
@@ -122,7 +122,7 @@ export async function handleRunFormula(context: ToolContext, args: any): Promise
 // ============================================================================
 
 export const listFormulasToolDefinition = {
-  name: 'list_formulas',
+  name: 'formulas_list',
   description: 'List all saved formulas for an application.',
   inputSchema: {
     type: 'object',
@@ -174,7 +174,7 @@ export async function handleListFormulas(context: ToolContext, args: any): Promi
 // ============================================================================
 
 export const deleteFormulaToolDefinition = {
-  name: 'delete_formula',
+  name: 'formulas_delete',
   description: 'Delete a saved formula by its ID.',
   inputSchema: {
     type: 'object',
@@ -225,9 +225,9 @@ export const formulasToolDefinitions = [
 ];
 
 export const formulasToolHandlers = {
-  'run_formula': 'runFormula',
-  'list_formulas': 'listFormulas',
-  'delete_formula': 'deleteFormula',
+  'formulas_run': 'runFormula',
+  'formulas_list': 'listFormulas',
+  'formulas_delete': 'deleteFormula',
 } as const;
 
 export class FormulasTools {

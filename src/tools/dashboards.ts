@@ -11,11 +11,11 @@ import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
 /**
- * Tool: list_dashboards
+ * Tool: dashboards_list
  * List all available dashboards for the current user
  */
 export const listDashboardsTool = {
-  name: 'list_dashboards',
+  name: 'dashboards_list',
   description: 'List all available dashboards for the current user',
   inputSchema: z.object({
     just_schema: z.boolean()
@@ -47,11 +47,11 @@ async function handleListDashboards(args: z.infer<typeof listDashboardsTool.inpu
 }
 
 /**
- * Tool: get_dashboard_data
+ * Tool: dashboards_data
  * Get widgets and data for a specific dashboard
  */
 export const getDashboardDataTool = {
-  name: 'get_dashboard_data',
+  name: 'dashboards_data',
   description: 'Get widgets and data for a specific dashboard with optional period filtering',
   inputSchema: z.object({
     dashboard_id: z.string()
@@ -91,11 +91,11 @@ async function handleGetDashboardData(args: z.infer<typeof getDashboardDataTool.
 }
 
 /**
- * Tool: create_dashboard
+ * Tool: dashboards_create
  * Create a new dashboard
  */
 export const createDashboardTool = {
-  name: 'create_dashboard',
+  name: 'dashboards_create',
   description: 'Create a new dashboard with specified settings',
   inputSchema: z.object({
     name: z.string()
@@ -150,11 +150,11 @@ async function handleCreateDashboard(args: z.infer<typeof createDashboardTool.in
 }
 
 /**
- * Tool: update_dashboard
+ * Tool: dashboards_update
  * Update an existing dashboard
  */
 export const updateDashboardTool = {
-  name: 'update_dashboard',
+  name: 'dashboards_update',
   description: 'Update an existing dashboard configuration',
   inputSchema: z.object({
     dashboard_id: z.string()
@@ -215,11 +215,11 @@ async function handleUpdateDashboard(args: z.infer<typeof updateDashboardTool.in
 }
 
 /**
- * Tool: delete_dashboard
+ * Tool: dashboards_delete
  * Delete a dashboard
  */
 export const deleteDashboardTool = {
-  name: 'delete_dashboard',
+  name: 'dashboards_delete',
   description: 'Delete a dashboard',
   inputSchema: z.object({
     dashboard_id: z.string()
@@ -249,11 +249,11 @@ async function handleDeleteDashboard(args: z.infer<typeof deleteDashboardTool.in
 }
 
 /**
- * Tool: add_dashboard_widget
+ * Tool: dashboards_widget_add
  * Add a widget to a dashboard
  */
 export const addDashboardWidgetTool = {
-  name: 'add_dashboard_widget',
+  name: 'dashboards_widget_add',
   description: 'Add a widget to a dashboard. Widgets can display various metrics like analytics, events, or custom data.',
   inputSchema: z.object({
     dashboard_id: z.string()
@@ -295,11 +295,11 @@ async function handleAddDashboardWidget(args: z.infer<typeof addDashboardWidgetT
 }
 
 /**
- * Tool: update_dashboard_widget
+ * Tool: dashboards_widget_update
  * Update a widget in a dashboard
  */
 export const updateDashboardWidgetTool = {
-  name: 'update_dashboard_widget',
+  name: 'dashboards_widget_update',
   description: 'Update a widget in a dashboard (e.g., change position, size, or configuration)',
   inputSchema: z.object({
     dashboard_id: z.string()
@@ -337,11 +337,11 @@ async function handleUpdateDashboardWidget(args: z.infer<typeof updateDashboardW
 }
 
 /**
- * Tool: remove_dashboard_widget
+ * Tool: dashboards_widget_remove
  * Remove a widget from a dashboard
  */
 export const removeDashboardWidgetTool = {
-  name: 'remove_dashboard_widget',
+  name: 'dashboards_widget_remove',
   description: 'Remove a widget from a dashboard',
   inputSchema: z.object({
     dashboard_id: z.string()
@@ -391,14 +391,14 @@ export const dashboardsToolDefinitions = [
  * Export tool handlers map
  */
 export const dashboardsToolHandlers = {
-  'list_dashboards': 'listDashboards',
-  'get_dashboard_data': 'getDashboardData',
-  'create_dashboard': 'createDashboard',
-  'update_dashboard': 'updateDashboard',
-  'delete_dashboard': 'deleteDashboard',
-  'add_dashboard_widget': 'addDashboardWidget',
-  'update_dashboard_widget': 'updateDashboardWidget',
-  'remove_dashboard_widget': 'removeDashboardWidget',
+  'dashboards_list': 'listDashboards',
+  'dashboards_data': 'getDashboardData',
+  'dashboards_create': 'createDashboard',
+  'dashboards_update': 'updateDashboard',
+  'dashboards_delete': 'deleteDashboard',
+  'dashboards_widget_add': 'addDashboardWidget',
+  'dashboards_widget_update': 'updateDashboardWidget',
+  'dashboards_widget_remove': 'removeDashboardWidget',
 } as const;
 
 /**

@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const listSDKLogsToolDefinition = {
-  name: 'list_sdk_logs',
+  name: 'sdk_logs_list',
   description: 'List incoming data logs sent by SDK to the server. Shows raw SDK requests and responses for debugging and monitoring purposes.',
   inputSchema: {
     type: 'object',
@@ -59,7 +59,7 @@ export const loggerToolDefinitions = [
 ];
 
 export const loggerToolHandlers = {
-  'list_sdk_logs': 'list_sdk_logs',
+  'sdk_logs_list': 'sdk_logs_list',
 } as const;
 
 // ============================================================================
@@ -69,7 +69,7 @@ export const loggerToolHandlers = {
 export class LoggerTools {
   constructor(private context: ToolContext) {}
 
-  async list_sdk_logs(args: any): Promise<ToolResult> {
+  async sdk_logs_list(args: any): Promise<ToolResult> {
     return handleListSDKLogs(this.context, args);
   }
 }

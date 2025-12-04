@@ -15,7 +15,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const listFunnelsToolDefinition = {
-  name: 'list_funnels',
+  name: 'funnels_list',
   description: 'List all funnels with their configurations and performance metrics. Funnels track user progression through a sequence of events.',
   inputSchema: {
     type: 'object',
@@ -79,7 +79,7 @@ export async function handleListFunnels(
 // ============================================================================
 
 export const getFunnelToolDefinition = {
-  name: 'get_funnel',
+  name: 'funnels_details',
   description: 'Get detailed information about a specific funnel including its configuration, steps, and performance data.',
   inputSchema: {
     type: 'object',
@@ -132,7 +132,7 @@ export async function handleGetFunnel(
 // ============================================================================
 
 export const getFunnelDataToolDefinition = {
-  name: 'get_funnel_data',
+  name: 'funnels_data',
   description: 'Get funnel analytics data for a specific time period with optional filtering.',
   inputSchema: {
     type: 'object',
@@ -211,7 +211,7 @@ export async function handleGetFunnelData(
 // ============================================================================
 
 export const getFunnelStepUsersToolDefinition = {
-  name: 'get_funnel_step_users',
+  name: 'funnels_step_users',
   description: 'Get list of user IDs (UIDs) who reached a specific step in the funnel.',
   inputSchema: {
     type: 'object',
@@ -284,7 +284,7 @@ export async function handleGetFunnelStepUsers(
 // ============================================================================
 
 export const getFunnelDropoffUsersToolDefinition = {
-  name: 'get_funnel_dropoff_users',
+  name: 'funnels_dropoff_users',
   description: 'Get list of user IDs (UIDs) who dropped off between two steps in the funnel.',
   inputSchema: {
     type: 'object',
@@ -362,7 +362,7 @@ export async function handleGetFunnelDropoffUsers(
 // ============================================================================
 
 export const createFunnelToolDefinition = {
-  name: 'create_funnel',
+  name: 'funnels_create',
   description: 'Create a new conversion funnel to track user progression through a sequence of events. Define steps, queries for filtering, and session requirements.',
   inputSchema: {
     type: 'object',
@@ -493,7 +493,7 @@ export async function handleCreateFunnel(
 // ============================================================================
 
 export const updateFunnelToolDefinition = {
-  name: 'update_funnel',
+  name: 'funnels_update',
   description: 'Update an existing funnel configuration including name, description, steps, and filters.',
   inputSchema: {
     type: 'object',
@@ -623,7 +623,7 @@ export async function handleUpdateFunnel(
 // ============================================================================
 
 export const deleteFunnelToolDefinition = {
-  name: 'delete_funnel',
+  name: 'funnels_delete',
   description: 'Delete a funnel. This action cannot be undone.',
   inputSchema: {
     type: 'object',
@@ -686,48 +686,48 @@ export const funnelsToolDefinitions = [
 ];
 
 export const funnelsToolHandlers = {
-  'list_funnels': 'list_funnels',
-  'get_funnel': 'get_funnel',
-  'get_funnel_data': 'get_funnel_data',
-  'get_funnel_step_users': 'get_funnel_step_users',
-  'get_funnel_dropoff_users': 'get_funnel_dropoff_users',
-  'create_funnel': 'create_funnel',
-  'update_funnel': 'update_funnel',
-  'delete_funnel': 'delete_funnel',
+  'funnels_list': 'funnels_list',
+  'funnels_details': 'funnels_details',
+  'funnels_data': 'funnels_data',
+  'funnels_step_users': 'funnels_step_users',
+  'funnels_dropoff_users': 'funnels_dropoff_users',
+  'funnels_create': 'funnels_create',
+  'funnels_update': 'funnels_update',
+  'funnels_delete': 'funnels_delete',
 } as const;
 
 export class FunnelsTools {
   constructor(private context: ToolContext) {}
 
-  async list_funnels(args: any): Promise<ToolResult> {
+  async funnels_list(args: any): Promise<ToolResult> {
     return handleListFunnels(this.context, args);
   }
 
-  async get_funnel(args: any): Promise<ToolResult> {
+  async funnels_details(args: any): Promise<ToolResult> {
     return handleGetFunnel(this.context, args);
   }
 
-  async get_funnel_data(args: any): Promise<ToolResult> {
+  async funnels_data(args: any): Promise<ToolResult> {
     return handleGetFunnelData(this.context, args);
   }
 
-  async get_funnel_step_users(args: any): Promise<ToolResult> {
+  async funnels_step_users(args: any): Promise<ToolResult> {
     return handleGetFunnelStepUsers(this.context, args);
   }
 
-  async get_funnel_dropoff_users(args: any): Promise<ToolResult> {
+  async funnels_dropoff_users(args: any): Promise<ToolResult> {
     return handleGetFunnelDropoffUsers(this.context, args);
   }
 
-  async create_funnel(args: any): Promise<ToolResult> {
+  async funnels_create(args: any): Promise<ToolResult> {
     return handleCreateFunnel(this.context, args);
   }
 
-  async update_funnel(args: any): Promise<ToolResult> {
+  async funnels_update(args: any): Promise<ToolResult> {
     return handleUpdateFunnel(this.context, args);
   }
 
-  async delete_funnel(args: any): Promise<ToolResult> {
+  async funnels_delete(args: any): Promise<ToolResult> {
     return handleDeleteFunnel(this.context, args);
   }
 }

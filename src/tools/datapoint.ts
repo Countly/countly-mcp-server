@@ -12,11 +12,11 @@ import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
 /**
- * Tool: get_datapoint_statistics
+ * Tool: datapoints_stats
  * Get amount of data points collected per app per datapoint type
  */
 export const getDatapointStatisticsTool = {
-  name: 'get_datapoint_statistics',
+  name: 'datapoints_stats',
   description: 'Get data points collected per app per datapoint type. Data points are a measure of collected data, often tied to server specs and billing. Optionally filter by specific apps.',
   inputSchema: z.object({
     period: z.string()
@@ -55,11 +55,11 @@ async function handleGetDatapointStatistics(args: z.infer<typeof getDatapointSta
 }
 
 /**
- * Tool: get_top_datapoint_apps
+ * Tool: datapoints_top_apps
  * Get top apps with their data points
  */
 export const getTopDatapointAppsTool = {
-  name: 'get_top_datapoint_apps',
+  name: 'datapoints_top_apps',
   description: 'Get top apps ranked by data point collection. Shows which apps are generating the most data points, useful for understanding data usage and billing.',
   inputSchema: z.object({
     period: z.string()
@@ -91,11 +91,11 @@ async function handleGetTopDatapointApps(args: z.infer<typeof getTopDatapointApp
 }
 
 /**
- * Tool: get_datapoint_punch_card
+ * Tool: datapoints_punch_card
  * Get hourly datapoint breakdown punchcard to check for server load patterns
  */
 export const getDatapointPunchCardTool = {
-  name: 'get_datapoint_punch_card',
+  name: 'datapoints_punch_card',
   description: 'Get hourly data point breakdown punchcard showing server load patterns throughout the day and week. Useful for capacity planning and identifying peak usage times.',
   inputSchema: z.object({
     period: z.string()
@@ -139,9 +139,9 @@ export const datapointToolDefinitions = [
  * Export tool handlers map
  */
 export const datapointToolHandlers = {
-  'get_datapoint_statistics': 'getDatapointStatistics',
-  'get_top_datapoint_apps': 'getTopDatapointApps',
-  'get_datapoint_punch_card': 'getDatapointPunchCard',
+  'datapoints_stats': 'getDatapointStatistics',
+  'datapoints_top_apps': 'getTopDatapointApps',
+  'datapoints_punch_card': 'getDatapointPunchCard',
 } as const;
 
 /**

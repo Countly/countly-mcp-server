@@ -71,7 +71,7 @@ async def main():
             print("Available tools:", tools)
             
             # Call a tool
-            result = await session.call_tool("list_apps", {})
+            result = await session.call_tool("apps_list", {})
             print("Apps:", result)
 
 if __name__ == "__main__":
@@ -104,7 +104,7 @@ async function main() {
   
   // Call a tool
   const result = await client.callTool({
-    name: 'list_apps',
+    name: 'apps_list',
     arguments: {}
   });
   console.log('Result:', result);

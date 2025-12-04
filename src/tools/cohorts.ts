@@ -14,7 +14,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const listCohortsToolDefinition = {
-  name: 'list_cohorts',
+  name: 'cohorts_list',
   description: 'List all user cohorts with filtering and pagination. Cohorts are groups of users based on behavior or manually created segments.',
   inputSchema: {
     type: 'object',
@@ -87,7 +87,7 @@ export async function handleListCohorts(
 // ============================================================================
 
 export const getCohortToolDefinition = {
-  name: 'get_cohort',
+  name: 'cohorts_details',
   description: 'Get detailed information about a specific cohort including its configuration, user count, and current state.',
   inputSchema: {
     type: 'object',
@@ -140,7 +140,7 @@ export async function handleGetCohort(
 // ============================================================================
 
 export const createCohortToolDefinition = {
-  name: 'create_cohort',
+  name: 'cohorts_create',
   description: 'Create a new behavioral cohort based on user actions and properties. Define steps with events users did or did not perform, with time periods and filters.',
   inputSchema: {
     type: 'object',
@@ -265,7 +265,7 @@ export async function handleCreateCohort(
 // ============================================================================
 
 export const updateCohortToolDefinition = {
-  name: 'update_cohort',
+  name: 'cohorts_update',
   description: 'Update an existing cohort configuration including name, description, steps, and sharing settings.',
   inputSchema: {
     type: 'object',
@@ -297,7 +297,7 @@ export const updateCohortToolDefinition = {
       },
       steps: {
         type: 'string',
-        description: 'JSON string array of behavioral steps (same format as create_cohort)',
+        description: 'JSON string array of behavioral steps (same format as cohorts_create)',
       },
       user_segmentation: {
         type: 'string',
@@ -432,7 +432,7 @@ export async function handleUpdateCohort(
 // ============================================================================
 
 export const deleteCohortToolDefinition = {
-  name: 'delete_cohort',
+  name: 'cohorts_delete',
   description: 'Delete a cohort. This action cannot be undone.',
   inputSchema: {
     type: 'object',
@@ -493,33 +493,33 @@ export const cohortsToolDefinitions = [
 ];
 
 export const cohortsToolHandlers = {
-  'list_cohorts': 'list_cohorts',
-  'get_cohort': 'get_cohort',
-  'create_cohort': 'create_cohort',
-  'update_cohort': 'update_cohort',
-  'delete_cohort': 'delete_cohort',
+  'cohorts_list': 'cohorts_list',
+  'cohorts_details': 'cohorts_details',
+  'cohorts_create': 'cohorts_create',
+  'cohorts_update': 'cohorts_update',
+  'cohorts_delete': 'cohorts_delete',
 } as const;
 
 export class CohortsTools {
   constructor(private context: ToolContext) {}
 
-  async list_cohorts(args: any): Promise<ToolResult> {
+  async cohorts_list(args: any): Promise<ToolResult> {
     return handleListCohorts(this.context, args);
   }
 
-  async get_cohort(args: any): Promise<ToolResult> {
+  async cohorts_details(args: any): Promise<ToolResult> {
     return handleGetCohort(this.context, args);
   }
 
-  async create_cohort(args: any): Promise<ToolResult> {
+  async cohorts_create(args: any): Promise<ToolResult> {
     return handleCreateCohort(this.context, args);
   }
 
-  async update_cohort(args: any): Promise<ToolResult> {
+  async cohorts_update(args: any): Promise<ToolResult> {
     return handleUpdateCohort(this.context, args);
   }
 
-  async delete_cohort(args: any): Promise<ToolResult> {
+  async cohorts_delete(args: any): Promise<ToolResult> {
     return handleDeleteCohort(this.context, args);
   }
 }

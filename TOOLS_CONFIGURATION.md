@@ -61,60 +61,60 @@ These categories are always available without plugin checks:
 - `search` and `fetch`: Provide MCP Connector required functionality for ChatGPT and similar clients
 
 ### apps
-**Tools**: `list_apps`, `get_app_by_name`, `create_app`, `update_app`, `delete_app`, `reset_app`
+**Tools**: `apps_list`, `apps_get_by_name`, `apps_create`, `apps_update`, `apps_delete`, `apps_reset`
 
 **Operations**:
-- C: create_app
-- R: list_apps, get_app_by_name
-- U: update_app
-- D: delete_app, reset_app
+- C: apps_create
+- R: apps_list, apps_get_by_name
+- U: apps_update
+- D: apps_delete, apps_reset
 
 ### analytics
-**Tools**: `get_analytics_data`, `get_analytics_app_summary`, `get_slipping_away_users`, `get_session_frequency`, `get_user_loyalty`, `get_session_durations`
+**Tools**: `get_analytics_data`, `app_analytics_summary`, `slipping_users`, `session_frequency`, `user_loyalty`, `session_durations`
 
 **Operations**:
 - R: All analytics tools (read-only)
 
-**Note**: Analytics tools provide various data insights about applications. `get_slipping_away_users` retrieves app users (end-users) who are becoming inactive based on inactivity period. `get_events_and_segments` shows both custom events and internal Countly events with their exact database structure.
+**Note**: Analytics tools provide various data insights about applications. `slipping_users` retrieves app users (end-users) who are becoming inactive based on inactivity period. `events_segments` shows both custom events and internal Countly events with their exact database structure.
 
 ### crashes
-**Tools**: `list_crash_groups`, `get_crash_statistics`, `view_crash`, `add_crash_comment`, `edit_crash_comment`, `delete_crash_comment`, `resolve_crash`, `unresolve_crash`, `hide_crash`, `show_crash`
+**Tools**: `crash_groups_list`, `crashes_stats_get`, `crashes_get`, `crashes_comment_add`, `crashes_comment_update`, `crashes_comment_delete`, `crashes_resolve`, `uncrashes_resolve`, `crashes_hide`, `crashes_show`
 
 **Operations**:
-- C: add_crash_comment
-- R: list_crash_groups, get_crash_statistics, view_crash
-- U: edit_crash_comment, resolve_crash, unresolve_crash, hide_crash, show_crash
-- D: delete_crash_comment
+- C: crashes_comment_add
+- R: crash_groups_list, crashes_stats_get, crashes_get
+- U: crashes_comment_update, crashes_resolve, uncrashes_resolve, crashes_hide, crashes_show
+- D: crashes_comment_delete
 
 **⚠️ Requires Plugin**: `crashes` plugin must be installed on Countly server
 
 ### notes
-**Tools**: `list_notes`, `create_note`, `delete_note`
+**Tools**: `notes_list`, `notes_create`, `notes_delete`
 
 **Operations**:
-- C: create_note
-- R: list_notes
-- D: delete_note
+- C: notes_create
+- R: notes_list
+- D: notes_delete
 
 ### events
-**Tools**: `create_event`, `get_events_and_segments`, `get_events_data`
+**Tools**: `events_create`, `events_segments`, `get_events_data`
 
 **Operations**:
-- C: create_event
-- R: get_events_and_segments, get_events_data
+- C: events_create
+- R: events_segments, get_events_data
 
 ### alerts
-**Tools**: `list_alerts`, `create_alert`, `delete_alert`
+**Tools**: `alerts_list`, `alerts_create`, `alerts_delete`
 
 **Operations**:
-- C: create_alert (also handles updates)
-- R: list_alerts
-- D: delete_alert
+- C: alerts_create (also handles updates)
+- R: alerts_list
+- D: alerts_delete
 
 **⚠️ Requires Plugin**: `alerts` plugin must be installed on Countly server
 
 ### views
-**Tools**: `get_views_table`, `get_view_segments`, `get_views_data`
+**Tools**: `views_table`, `views_segments`, `views_data`
 
 **Operations**:
 - R: All views tools (read-only)
@@ -122,7 +122,7 @@ These categories are always available without plugin checks:
 **⚠️ Requires Plugin**: `views` plugin must be installed on Countly server
 
 ### database
-**Tools**: `query_database`, `list_databases`, `get_document`, `aggregate_collection`, `get_collection_indexes`, `get_db_statistics`
+**Tools**: `databases_query`, `databases_list`, `databases_document`, `collections_aggregate`, `collections_indexes`, `databases_stats`
 
 **Operations**:
 - R: All database tools (read-only)
@@ -130,37 +130,37 @@ These categories are always available without plugin checks:
 **⚠️ Requires Plugin**: `dbviewer` plugin must be installed on Countly server
 
 ### dashboard_users
-**Tools**: `get_all_dashboard_users`
+**Tools**: `dashboard_users`
 
 **Operations**:
-- R: get_all_dashboard_users
+- R: dashboard_users
 
 **Note**: Returns management/admin users who access the Countly dashboard. These are the users who log into Countly to analyze data, configure settings, and manage applications.
 
 ### drill
-**Tools**: `get_queriable_fields_for_event`, `run_query`, `list_drill_bookmarks`, `create_drill_bookmark`, `delete_drill_bookmark`
+**Tools**: `queriable_fields_list`, `run_query`, `drill_bookmarks_list`, `drill_bookmarks_create`, `drill_bookmarks_delete`
 
 **Operations**:
-- R: get_queriable_fields_for_event, run_query, list_drill_bookmarks
-- C: create_drill_bookmark
-- D: delete_drill_bookmark
+- R: queriable_fields_list, run_query, drill_bookmarks_list
+- C: drill_bookmarks_create
+- D: drill_bookmarks_delete
 
 **Notes**:
-- `get_queriable_fields_for_event`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
+- `queriable_fields_list`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
 - `run_query`: Run drill segmentation queries with MongoDB query objects. Can break down by projection key (segment or user property). Supports buckets: hourly, daily, weekly, monthly
-- `list_drill_bookmarks`: List all saved drill bookmarks for a specific event
-- `create_drill_bookmark`: Create a new bookmark to save a query for later reuse in the dashboard
-- `delete_drill_bookmark`: Delete an existing drill bookmark
+- `drill_bookmarks_list`: List all saved drill bookmarks for a specific event
+- `drill_bookmarks_create`: Create a new bookmark to save a query for later reuse in the dashboard
+- `drill_bookmarks_delete`: Delete an existing drill bookmark
 
 **⚠️ Requires Plugin**: `drill` plugin must be installed on Countly server
 
 ### app_users
-**Tools**: `create_app_user`, `edit_app_user`, `delete_app_user`, `export_app_users`
+**Tools**: `apps_create_user`, `app_users_update`, `apps_delete_user`, `export_app_users`
 
 **Operations**:
-- C: create_app_user
-- U: edit_app_user
-- D: delete_app_user
+- C: apps_create_user
+- U: app_users_update
+- D: apps_delete_user
 
 **Note**: Manages end-users of the applications being tracked by Countly. These are the users of your mobile apps, websites, or other applications that send data to Countly for analytics.
 
@@ -271,28 +271,28 @@ await tools.get_version({});
 const { plugins } = await tools.get_plugins({});
 
 // 2. Use core features (always available)
-const apps = await tools.list_apps({});
+const apps = await tools.apps_list({});
 
 // 3. Use plugin-dependent features only if available
 if (plugins.includes('crashes')) {
-  const crashes = await tools.list_crash_groups({ app_name: 'MyApp' });
+  const crashes = await tools.crash_groups_list({ app_name: 'MyApp' });
 }
 
 if (plugins.includes('alerts')) {
-  const alerts = await tools.list_alerts({ app_name: 'MyApp' });
+  const alerts = await tools.alerts_list({ app_name: 'MyApp' });
 }
 
 if (plugins.includes('views')) {
-  const views = await tools.get_views_table({ app_name: 'MyApp' });
+  const views = await tools.views_table({ app_name: 'MyApp' });
 }
 
 if (plugins.includes('dbviewer')) {
-  const databases = await tools.list_databases({});
+  const databases = await tools.databases_list({});
 }
 
 if (plugins.includes('drill')) {
   // Get user properties and event segments metadata
-  const meta = await tools.get_queriable_fields_for_event({ 
+  const meta = await tools.queriable_fields_list({ 
     app_name: 'MyApp',
     event: 'Account Created' 
   });
@@ -307,13 +307,13 @@ if (plugins.includes('drill')) {
   });
   
   // List existing bookmarks
-  const bookmarks = await tools.list_drill_bookmarks({
+  const bookmarks = await tools.drill_bookmarks_list({
     app_name: 'MyApp',
     event_key: 'Account Created'
   });
   
   // Create a bookmark
-  await tools.create_drill_bookmark({
+  await tools.drill_bookmarks_create({
     app_name: 'MyApp',
     event_key: 'Account Created',
     name: 'US Users',
@@ -324,7 +324,7 @@ if (plugins.includes('drill')) {
 ```
 
 ### user_profiles
-**Tools**: `query_user_profiles`, `breakdown_user_profiles`, `get_user_profile_details`, `add_user_note`
+**Tools**: `user_profiles_query`, `user_profiles_breakdown`, `user_profiles_get`, `user_profiles_note_add`
 
 **Requires plugin**: `users`
 
@@ -334,27 +334,27 @@ Query user profiles and manage user notes. Note that user properties in queries 
 ```typescript
 async function userProfileExamples() {
   // Query users with MongoDB filters (NO "up." prefix)
-  const users = await tools.query_user_profiles({
+  const users = await tools.user_profiles_query({
     app_name: 'MyApp',
     query: '{"country":"US"}',  // Note: no "up." prefix
     period: '30days'
   });
   
   // Break down users by property with grouping
-  const breakdown = await tools.breakdown_user_profiles({
+  const breakdown = await tools.user_profiles_breakdown({
     app_name: 'MyApp',
     projection_key: '{"country":"$country","plan":"$custom.plan"}',
     period: '30days'
   });
   
   // Get specific user details by UID
-  const user = await tools.get_user_profile_details({
+  const user = await tools.user_profiles_get({
     app_name: 'MyApp',
     uid: 'user123'
   });
   
   // Add note to user profile
-  await tools.add_user_note({
+  await tools.user_profiles_note_add({
     app_name: 'MyApp',
     uid: 'user123',
     note: 'User upgraded to premium plan'
@@ -363,7 +363,7 @@ async function userProfileExamples() {
 ```
 
 ### cohorts
-**Tools**: `list_cohorts`, `get_cohort`, `create_cohort`, `update_cohort`, `delete_cohort`
+**Tools**: `cohorts_list`, `cohorts_details`, `cohorts_create`, `cohorts_update`, `cohorts_delete`
 
 **Requires plugin**: `cohorts`
 
@@ -373,14 +373,14 @@ Manage user cohorts - groups of users based on behavioral criteria or manual sel
 ```typescript
 async function cohortExamples() {
   // List all cohorts
-  const cohorts = await tools.list_cohorts({
+  const cohorts = await tools.cohorts_list({
     app_name: 'MyApp',
     type: 'auto',  // or 'manual'
     limit: 10
   });
   
   // Get specific cohort details
-  const cohort = await tools.get_cohort({
+  const cohort = await tools.cohorts_details({
     app_name: 'MyApp',
     cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c'
   });
@@ -412,7 +412,7 @@ async function cohortExamples() {
     }
   ];
   
-  await tools.create_cohort({
+  await tools.cohorts_create({
     app_name: 'MyApp',
     name: 'Inactive Users on Old Version',
     description: 'Users on version 5:10:0 who haven\'t viewed pages in 7 days',
@@ -425,7 +425,7 @@ async function cohortExamples() {
   });
   
   // Update existing cohort
-  await tools.update_cohort({
+  await tools.cohorts_update({
     app_name: 'MyApp',
     cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c',
     description: 'Updated description',
@@ -433,7 +433,7 @@ async function cohortExamples() {
   });
   
   // Delete cohort
-  await tools.delete_cohort({
+  await tools.cohorts_delete({
     app_name: 'MyApp',
     cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c'
   });
@@ -441,7 +441,7 @@ async function cohortExamples() {
 ```
 
 ### funnels
-**Tools**: `list_funnels`, `get_funnel`, `get_funnel_data`, `get_funnel_step_users`, `get_funnel_dropoff_users`, `create_funnel`, `update_funnel`, `delete_funnel`
+**Tools**: `funnels_list`, `funnels_details`, `funnels_details_data`, `funnels_details_step_users`, `funnels_details_dropoff_users`, `funnels_create`, `funnels_update`, `funnels_delete`
 
 **Requires plugin**: `funnels`
 
@@ -451,19 +451,19 @@ Manage conversion funnels to track user progression through sequential events. A
 ```typescript
 async function funnelExamples() {
   // List all funnels
-  const funnels = await tools.list_funnels({
+  const funnels = await tools.funnels_list({
     app_name: 'MyApp',
     limit: 10
   });
   
   // Get specific funnel details
-  const funnel = await tools.get_funnel({
+  const funnel = await tools.funnels_details({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff'
   });
   
   // Create a purchase funnel
-  await tools.create_funnel({
+  await tools.funnels_create({
     app_name: 'MyApp',
     name: 'E-commerce Purchase Flow',
     description: 'Track user journey from product view to purchase',
@@ -499,7 +499,7 @@ async function funnelExamples() {
   });
   
   // Get funnel analytics data for last 30 days
-  const data = await tools.get_funnel_data({
+  const data = await tools.funnels_details_data({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff',
     period: '30days',
@@ -507,7 +507,7 @@ async function funnelExamples() {
   });
   
   // Get users who reached step 2 (Added to Cart)
-  const stepUsers = await tools.get_funnel_step_users({
+  const stepUsers = await tools.funnels_details_step_users({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff',
     step: 2,
@@ -515,7 +515,7 @@ async function funnelExamples() {
   });
   
   // Get users who dropped off between step 2 and 3
-  const dropoffUsers = await tools.get_funnel_dropoff_users({
+  const dropoffUsers = await tools.funnels_details_dropoff_users({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff',
     from_step: 2,
@@ -524,7 +524,7 @@ async function funnelExamples() {
   });
   
   // Update existing funnel
-  await tools.update_funnel({
+  await tools.funnels_update({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff',
     description: 'Updated funnel description',
@@ -532,7 +532,7 @@ async function funnelExamples() {
   });
   
   // Delete funnel
-  await tools.delete_funnel({
+  await tools.funnels_delete({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff'
   });

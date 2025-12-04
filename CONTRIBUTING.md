@@ -161,10 +161,10 @@ export const userManagementToolDefinitions = [
 // 4. Add to handlers map
 export const userManagementToolHandlers = {
   'get_all_users': 'getAllUsers',
-  'create_app_user': 'createAppUser',
-  'delete_app_user': 'deleteAppUser',
+  'apps_create_user': 'createAppUser',
+  'apps_delete_user': 'deleteAppUser',
   'export_app_users': 'exportAppUsers',
-  'get_slipping_away_users': 'getSlippingAwayUsers',
+  'slipping_users': 'getSlippingAwayUsers',
   'get_active_users': 'getActiveUsers', // Add here
 } as const;
 
@@ -187,10 +187,10 @@ That's it! The tool is now automatically discovered and routed by the main serve
 **CRITICAL**: When adding a new tool, you **MUST** update the CRUD permissions configuration in `src/lib/tools-config.ts`. This allows administrators to control access to your tool through environment variables.
 
 Each tool must be classified with one of these CRUD operations:
-- **C (Create)** - Tools that create new resources (e.g., `create_app`, `create_note`, `add_crash_comment`)
-- **R (Read)** - Tools that read/retrieve data (e.g., `list_apps`, `get_dashboard_data`, `view_crash`)
-- **U (Update)** - Tools that modify existing resources (e.g., `update_app`, `edit_crash_comment`, `resolve_crash`)
-- **D (Delete)** - Tools that delete resources (e.g., `delete_app`, `delete_note`, `reset_app`)
+- **C (Create)** - Tools that create new resources (e.g., `apps_create`, `notes_create`, `crashes_comment_add`)
+- **R (Read)** - Tools that read/retrieve data (e.g., `apps_list`, `dashboards_data`, `crashes_get`)
+- **U (Update)** - Tools that modify existing resources (e.g., `apps_update`, `crashes_comment_update`, `crashes_resolve`)
+- **D (Delete)** - Tools that delete resources (e.g., `apps_delete`, `notes_delete`, `apps_reset`)
 
 **Example: Adding the `get_active_users` tool**
 
@@ -202,10 +202,10 @@ export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOp
   
   users: {
     operations: {
-      'create_app_user': 'C',
-      'delete_app_user': 'D',
+      'apps_create_user': 'C',
+      'apps_delete_user': 'D',
       'export_app_users': 'R',
-      'get_slipping_away_users': 'R',
+      'slipping_users': 'R',
       'get_all_users': 'R',
       'get_active_users': 'R',  // ADD YOUR TOOL HERE with appropriate CRUD operation
     }

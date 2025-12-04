@@ -12,11 +12,11 @@ import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
 /**
- * Tool: list_server_log_files
+ * Tool: server_logs_files_list
  * List available server log files
  */
 export const listServerLogFilesTool = {
-  name: 'list_server_log_files',
+  name: 'server_logs_files_list',
   description: 'List available server log files. Only available in non-Docker deployments. Returns list of log files that can be viewed.',
   inputSchema: z.object({
     app_id: z.string()
@@ -53,11 +53,11 @@ async function handleListServerLogFiles(args: z.infer<typeof listServerLogFilesT
 }
 
 /**
- * Tool: get_server_log_contents
+ * Tool: server_logs_contents
  * Get contents of a specific server log file
  */
 export const getServerLogContentsTool = {
-  name: 'get_server_log_contents',
+  name: 'server_logs_contents',
   description: 'Get contents of a specific server log file. Only available in non-Docker deployments. Retrieve log entries for debugging and monitoring.',
   inputSchema: z.object({
     app_id: z.string()
@@ -67,7 +67,7 @@ export const getServerLogContentsTool = {
       .optional()
       .describe('Application name (alternative to app_id)'),
     log: z.string()
-      .describe('Log file name to retrieve (e.g., "api", "dashboard", "jobs"). Use list_server_log_files to see available logs.'),
+      .describe('Log file name to retrieve (e.g., "api", "dashboard", "jobs"). Use server_logs_files_list to see available logs.'),
     bytes: z.number()
       .optional()
       .default(100000)
@@ -112,8 +112,8 @@ export const serverLogsToolDefinitions = [
  * Export tool handlers map
  */
 export const serverLogsToolHandlers = {
-  'list_server_log_files': 'listServerLogFiles',
-  'get_server_log_contents': 'getServerLogContents',
+  'server_logs_files_list': 'listServerLogFiles',
+  'server_logs_contents': 'getServerLogContents',
 } as const;
 
 /**

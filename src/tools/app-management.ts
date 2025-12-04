@@ -8,7 +8,7 @@ import { ToolContext, ToolResult } from './types.js';
 // ============================================================================
 
 export const listAppsToolDefinition = {
-  name: 'list_apps',
+  name: 'apps_list',
   description: 'List all available applications with their names and IDs',
   inputSchema: {
     type: 'object',
@@ -35,7 +35,7 @@ export async function handleListApps(context: ToolContext, _: any): Promise<Tool
 // ============================================================================
 
 export const getAppByNameToolDefinition = {
-  name: 'get_app_by_name',
+  name: 'apps_get_by_name',
   description: 'Get app information by app name',
   inputSchema: {
     type: 'object',
@@ -73,7 +73,7 @@ export async function handleGetAppByName(context: ToolContext, args: any): Promi
 // ============================================================================
 
 export const createAppToolDefinition = {
-  name: 'create_app',
+  name: 'apps_create',
   description: 'Create a new app in Countly (requires global admin privileges)',
   inputSchema: {
     type: 'object',
@@ -132,7 +132,7 @@ appData.category = category;
 // ============================================================================
 
 export const updateAppToolDefinition = {
-  name: 'update_app',
+  name: 'apps_update',
   description: 'Update an existing app in Countly',
   inputSchema: {
     type: 'object',
@@ -200,7 +200,7 @@ updateData.category = category;
 // ============================================================================
 
 export const deleteAppToolDefinition = {
-  name: 'delete_app',
+  name: 'apps_delete',
   description: 'Delete an app from Countly (requires global admin privileges)',
   inputSchema: {
     type: 'object',
@@ -246,7 +246,7 @@ export async function handleDeleteApp(context: ToolContext, args: any): Promise<
 // ============================================================================
 
 export const resetAppToolDefinition = {
-  name: 'reset_app',
+  name: 'apps_reset',
   description: 'Reset all data for an app (requires global admin privileges)',
   inputSchema: {
     type: 'object',
@@ -301,38 +301,38 @@ export const appManagementToolDefinitions = [
 ];
 
 export const appManagementToolHandlers = {
-  'list_apps': 'listApps',
-  'get_app_by_name': 'getAppByName',
-  'create_app': 'createApp',
-  'update_app': 'updateApp',
-  'delete_app': 'deleteApp',
-  'reset_app': 'resetApp',
+  'apps_list': 'apps_list',
+  'apps_get_by_name': 'apps_get_by_name',
+  'apps_create': 'apps_create',
+  'apps_update': 'apps_update',
+  'apps_delete': 'apps_delete',
+  'apps_reset': 'apps_reset',
 } as const;
 
 export class AppManagementTools {
   constructor(private context: ToolContext) {}
 
-  async listApps(args: any): Promise<ToolResult> {
+  async apps_list(args: any): Promise<ToolResult> {
     return handleListApps(this.context, args);
   }
 
-  async getAppByName(args: any): Promise<ToolResult> {
+  async apps_get_by_name(args: any): Promise<ToolResult> {
     return handleGetAppByName(this.context, args);
   }
 
-  async createApp(args: any): Promise<ToolResult> {
+  async apps_create(args: any): Promise<ToolResult> {
     return handleCreateApp(this.context, args);
   }
 
-  async updateApp(args: any): Promise<ToolResult> {
+  async apps_update(args: any): Promise<ToolResult> {
     return handleUpdateApp(this.context, args);
   }
 
-  async deleteApp(args: any): Promise<ToolResult> {
+  async apps_delete(args: any): Promise<ToolResult> {
     return handleDeleteApp(this.context, args);
   }
 
-  async resetApp(args: any): Promise<ToolResult> {
+  async apps_reset(args: any): Promise<ToolResult> {
     return handleResetApp(this.context, args);
   }
 }

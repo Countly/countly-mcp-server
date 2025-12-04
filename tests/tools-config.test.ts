@@ -157,12 +157,12 @@ describe('Tools Configuration', () => {
   });
 
   describe('Specific tool categorizations', () => {
-  it('should categorize get_all_dashboard_users in dashboard_users category', () => {
-    expect(TOOL_CATEGORIES.dashboard_users.operations['get_all_dashboard_users']).toBe('R');
-  });    it('should have moved get_slipping_away_users to analytics', () => {
-    expect(TOOL_CATEGORIES.analytics.operations['get_slipping_away_users']).toBe('R');
-    expect(TOOL_CATEGORIES.dashboard_users.operations['get_slipping_away_users']).toBeUndefined();
-    expect(TOOL_CATEGORIES.app_users.operations['get_slipping_away_users']).toBeUndefined();
+  it('should categorize dashboard_users in dashboard_users category', () => {
+    expect(TOOL_CATEGORIES.dashboard_users.operations['dashboard_users']).toBe('R');
+  });    it('should have moved slipping_users to analytics', () => {
+    expect(TOOL_CATEGORIES.analytics.operations['slipping_users']).toBe('R');
+    expect(TOOL_CATEGORIES.dashboard_users.operations['slipping_users']).toBeUndefined();
+    expect(TOOL_CATEGORIES.app_users.operations['slipping_users']).toBeUndefined();
   });
 
     it('should not have share/unshare crash tools', () => {
@@ -172,16 +172,16 @@ describe('Tools Configuration', () => {
 
     it('should have all crash management tools', () => {
       const crashTools = Object.keys(TOOL_CATEGORIES.crashes.operations);
-      expect(crashTools).toContain('list_crash_groups');
-      expect(crashTools).toContain('get_crash_statistics');
-      expect(crashTools).toContain('view_crash');
-      expect(crashTools).toContain('resolve_crash');
-      expect(crashTools).toContain('unresolve_crash');
-      expect(crashTools).toContain('hide_crash');
-      expect(crashTools).toContain('show_crash');
-      expect(crashTools).toContain('add_crash_comment');
-      expect(crashTools).toContain('edit_crash_comment');
-      expect(crashTools).toContain('delete_crash_comment');
+      expect(crashTools).toContain('crash_groups_list');
+      expect(crashTools).toContain('crashes_stats_get');
+      expect(crashTools).toContain('crashes_get');
+      expect(crashTools).toContain('crashes_resolve');
+      expect(crashTools).toContain('crashes_unresolve');
+      expect(crashTools).toContain('crashes_hide');
+      expect(crashTools).toContain('crashes_show');
+      expect(crashTools).toContain('crashes_comment_add');
+      expect(crashTools).toContain('crashes_comment_update');
+      expect(crashTools).toContain('crashes_comment_delete');
     });
   });
 
@@ -273,8 +273,8 @@ describe('Tools Configuration', () => {
         apps: new Set<'C' | 'R' | 'U' | 'D'>(['C', 'R']),
       };
       
-      expect(isToolAllowed('list_apps', config)).toBe(true);
-      expect(isToolAllowed('create_app', config)).toBe(true);
+      expect(isToolAllowed('apps_list', config)).toBe(true);
+      expect(isToolAllowed('apps_create', config)).toBe(true);
     });
 
     it('should deny tool when operation is not permitted', () => {
@@ -282,8 +282,8 @@ describe('Tools Configuration', () => {
         apps: new Set<'C' | 'R' | 'U' | 'D'>(['R']),
       };
       
-      expect(isToolAllowed('create_app', config)).toBe(false);
-      expect(isToolAllowed('delete_app', config)).toBe(false);
+      expect(isToolAllowed('apps_create', config)).toBe(false);
+      expect(isToolAllowed('apps_delete', config)).toBe(false);
     });
 
     it('should deny tool when category is disabled', () => {
@@ -291,7 +291,7 @@ describe('Tools Configuration', () => {
         apps: new Set<'C' | 'R' | 'U' | 'D'>(),
       };
       
-      expect(isToolAllowed('list_apps', config)).toBe(false);
+      expect(isToolAllowed('apps_list', config)).toBe(false);
     });
 
     it('should return true for unknown tools (forward compatibility)', () => {
@@ -306,9 +306,9 @@ describe('Tools Configuration', () => {
   describe('filterTools', () => {
     it('should filter tools based on configuration', () => {
       const tools = [
-        { name: 'list_apps' },
-        { name: 'create_app' },
-        { name: 'delete_app' },
+        { name: 'apps_list' },
+        { name: 'apps_create' },
+        { name: 'apps_delete' },
       ];
       
       const config = {
@@ -317,14 +317,14 @@ describe('Tools Configuration', () => {
       
       const filtered = filterTools(tools, config);
       expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe('list_apps');
+      expect(filtered[0].name).toBe('apps_list');
     });
 
     it('should allow all tools with full permissions', () => {
       const tools = [
-        { name: 'list_apps' },
-        { name: 'create_app' },
-        { name: 'delete_app' },
+        { name: 'apps_list' },
+        { name: 'apps_create' },
+        { name: 'apps_delete' },
       ];
       
       const config = {
@@ -337,8 +337,8 @@ describe('Tools Configuration', () => {
 
     it('should filter out all tools when category is disabled', () => {
       const tools = [
-        { name: 'list_apps' },
-        { name: 'create_app' },
+        { name: 'apps_list' },
+        { name: 'apps_create' },
       ];
       
       const config = {
@@ -437,14 +437,14 @@ describe('Tools Configuration', () => {
       });
       
       // All write operations should be denied
-      expect(isToolAllowed('create_app', config)).toBe(false);
-      expect(isToolAllowed('delete_app', config)).toBe(false);
-      expect(isToolAllowed('add_crash_comment', config)).toBe(false);
+      expect(isToolAllowed('apps_create', config)).toBe(false);
+      expect(isToolAllowed('apps_delete', config)).toBe(false);
+      expect(isToolAllowed('crashes_comment_add', config)).toBe(false);
       
       // All read operations should be allowed
-      expect(isToolAllowed('list_apps', config)).toBe(true);
+      expect(isToolAllowed('apps_list', config)).toBe(true);
       expect(isToolAllowed('get_analytics_data', config)).toBe(true);
-      expect(isToolAllowed('view_crash', config)).toBe(true);
+      expect(isToolAllowed('crashes_get', config)).toBe(true);
     });
 
     it('should support selective category access', () => {
@@ -456,12 +456,12 @@ describe('Tools Configuration', () => {
       
       // Allowed categories
       expect(isToolAllowed('get_analytics_data', config)).toBe(true);
-      expect(isToolAllowed('list_apps', config)).toBe(true);
+      expect(isToolAllowed('apps_list', config)).toBe(true);
       
       // Disabled categories
-      expect(isToolAllowed('list_crash_groups', config)).toBe(false);
-      expect(isToolAllowed('create_note', config)).toBe(false);
-      expect(isToolAllowed('query_database', config)).toBe(false);
+      expect(isToolAllowed('crash_groups_list', config)).toBe(false);
+      expect(isToolAllowed('notes_create', config)).toBe(false);
+      expect(isToolAllowed('databases_query', config)).toBe(false);
     });
 
     it('should support no-delete policy', () => {
@@ -470,15 +470,15 @@ describe('Tools Configuration', () => {
       });
       
       // Delete operations should be denied
-      expect(isToolAllowed('delete_app', config)).toBe(false);
-      expect(isToolAllowed('delete_app_user', config)).toBe(false);
-      expect(isToolAllowed('delete_crash_comment', config)).toBe(false);
-      expect(isToolAllowed('delete_note', config)).toBe(false);
+      expect(isToolAllowed('apps_delete', config)).toBe(false);
+      expect(isToolAllowed('app_users_delete', config)).toBe(false);
+      expect(isToolAllowed('crashes_comment_delete', config)).toBe(false);
+      expect(isToolAllowed('notes_delete', config)).toBe(false);
       
       // Other operations should be allowed
-      expect(isToolAllowed('create_app', config)).toBe(true);
-      expect(isToolAllowed('update_app', config)).toBe(true);
-      expect(isToolAllowed('list_apps', config)).toBe(true);
+      expect(isToolAllowed('apps_create', config)).toBe(true);
+      expect(isToolAllowed('apps_update', config)).toBe(true);
+      expect(isToolAllowed('apps_list', config)).toBe(true);
     });
   });
 
@@ -581,12 +581,12 @@ describe('Tools Configuration', () => {
       const { filterToolsByPlugins } = await import('../src/lib/tools-config.js');
       
       const mockTools = [
-        { name: 'list_apps' },
-        { name: 'list_alerts' },
-        { name: 'list_crash_groups' },
-        { name: 'get_views_table' },
-        { name: 'get_analytics_app_summary' },
-        { name: 'query_database' },
+        { name: 'apps_list' },
+        { name: 'alerts_list' },
+        { name: 'crash_groups_list' },
+        { name: 'views_table' },
+        { name: 'app_analytics_summary' },
+        { name: 'databases_query' },
       ];
       
       const config = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'CRUD' });
@@ -594,41 +594,41 @@ describe('Tools Configuration', () => {
       // With crashes, views, and dbviewer plugins
       const plugins1 = ['crashes', 'views', 'dbviewer'];
       const filtered1 = filterToolsByPlugins(mockTools, config, plugins1);
-      expect(filtered1.map(t => t.name)).toContain('list_apps');
-      expect(filtered1.map(t => t.name)).toContain('list_crash_groups');
-      expect(filtered1.map(t => t.name)).toContain('get_views_table');
-      expect(filtered1.map(t => t.name)).toContain('query_database');
-      expect(filtered1.map(t => t.name)).toContain('get_analytics_app_summary');
-      expect(filtered1.map(t => t.name)).not.toContain('list_alerts');
+      expect(filtered1.map(t => t.name)).toContain('apps_list');
+      expect(filtered1.map(t => t.name)).toContain('crash_groups_list');
+      expect(filtered1.map(t => t.name)).toContain('views_table');
+      expect(filtered1.map(t => t.name)).toContain('databases_query');
+      expect(filtered1.map(t => t.name)).toContain('app_analytics_summary');
+      expect(filtered1.map(t => t.name)).not.toContain('alerts_list');
       
       // With alerts plugin only
       const plugins2 = ['alerts'];
       const filtered2 = filterToolsByPlugins(mockTools, config, plugins2);
-      expect(filtered2.map(t => t.name)).toContain('list_apps');
-      expect(filtered2.map(t => t.name)).toContain('list_alerts');
-      expect(filtered2.map(t => t.name)).toContain('get_analytics_app_summary');
-      expect(filtered2.map(t => t.name)).not.toContain('list_crash_groups');
-      expect(filtered2.map(t => t.name)).not.toContain('get_views_table');
-      expect(filtered2.map(t => t.name)).not.toContain('query_database');
+      expect(filtered2.map(t => t.name)).toContain('apps_list');
+      expect(filtered2.map(t => t.name)).toContain('alerts_list');
+      expect(filtered2.map(t => t.name)).toContain('app_analytics_summary');
+      expect(filtered2.map(t => t.name)).not.toContain('crash_groups_list');
+      expect(filtered2.map(t => t.name)).not.toContain('views_table');
+      expect(filtered2.map(t => t.name)).not.toContain('databases_query');
       
       // With no optional plugins
       const plugins3: string[] = [];
       const filtered3 = filterToolsByPlugins(mockTools, config, plugins3);
-      expect(filtered3.map(t => t.name)).toContain('list_apps');
-      expect(filtered3.map(t => t.name)).toContain('get_analytics_app_summary');
-      expect(filtered3.map(t => t.name)).not.toContain('list_alerts');
-      expect(filtered3.map(t => t.name)).not.toContain('list_crash_groups');
-      expect(filtered3.map(t => t.name)).not.toContain('get_views_table');
-      expect(filtered3.map(t => t.name)).not.toContain('query_database');
+      expect(filtered3.map(t => t.name)).toContain('apps_list');
+      expect(filtered3.map(t => t.name)).toContain('app_analytics_summary');
+      expect(filtered3.map(t => t.name)).not.toContain('alerts_list');
+      expect(filtered3.map(t => t.name)).not.toContain('crash_groups_list');
+      expect(filtered3.map(t => t.name)).not.toContain('views_table');
+      expect(filtered3.map(t => t.name)).not.toContain('databases_query');
     });
 
     it('should combine config and plugin filtering', async () => {
       const { filterToolsByPlugins } = await import('../src/lib/tools-config.js');
       
       const mockTools = [
-        { name: 'list_alerts' },
-        { name: 'create_alert' },
-        { name: 'delete_alert' },
+        { name: 'alerts_list' },
+        { name: 'alerts_create' },
+        { name: 'alerts_delete' },
       ];
       
       // Allow only read operations
@@ -636,9 +636,9 @@ describe('Tools Configuration', () => {
       const plugins = ['alerts']; // Plugin is available
       
       const filtered = filterToolsByPlugins(mockTools, config, plugins);
-      expect(filtered.map(t => t.name)).toContain('list_alerts'); // R operation
-      expect(filtered.map(t => t.name)).not.toContain('create_alert'); // C operation
-      expect(filtered.map(t => t.name)).not.toContain('delete_alert'); // D operation
+      expect(filtered.map(t => t.name)).toContain('alerts_list'); // R operation
+      expect(filtered.map(t => t.name)).not.toContain('alerts_create'); // C operation
+      expect(filtered.map(t => t.name)).not.toContain('alerts_delete'); // D operation
     });
   });
 });

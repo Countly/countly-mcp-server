@@ -124,7 +124,7 @@ describe('Transport Integration Tests', () => {
               
               // Check that we have some expected tools
               const toolNames = response.result.tools.map((t: any) => t.name);
-              expect(toolNames).toContain('list_apps');
+              expect(toolNames).toContain('apps_list');
               
               resolve();
             } catch (error) {

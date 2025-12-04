@@ -29,49 +29,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prompts can be exposed as slash commands in MCP clients for guided workflows
 
 - **Hooks Module** (6 tools): Webhook and automation management based on `hooks` plugin
-  - `list_hooks`: List all webhooks/hooks configured for an app
-  - `test_hook`: Test hook configuration with mock data before creating
-  - `create_hook`: Create webhooks with multiple trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect)
-  - `update_hook`: Update existing webhook configurations
-  - `delete_hook`: Delete webhooks by ID
-  - `get_internal_triggers`: Get list of 23 available internal Countly events for triggers
+  - `hooks_list`: List all webhooks/hooks configured for an app
+  - `hooks_test`: Test hook configuration with mock data before creating
+  - `hooks_create`: Create webhooks with multiple trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect)
+  - `hooks_update`: Update existing webhook configurations
+  - `hooks_delete`: Delete webhooks by ID
+  - `hooks_internal_triggers_get`: Get list of 23 available internal Countly events for triggers
 
 - **Times of Day Module** (1 tool): User behavior pattern analysis based on `times-of-day` plugin
-  - `get_times_of_day`: Analyze when users are most active throughout the day/week in their local time
+  - `times_of_day`: Analyze when users are most active throughout the day/week in their local time
 
 - **Dashboards Module** (8 tools): Custom dashboard management based on `dashboards` plugin
-  - `list_dashboards`: List all available dashboards
-  - `get_dashboard_data`: Get widgets and data for specific dashboard
-  - `create_dashboard`: Create dashboards with sharing, auto-refresh, and themes
-  - `update_dashboard`: Update dashboard configuration
-  - `delete_dashboard`: Delete dashboards
-  - `add_dashboard_widget`: Add widgets with full configuration
-  - `update_dashboard_widget`: Update widget position/size in grid layout
-  - `remove_dashboard_widget`: Remove widgets from dashboard
+  - `dashboards_list`: List all available dashboards
+  - `dashboards_data`: Get widgets and data for specific dashboard
+  - `dashboards_create`: Create dashboards with sharing, auto-refresh, and themes
+  - `dashboards_update`: Update dashboard configuration
+  - `dashboards_delete`: Delete dashboards
+  - `dashboards_widget_add`: Add widgets with full configuration
+  - `dashboards_update_widget`: Update widget position/size in grid layout
+  - `dashboards_widget_remove`: Remove widgets from dashboard
 
 - **Email Reports Module** (7 tools): Periodic email report management based on `reports` plugin
-  - `list_email_reports`: List all configured email reports
-  - `create_core_email_report`: Create reports with analytics, events, crashes, and star-rating metrics
-  - `create_dashboard_email_report`: Create reports for specific dashboards
-  - `update_email_report`: Update report configuration
-  - `preview_email_report`: Preview reports before sending
-  - `send_email_report`: Manually trigger report sending
-  - `delete_email_report`: Delete report configurations
+  - `email_reports_list`: List all configured email reports
+  - `email_reports_core_create`: Create reports with analytics, events, crashes, and star-rating metrics
+  - `email_reports_dashboard_create`: Create reports for specific dashboards
+  - `email_reports_update`: Update report configuration
+  - `email_reports_preview`: Preview reports before sending
+  - `email_reports_send`: Manually trigger report sending
+  - `email_reports_delete`: Delete report configurations
 
 - **Server Logs Module** (2 tools): Server log file access based on `errorlogs` plugin
-  - `list_server_log_files`: List available log files (api, dashboard, jobs)
-  - `get_server_log_contents`: View log file contents (non-Docker deployments only)
+  - `server_logs_files_list`: List available log files (api, dashboard, jobs)
+  - `server_logs_contents`: View log file contents (non-Docker deployments only)
 
 - **Datapoint Module** (3 tools): Data point monitoring for billing/capacity planning based on `server-stats` plugin
-  - `get_datapoint_statistics`: Get overall data point collection statistics
+  - `datapoints_stats`: Get overall data point collection statistics
   - `get_top_apps_by_datapoints`: Rank apps by data point usage
-  - `get_datapoint_punch_card`: Hourly load pattern visualization
+  - `datapoints_punch_card`: Hourly load pattern visualization
 
 - **Filtering Rules Module** (4 tools): Request blocking management based on `blocks` plugin
-  - `list_filtering_rules`: List all configured blocking rules
-  - `create_filtering_rule`: Create rules to block requests by IP, version, or properties
-  - `update_filtering_rule`: Update existing blocking rules
-  - `delete_filtering_rule`: Delete blocking rules
+  - `filtering_rules_list`: List all configured blocking rules
+  - `filtering_rules_create`: Create rules to block requests by IP, version, or properties
+  - `filtering_rules_update`: Update existing blocking rules
+  - `filtering_rules_delete`: Delete blocking rules
 
 - **Compliance Hub Module** (4 tools): Data consent and privacy management based on `compliance-hub` plugin
   - `list_consents`: List all consent features configured for an app
@@ -100,17 +100,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `list_remote_config_parameters`: List all parameters
   - `get_remote_config_parameter`: Get specific parameter details
   - `create_remote_config_parameter`: Create new parameters
-  - `update_remote_config_parameter`: Update parameters
-  - `delete_remote_config_parameter`: Delete parameters
+  - `remote_config_parameters_update`: Update parameters
+  - `remote_config_parameters_delete`: Delete parameters
   - `list_remote_config_conditions`: List targeting conditions
   - `create_remote_config_condition`: Create targeting conditions
-  - `delete_remote_config_condition`: Delete conditions
+  - `remote_config_conditions_delete`: Delete conditions
 
 - **Retention Module** (1 tool): User retention analysis based on `retention_segments` plugin
-  - `get_retention_data`: Analyze user retention cohorts over time
+  - `retention_data`: Analyze user retention cohorts over time
 
 - **Live Users Module** (6 tools): Real-time concurrent user monitoring based on `concurrent_users` plugin
-  - `get_live_users`: Get current concurrent users
+  - `live_users`: Get current concurrent users
   - `get_live_user_details`: Get detailed information about live users
   - `get_live_cities`: See cities with active users
   - `get_live_countries`: See countries with active users
@@ -118,32 +118,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `get_live_sources`: See traffic sources of live users
 
 - **Formulas Module** (6 tools): Custom metric formula management based on `formulas` plugin
-  - `list_formulas`: List all configured formulas
+  - `formulas_list`: List all configured formulas
   - `get_formula`: Get specific formula details
   - `create_formula`: Create custom metric formulas
   - `update_formula`: Update formula configuration
-  - `delete_formula`: Delete formulas
+  - `formulas_delete`: Delete formulas
   - `get_formula_data`: Get calculated formula data
 
 - **Funnels Module** (8 tools): Conversion funnel analysis based on `funnels` plugin
-  - `list_funnels`: List all configured funnels
-  - `get_funnel`: Get specific funnel details
-  - `create_funnel`: Create conversion funnels with multiple steps
-  - `update_funnel`: Update funnel configuration
-  - `delete_funnel`: Delete funnels
-  - `get_funnel_data`: Get funnel conversion data
-  - `get_funnel_sessions`: Get user sessions that matched funnel
-  - `get_funnel_steps`: Get detailed step-by-step breakdown
+  - `funnels_list`: List all configured funnels
+  - `funnels_details`: Get specific funnel details
+  - `funnels_create`: Create conversion funnels with multiple steps
+  - `funnels_update`: Update funnel configuration
+  - `funnels_delete`: Delete funnels
+  - `funnels_details_data`: Get funnel conversion data
+  - `funnels_details_sessions`: Get user sessions that matched funnel
+  - `funnels_details_steps`: Get detailed step-by-step breakdown
 
 - **Cohorts Module** (8 tools): User cohort management based on `cohorts` plugin
-  - `list_cohorts`: List all cohorts
-  - `get_cohort`: Get specific cohort details
-  - `create_cohort`: Create user cohorts with conditions
-  - `update_cohort`: Update cohort configuration
-  - `delete_cohort`: Delete cohorts
-  - `get_cohort_users`: Get users in a cohort
+  - `cohorts_list`: List all cohorts
+  - `cohorts_details`: Get specific cohort details
+  - `cohorts_create`: Create user cohorts with conditions
+  - `cohorts_update`: Update cohort configuration
+  - `cohorts_delete`: Delete cohorts
+  - `cohorts_details_users`: Get users in a cohort
   - `recalculate_cohort`: Trigger cohort recalculation
-  - `get_cohort_user_count`: Get current user count
+  - `cohorts_details_user_count`: Get current user count
 
 - **User Profiles Module** (4 tools): App user profile management based on `users` plugin
   - `search_user_profiles`: Search users with filters and sorting
@@ -155,18 +155,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `drill_query`: Execute custom drill queries
   - `get_drill_meta`: Get available drill properties
   - `get_drill_bookmarks`: List saved drill queries
-  - `create_drill_bookmark`: Save drill queries
-  - `delete_drill_bookmark`: Delete saved queries
+  - `drill_bookmarks_create`: Save drill queries
+  - `drill_bookmarks_delete`: Delete saved queries
 
 - **Core Module Enhancements** (2 additional tools):
-  - `list_jobs`: List background jobs with pagination and sorting
-  - `get_job_runs`: Get execution history for specific jobs
+  - `jobs_list`: List background jobs with pagination and sorting
+  - `job_runs`: Get execution history for specific jobs
 
 - **Analytics Module Enhancements** (4 additional tools):
-  - `get_user_loyalty`: Analyze user loyalty and session count distribution
-  - `get_session_durations`: Analyze session duration patterns
-  - `get_session_frequency`: Analyze time between user sessions
-  - `get_slipping_away_users`: Identify users becoming inactive
+  - `user_loyalty`: Analyze user loyalty and session count distribution
+  - `session_durations`: Analyze session duration patterns
+  - `session_frequency`: Analyze time between user sessions
+  - `slipping_users`: Identify users becoming inactive
 
 ### Changed
 - **Tool Count**: Expanded from 27 tools to 132 tools across 30 categories

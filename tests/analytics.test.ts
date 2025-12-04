@@ -165,13 +165,13 @@ describe('Analytics', () => {
       analytics.init(true);
       vi.clearAllMocks();
       
-      analytics.trackToolExecution('list_apps', true, 150);
+      analytics.trackToolExecution('apps_list', true, 150);
       
       expect(Countly.add_event).toHaveBeenCalledWith(
         expect.objectContaining({
           key: 'tool_executed',
           segmentation: expect.objectContaining({
-            tool: 'list_apps',
+            tool: 'apps_list',
             success: 1,
             duration: 150,
           }),
@@ -184,12 +184,12 @@ describe('Analytics', () => {
       analytics.init(true);
       vi.clearAllMocks();
       
-      analytics.trackToolExecution('create_app', false, 200);
+      analytics.trackToolExecution('apps_create', false, 200);
       
       expect(Countly.add_event).toHaveBeenCalledWith(
         expect.objectContaining({
           segmentation: expect.objectContaining({
-            tool: 'create_app',
+            tool: 'apps_create',
             success: 0,
           }),
         })
@@ -201,7 +201,7 @@ describe('Analytics', () => {
       analytics.init(true);
       vi.clearAllMocks();
       
-      analytics.trackToolExecution('query_database', true, 500);
+      analytics.trackToolExecution('databases_query', true, 500);
       
       // Should call add_event twice: once for tool_executed, once for tool_execution_time
       expect(Countly.add_event).toHaveBeenCalledTimes(2);
@@ -218,7 +218,7 @@ describe('Analytics', () => {
       analytics.init(true);
       vi.clearAllMocks();
       
-      analytics.trackToolExecution('list_apps', true);
+      analytics.trackToolExecution('apps_list', true);
       
       expect(Countly.add_event).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -233,7 +233,7 @@ describe('Analytics', () => {
       const Countly = await getCountlyMock();
       analytics.init(false);
       
-      analytics.trackToolExecution('list_apps', true, 100);
+      analytics.trackToolExecution('apps_list', true, 100);
       
       expect(Countly.add_event).not.toHaveBeenCalled();
     });
@@ -429,14 +429,14 @@ describe('Analytics', () => {
       analytics.init(true);
       vi.clearAllMocks();
       
-      analytics.trackError('ValidationError', 'Invalid input', 'create_app');
+      analytics.trackError('ValidationError', 'Invalid input', 'apps_create');
       
       expect(Countly.add_event).toHaveBeenCalledWith(
         expect.objectContaining({
           key: 'error_occurred',
           segmentation: expect.objectContaining({
             error_type: 'ValidationError',
-            tool: 'create_app',
+            tool: 'apps_create',
           }),
         })
       );

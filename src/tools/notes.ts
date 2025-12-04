@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const createNoteToolDefinition = {
-  name: 'create_note',
+  name: 'notes_create',
   description: 'Create a new note',
   inputSchema: {
     type: 'object',
@@ -82,7 +82,7 @@ export async function handleCreateNote(context: ToolContext, args: any): Promise
 // ============================================================================
 
 export const listNotesToolDefinition = {
-  name: 'list_notes',
+  name: 'notes_list',
   description: 'List all notes for an application within a time period',
   inputSchema: {
     type: 'object',
@@ -159,7 +159,7 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
 // ============================================================================
 
 export const deleteNoteToolDefinition = {
-  name: 'delete_note',
+  name: 'notes_delete',
   description: 'Delete a note',
   inputSchema: {
     type: 'object',
@@ -210,9 +210,9 @@ export const notesToolDefinitions = [
 ];
 
 export const notesToolHandlers = {
-  'create_note': 'createNote',
-  'list_notes': 'listNotes',
-  'delete_note': 'deleteNote',
+  'notes_create': 'createNote',
+  'notes_list': 'listNotes',
+  'notes_delete': 'deleteNote',
 } as const;
 
 export class NotesTools {

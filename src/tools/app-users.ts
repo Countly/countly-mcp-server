@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const createAppUserToolDefinition = {
-  name: 'create_app_user',
+  name: 'app_users_create',
   description: 'Create a new app user (end-user of your application being tracked by Countly)',
   inputSchema: {
     type: 'object',
@@ -104,7 +104,7 @@ export async function handleCreateAppUser(context: ToolContext, args: any): Prom
 // ============================================================================
 
 export const editAppUserToolDefinition = {
-  name: 'edit_app_user',
+  name: 'app_users_update',
   description: 'Update existing app user(s) using MongoDB query and update operations. Allows bulk updates matching specific criteria.',
   inputSchema: {
     type: 'object',
@@ -199,7 +199,7 @@ export async function handleEditAppUser(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const deleteAppUserToolDefinition = {
-  name: 'delete_app_user',
+  name: 'app_users_delete',
   description: 'Delete app user(s) matching a MongoDB query. Can delete single or multiple users based on the query criteria.',
   inputSchema: {
     type: 'object',
@@ -263,9 +263,9 @@ export const appUsersToolDefinitions = [
 ];
 
 export const appUsersToolHandlers = {
-  'create_app_user': 'createAppUser',
-  'edit_app_user': 'editAppUser',
-  'delete_app_user': 'deleteAppUser',
+  'app_users_create': 'createAppUser',
+  'app_users_update': 'editAppUser',
+  'app_users_delete': 'deleteAppUser',
 } as const;
 
 export class AppUsersTools {

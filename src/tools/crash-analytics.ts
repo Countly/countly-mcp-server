@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const resolveCrashToolDefinition = {
-  name: 'resolve_crash',
+  name: 'crashes_resolve',
   description: 'Mark a crash group as resolved',
   inputSchema: {
     type: 'object',
@@ -55,7 +55,7 @@ export async function handleResolveCrash(context: ToolContext, args: any): Promi
 // ============================================================================
 
 export const unresolveCrashToolDefinition = {
-  name: 'unresolve_crash',
+  name: 'crashes_unresolve',
   description: 'Mark a crash group as unresolved',
   inputSchema: {
     type: 'object',
@@ -104,7 +104,7 @@ export async function handleUnresolveCrash(context: ToolContext, args: any): Pro
 // ============================================================================
 
 export const viewCrashToolDefinition = {
-  name: 'view_crash',
+  name: 'crashes_get',
   description: 'View data for specific crash group',
   inputSchema: {
     type: 'object',
@@ -160,7 +160,7 @@ export async function handleViewCrash(context: ToolContext, args: any): Promise<
 // ============================================================================
 
 export const hideCrashToolDefinition = {
-  name: 'hide_crash',
+  name: 'crashes_hide',
   description: 'Hide a crash group from view',
   inputSchema: {
     type: 'object',
@@ -209,7 +209,7 @@ export async function handleHideCrash(context: ToolContext, args: any): Promise<
 // ============================================================================
 
 export const showCrashToolDefinition = {
-  name: 'show_crash',
+  name: 'crashes_show',
   description: 'Show a hidden crash group',
   inputSchema: {
     type: 'object',
@@ -258,7 +258,7 @@ export async function handleShowCrash(context: ToolContext, args: any): Promise<
 // ============================================================================
 
 export const addCrashCommentToolDefinition = {
-  name: 'add_crash_comment',
+  name: 'crashes_comment_add',
   description: 'Add a comment to a crash group',
   inputSchema: {
     type: 'object',
@@ -312,7 +312,7 @@ export async function handleAddCrashComment(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const editCrashCommentToolDefinition = {
-  name: 'edit_crash_comment',
+  name: 'crashes_comment_update',
   description: 'Edit an existing comment on a crash group',
   inputSchema: {
     type: 'object',
@@ -368,7 +368,7 @@ export async function handleEditCrashComment(context: ToolContext, args: any): P
 // ============================================================================
 
 export const deleteCrashCommentToolDefinition = {
-  name: 'delete_crash_comment',
+  name: 'crashes_comment_delete',
   description: 'Delete a comment from a crash group',
   inputSchema: {
     type: 'object',
@@ -422,7 +422,7 @@ export async function handleDeleteCrashComment(context: ToolContext, args: any):
 // ============================================================================
 
 export const listCrashGroupsToolDefinition = {
-  name: 'list_crash_groups',
+  name: 'crash_groups_list',
   description: 'List crash groups for an app with optional filtering',
   inputSchema: {
     type: 'object',
@@ -481,7 +481,7 @@ export async function handleListCrashGroups(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const getCrashStatisticsToolDefinition = {
-  name: 'get_crash_statistics',
+  name: 'crashes_stats_get',
   description: 'Get overall crash statistics and graph data for an app',
   inputSchema: {
     type: 'object',
@@ -548,16 +548,16 @@ export const crashAnalyticsToolDefinitions = [
 ];
 
 export const crashAnalyticsToolHandlers = {
-  'resolve_crash': 'resolveCrash',
-  'unresolve_crash': 'unresolveCrash',
-  'view_crash': 'viewCrash',
-  'hide_crash': 'hideCrash',
-  'show_crash': 'showCrash',
-  'add_crash_comment': 'addCrashComment',
-  'edit_crash_comment': 'editCrashComment',
-  'delete_crash_comment': 'deleteCrashComment',
-  'list_crash_groups': 'listCrashGroups',
-  'get_crash_statistics': 'getCrashStatistics',
+  'crashes_resolve': 'resolveCrash',
+  'crashes_unresolve': 'unresolveCrash',
+  'crashes_get': 'viewCrash',
+  'crashes_hide': 'hideCrash',
+  'crashes_show': 'showCrash',
+  'crashes_comment_add': 'addCrashComment',
+  'crashes_comment_update': 'editCrashComment',
+  'crashes_comment_delete': 'deleteCrashComment',
+  'crash_groups_list': 'listCrashGroups',
+  'crashes_stats_get': 'getCrashStatistics',
 } as const;
 
 export class CrashAnalyticsTools {

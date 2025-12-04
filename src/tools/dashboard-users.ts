@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getAllDashboardUsersToolDefinition = {
-  name: 'get_all_dashboard_users',
+  name: 'dashboard_users',
   description: 'Get a list of all dashboard users (admin/management users who access the Countly dashboard)',
   inputSchema: {
     type: 'object',
@@ -50,7 +50,7 @@ export const dashboardUsersToolDefinitions = [
 ];
 
 export const dashboardUsersToolHandlers = {
-  'get_all_dashboard_users': 'getAllDashboardUsers',
+  'dashboard_users': 'getAllDashboardUsers',
 } as const;
 
 export class DashboardUsersTools {

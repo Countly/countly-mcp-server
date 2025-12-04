@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getSDKStatsToolDefinition = {
-  name: 'get_sdk_stats',
+  name: 'sdk_stats_get',
   description: 'Get statistics about SDKs sending data to the server. Shows SDK names, versions, request type breakdown, and health check information.',
   inputSchema: {
     type: 'object',
@@ -53,7 +53,7 @@ export async function handleGetSDKStats(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const getSDKConfigToolDefinition = {
-  name: 'get_sdk_config',
+  name: 'sdk_config_get',
   description: 'Get SDK configuration settings passed to SDKs to control their behavior. Shows enabled features, tracking settings, and other SDK control parameters.',
   inputSchema: {
     type: 'object',
@@ -98,8 +98,8 @@ export const sdksToolDefinitions = [
 ];
 
 export const sdksToolHandlers = {
-  'get_sdk_stats': 'get_sdk_stats',
-  'get_sdk_config': 'get_sdk_config',
+  'sdk_stats_get': 'sdk_stats_get',
+  'sdk_config_get': 'sdk_config_get',
 } as const;
 
 // ============================================================================
@@ -109,11 +109,11 @@ export const sdksToolHandlers = {
 export class SDKsTools {
   constructor(private context: ToolContext) {}
 
-  async get_sdk_stats(args: any): Promise<ToolResult> {
+  async sdk_stats_get(args: any): Promise<ToolResult> {
     return handleGetSDKStats(this.context, args);
   }
 
-  async get_sdk_config(args: any): Promise<ToolResult> {
+  async sdk_config_get(args: any): Promise<ToolResult> {
     return handleGetSDKConfig(this.context, args);
   }
 }

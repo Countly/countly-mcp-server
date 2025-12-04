@@ -13,11 +13,11 @@ import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
 /**
- * Tool: list_hooks
+ * Tool: hooks_list
  * List all webhooks/hooks configured for an app
  */
 export const listHooksTool = {
-  name: 'list_hooks',
+  name: 'hooks_list',
   description: 'List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.',
   inputSchema: z.object({
     app_id: z.string()
@@ -53,11 +53,11 @@ async function handleListHooks(args: z.infer<typeof listHooksTool.inputSchema>, 
 }
 
 /**
- * Tool: test_hook
+ * Tool: hooks_test
  * Test a hook configuration before creating it
  */
 export const testHookTool = {
-  name: 'test_hook',
+  name: 'hooks_test',
   description: 'Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.',
   inputSchema: z.object({
     app_id: z.string()
@@ -103,11 +103,11 @@ async function handleTestHook(args: z.infer<typeof testHookTool.inputSchema>, co
 }
 
 /**
- * Tool: create_hook
+ * Tool: hooks_create
  * Create a new webhook/hook
  */
 export const createHookTool = {
-  name: 'create_hook',
+  name: 'hooks_create',
   description: `Create a new webhook/hook. Hooks can be triggered by:
 - IncomingDataTrigger: Triggered by specific events with optional filters
 - APIEndPointTrigger: Creates a unique endpoint URL that can be called externally
@@ -187,11 +187,11 @@ async function handleCreateHook(args: z.infer<typeof createHookTool.inputSchema>
 }
 
 /**
- * Tool: update_hook
+ * Tool: hooks_update
  * Update an existing webhook/hook
  */
 export const updateHookTool = {
-  name: 'update_hook',
+  name: 'hooks_update',
   description: 'Update an existing webhook/hook configuration. Provide the hook _id and new configuration.',
   inputSchema: z.object({
     app_id: z.string()
@@ -301,11 +301,11 @@ async function handleUpdateHook(args: z.infer<typeof updateHookTool.inputSchema>
 }
 
 /**
- * Tool: delete_hook
+ * Tool: hooks_delete
  * Delete a webhook/hook
  */
 export const deleteHookTool = {
-  name: 'delete_hook',
+  name: 'hooks_delete',
   description: 'Delete a webhook/hook by its ID',
   inputSchema: z.object({
     app_id: z.string()
@@ -344,11 +344,11 @@ async function handleDeleteHook(args: z.infer<typeof deleteHookTool.inputSchema>
 }
 
 /**
- * Tool: get_internal_triggers
+ * Tool: hooks_internal_triggers_get
  * Get list of available internal events that can trigger hooks
  */
 export const getInternalTriggersTool = {
-  name: 'get_internal_triggers',
+  name: 'hooks_internal_triggers_get',
   description: 'Get list of available internal Countly events that can be used as triggers for hooks',
   inputSchema: z.object({}),
 };
@@ -402,10 +402,10 @@ export const hooksTools = [
 
 // Export handlers map
 export const hooksHandlers = {
-  list_hooks: handleListHooks,
-  test_hook: handleTestHook,
-  create_hook: handleCreateHook,
-  update_hook: handleUpdateHook,
-  delete_hook: handleDeleteHook,
-  get_internal_triggers: handleGetInternalTriggers,
+  hooks_list: handleListHooks,
+  hooks_test: handleTestHook,
+  hooks_create: handleCreateHook,
+  hooks_update: handleUpdateHook,
+  hooks_delete: handleDeleteHook,
+  hooks_internal_triggers_get: handleGetInternalTriggers,
 };

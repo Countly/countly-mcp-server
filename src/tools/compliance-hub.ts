@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getConsentStatsToolDefinition = {
-  name: 'get_consent_stats',
+  name: 'consents_stats',
   description: 'Get aggregated statistics about user consents. Shows which consents users have given and when, with trend data over time.',
   inputSchema: {
     type: 'object',
@@ -53,7 +53,7 @@ export async function handleGetConsentStats(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const listUserConsentsToolDefinition = {
-  name: 'list_user_consents',
+  name: 'consents_list',
   description: 'List specific users and their consent status. Shows which users have given or denied specific consents.',
   inputSchema: {
     type: 'object',
@@ -121,7 +121,7 @@ export async function handleListUserConsents(context: ToolContext, args: any): P
 // ============================================================================
 
 export const searchConsentHistoryToolDefinition = {
-  name: 'search_consent_history',
+  name: 'consents_history_search',
   description: 'Search consent history records. Shows when users gave or revoked consents with detailed audit trail.',
   inputSchema: {
     type: 'object',
@@ -209,9 +209,9 @@ export const complianceHubToolDefinitions = [
 ];
 
 export const complianceHubToolHandlers = {
-  'get_consent_stats': 'get_consent_stats',
-  'list_user_consents': 'list_user_consents',
-  'search_consent_history': 'search_consent_history',
+  'consents_stats': 'consents_stats',
+  'consents_list': 'consents_list',
+  'consents_history_search': 'consents_history_search',
 } as const;
 
 // ============================================================================
@@ -221,15 +221,15 @@ export const complianceHubToolHandlers = {
 export class ComplianceHubTools {
   constructor(private context: ToolContext) {}
 
-  async get_consent_stats(args: any): Promise<ToolResult> {
+  async consents_stats(args: any): Promise<ToolResult> {
     return handleGetConsentStats(this.context, args);
   }
 
-  async list_user_consents(args: any): Promise<ToolResult> {
+  async consents_list(args: any): Promise<ToolResult> {
     return handleListUserConsents(this.context, args);
   }
 
-  async search_consent_history(args: any): Promise<ToolResult> {
+  async consents_history_search(args: any): Promise<ToolResult> {
     return handleSearchConsentHistory(this.context, args);
   }
 }

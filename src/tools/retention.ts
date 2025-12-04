@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getRetentionToolDefinition = {
-  name: 'get_retention',
+  name: 'retention',
   description: 'Get retention data showing how many consecutive same events (like sessions) users did before breaking the streak. Supports three retention types: Full (strict - breaks on first skip), Classic (Day N - checks specific days independently), and Unbounded (lenient - counts any return after a day).',
   inputSchema: {
     type: 'object',
@@ -117,7 +117,7 @@ export const retentionToolDefinitions = [
 ];
 
 export const retentionToolHandlers = {
-  'get_retention': 'getRetention',
+  'retention': 'getRetention',
 } as const;
 
 export class RetentionTools {

@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const listRemoteConfigsToolDefinition = {
-  name: 'list_remote_configs',
+  name: 'remote_configs_list',
   description: 'List all remote config parameters and conditions for an application. Remote configs allow controlling app behavior by changing parameter values on the server.',
   inputSchema: {
     type: 'object',
@@ -49,7 +49,7 @@ export async function handleListRemoteConfigs(context: ToolContext, args: any): 
 // ============================================================================
 
 export const addRemoteConfigConditionToolDefinition = {
-  name: 'add_remote_config_condition',
+  name: 'remote_config_conditions_add',
   description: 'Add a condition to segment user groups for which to use specific parameter values. Conditions use MongoDB queries to match users based on properties like age, country, etc.',
   inputSchema: {
     type: 'object',
@@ -94,7 +94,7 @@ export async function handleAddRemoteConfigCondition(context: ToolContext, args:
 // ============================================================================
 
 export const updateRemoteConfigConditionToolDefinition = {
-  name: 'update_remote_config_condition',
+  name: 'remote_config_conditions_update',
   description: 'Update an existing remote config condition to modify user segmentation criteria.',
   inputSchema: {
     type: 'object',
@@ -144,7 +144,7 @@ export async function handleUpdateRemoteConfigCondition(context: ToolContext, ar
 // ============================================================================
 
 export const deleteRemoteConfigConditionToolDefinition = {
-  name: 'delete_remote_config_condition',
+  name: 'remote_config_conditions_delete',
   description: 'Delete a remote config condition. Note: Cannot delete conditions that are currently being used by parameters.',
   inputSchema: {
     type: 'object',
@@ -189,7 +189,7 @@ export async function handleDeleteRemoteConfigCondition(context: ToolContext, ar
 // ============================================================================
 
 export const addRemoteConfigParameterToolDefinition = {
-  name: 'add_remote_config_parameter',
+  name: 'remote_config_parameters_add',
   description: 'Add a remote config parameter that apps can fetch and use to control behavior. Parameters can have different values for different user segments based on conditions.',
   inputSchema: {
     type: 'object',
@@ -234,7 +234,7 @@ export async function handleAddRemoteConfigParameter(context: ToolContext, args:
 // ============================================================================
 
 export const updateRemoteConfigParameterToolDefinition = {
-  name: 'update_remote_config_parameter',
+  name: 'remote_config_parameters_update',
   description: 'Update an existing remote config parameter to change its values, conditions, or status.',
   inputSchema: {
     type: 'object',
@@ -284,7 +284,7 @@ export async function handleUpdateRemoteConfigParameter(context: ToolContext, ar
 // ============================================================================
 
 export const deleteRemoteConfigParameterToolDefinition = {
-  name: 'delete_remote_config_parameter',
+  name: 'remote_config_parameters_delete',
   description: 'Delete a remote config parameter. This will remove the parameter from the server and apps will no longer receive it.',
   inputSchema: {
     type: 'object',
@@ -339,13 +339,13 @@ export const remoteConfigToolDefinitions = [
 ];
 
 export const remoteConfigToolHandlers = {
-  'list_remote_configs': 'listRemoteConfigs',
-  'add_remote_config_condition': 'addRemoteConfigCondition',
-  'update_remote_config_condition': 'updateRemoteConfigCondition',
-  'delete_remote_config_condition': 'deleteRemoteConfigCondition',
-  'add_remote_config_parameter': 'addRemoteConfigParameter',
-  'update_remote_config_parameter': 'updateRemoteConfigParameter',
-  'delete_remote_config_parameter': 'deleteRemoteConfigParameter',
+  'remote_configs_list': 'listRemoteConfigs',
+  'remote_config_conditions_add': 'addRemoteConfigCondition',
+  'remote_config_conditions_update': 'updateRemoteConfigCondition',
+  'remote_config_conditions_delete': 'deleteRemoteConfigCondition',
+  'remote_config_parameters_add': 'addRemoteConfigParameter',
+  'remote_config_parameters_update': 'updateRemoteConfigParameter',
+  'remote_config_parameters_delete': 'deleteRemoteConfigParameter',
 } as const;
 
 export class RemoteConfigTools {

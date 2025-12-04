@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getViewsTableToolDefinition = {
-  name: 'get_views_table',
+  name: 'views_table',
   description: 'Get list of views and totals for each view in the application',
   inputSchema: {
     type: 'object',
@@ -73,7 +73,7 @@ export async function handleGetViewsTable(context: ToolContext, args: any): Prom
 // ============================================================================
 
 export const getViewSegmentsToolDefinition = {
-  name: 'get_view_segments',
+  name: 'views_segments',
   description: 'Get available segments for views in the application',
   inputSchema: {
     type: 'object',
@@ -129,7 +129,7 @@ export async function handleGetViewSegments(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const getViewsDataToolDefinition = {
-  name: 'get_views_data',
+  name: 'views_data',
   description: 'Get data breakdown by time for selected views with optional segment filtering',
   inputSchema: {
     type: 'object',
@@ -198,9 +198,9 @@ export const viewsToolDefinitions = [
 ];
 
 export const viewsToolHandlers = {
-  'get_views_table': 'getViewsTable',
-  'get_view_segments': 'getViewSegments',
-  'get_views_data': 'getViewsData',
+  'views_table': 'getViewsTable',
+  'views_segments': 'getViewSegments',
+  'views_data': 'getViewsData',
 } as const;
 
 export class ViewsTools {

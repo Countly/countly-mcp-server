@@ -97,8 +97,8 @@ describe('Prompts', () => {
       expect(result.description).toContain('EngagementApp');
       expect(result.messages[0].content.text).toContain('EngagementApp');
       expect(result.messages[0].content.text).toContain('sessions, users, events');
-      expect(result.messages[0].content.text).toContain('get_analytics_app_summary');
-      expect(result.messages[0].content.text).toContain('get_user_loyalty');
+      expect(result.messages[0].content.text).toContain('app_analytics_summary');
+      expect(result.messages[0].content.text).toContain('user_loyalty');
     });
 
     it('should generate compare versions prompt', () => {
@@ -126,8 +126,8 @@ describe('Prompts', () => {
       expect(result.description).toContain('RetentionApp');
       expect(result.messages[0].content.text).toContain('RetentionApp');
       expect(result.messages[0].content.text).toContain('NewUsers');
-      expect(result.messages[0].content.text).toContain('get_retention_data');
-      expect(result.messages[0].content.text).toContain('get_cohort_users');
+      expect(result.messages[0].content.text).toContain('retention_data');
+      expect(result.messages[0].content.text).toContain('cohorts_details_users');
     });
 
     it('should generate retention analysis prompt without cohort', () => {
@@ -137,8 +137,8 @@ describe('Prompts', () => {
 
       expect(result.description).toContain('RetentionApp');
       expect(result.messages[0].content.text).toContain('RetentionApp');
-      expect(result.messages[0].content.text).toContain('get_retention_data');
-      expect(result.messages[0].content.text).not.toContain('get_cohort_users');
+      expect(result.messages[0].content.text).toContain('retention_data');
+      expect(result.messages[0].content.text).not.toContain('cohorts_details_users');
     });
 
     it('should generate funnel optimization prompt', () => {
@@ -151,8 +151,8 @@ describe('Prompts', () => {
       expect(result.description).toContain('PurchaseFunnel');
       expect(result.messages[0].content.text).toContain('FunnelApp');
       expect(result.messages[0].content.text).toContain('PurchaseFunnel');
-      expect(result.messages[0].content.text).toContain('list_funnels');
-      expect(result.messages[0].content.text).toContain('get_funnel_data');
+      expect(result.messages[0].content.text).toContain('funnels_list');
+      expect(result.messages[0].content.text).toContain('funnels_details_data');
     });
 
     it('should generate event health check prompt', () => {
@@ -176,8 +176,8 @@ describe('Prompts', () => {
       expect(result.description).toContain('ChurnApp');
       expect(result.messages[0].content.text).toContain('ChurnApp');
       expect(result.messages[0].content.text).toContain('period=14');
-      expect(result.messages[0].content.text).toContain('get_slipping_away_users');
-      expect(result.messages[0].content.text).toContain('get_user_loyalty');
+      expect(result.messages[0].content.text).toContain('slipping_users');
+      expect(result.messages[0].content.text).toContain('user_loyalty');
     });
 
     it('should generate churn risk prompt with default inactivity days', () => {
@@ -197,8 +197,8 @@ describe('Prompts', () => {
       expect(result.description).toContain('PerfApp');
       expect(result.messages[0].content.text).toContain('PerfApp');
       expect(result.messages[0].content.text).toContain('60days');
-      expect(result.messages[0].content.text).toContain('get_analytics_app_summary');
-      expect(result.messages[0].content.text).toContain('get_crash_statistics');
+      expect(result.messages[0].content.text).toContain('app_analytics_summary');
+      expect(result.messages[0].content.text).toContain('crashes_stats_get');
       expect(result.messages[0].content.text).toContain('countly://app/');
     });
 

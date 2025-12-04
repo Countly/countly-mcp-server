@@ -214,8 +214,8 @@ function generateCrashTrendsPrompt(args: Record<string, string>): PromptResult {
           text: `Please analyze the crash and error trends for the "${appName}" application over the ${period} period. 
 
 I need you to:
-1. Use list_crash_groups to get recent crashes for ${appName}
-2. Use get_crash_statistics to get overall crash metrics
+1. Use crash_groups_list to get recent crashes for ${appName}
+2. Use crashes_stats_get to get overall crash metrics
 3. Identify the most common crash patterns
 4. Analyze trends (increasing/decreasing crash rates)
 5. Highlight any critical issues that need immediate attention
@@ -242,11 +242,11 @@ function generateEngagementReportPrompt(args: Record<string, string>): PromptRes
           text: `Create a comprehensive user engagement report for "${appName}" including these metrics: ${metrics}.
 
 Please:
-1. Use get_analytics_app_summary to fetch current analytics
-2. Use get_user_loyalty to understand user engagement levels
-3. Use get_session_frequency to analyze usage patterns
+1. Use app_analytics_summary to fetch current analytics
+2. Use user_loyalty to understand user engagement levels
+3. Use session_frequency to analyze usage patterns
 4. Use get_top_events to identify key user actions
-5. Use get_slipping_away_users to identify users at risk
+5. Use slipping_users to identify users at risk
 
 Provide a detailed analysis covering:
 - Overall engagement trends
@@ -278,7 +278,7 @@ Please:
 1. Use get_analytics_data with appropriate filters to get metrics for each version
 2. Compare key metrics: sessions, users, crashes, session duration
 3. Analyze any significant changes in user behavior
-4. Check for version-specific crashes using list_crash_groups
+4. Check for version-specific crashes using crash_groups_list
 5. Identify any performance regressions or improvements
 
 Provide a side-by-side comparison highlighting:
@@ -308,9 +308,9 @@ function generateRetentionAnalysisPrompt(args: Record<string, string>): PromptRe
           text: `Analyze user retention patterns${cohortText} in the "${appName}" application.
 
 Please:
-1. Use get_retention_data to get retention cohort analysis
-2. Use get_user_loyalty to understand repeat usage patterns
-3. Use get_session_frequency to analyze time between sessions${cohortName ? `\n4. Use get_cohort_users to analyze the specific cohort "${cohortName}"` : ''}
+1. Use retention_data to get retention cohort analysis
+2. Use user_loyalty to understand repeat usage patterns
+3. Use session_frequency to analyze time between sessions${cohortName ? `\n4. Use cohorts_details_users to analyze the specific cohort "${cohortName}"` : ''}
 
 Provide insights on:
 - Retention rates by cohort
@@ -338,10 +338,10 @@ function generateFunnelOptimizationPrompt(args: Record<string, string>): PromptR
           text: `Analyze and optimize the "${funnelName}" conversion funnel in the "${appName}" application.
 
 Please:
-1. Use list_funnels to find the funnel
-2. Use get_funnel_data to get conversion metrics
-3. Use get_funnel_steps to analyze each step
-4. Use get_funnel_sessions to understand user behavior
+1. Use funnels_list to find the funnel
+2. Use funnels_details_data to get conversion metrics
+3. Use funnels_details_steps to analyze each step
+4. Use funnels_details_sessions to understand user behavior
 
 Provide analysis including:
 - Overall conversion rate
@@ -399,9 +399,9 @@ function generateChurnRiskPrompt(args: Record<string, string>): PromptResult {
           text: `Identify users who are at risk of churning from the "${appName}" application.
 
 Please:
-1. Use get_slipping_away_users with period=${inactivityDays} to find inactive users
-2. Use get_user_loyalty to understand typical usage patterns
-3. Use get_session_frequency to analyze session timing
+1. Use slipping_users with period=${inactivityDays} to find inactive users
+2. Use user_loyalty to understand typical usage patterns
+3. Use session_frequency to analyze session timing
 4. Compare at-risk users with active users to identify patterns
 
 Provide analysis including:
@@ -430,9 +430,9 @@ function generatePerformanceDashboardPrompt(args: Record<string, string>): Promp
           text: `Provide a comprehensive performance overview for "${appName}" over the ${timeRange} period.
 
 Please gather data from:
-1. get_analytics_app_summary for overall metrics
-2. get_crash_statistics for stability metrics
-3. get_session_durations for performance insights
+1. app_analytics_summary for overall metrics
+2. crashes_stats_get for stability metrics
+3. session_durations for performance insights
 4. get_analytics_data for detailed breakdowns
 5. Check the countly://app/{app_id}/overview resource
 

@@ -175,7 +175,7 @@ export async function handleFetch(context: ToolContext, args: any): Promise<Tool
 // ============================================================================
 
 export const listJobsToolDefinition = {
-  name: 'list_jobs',
+  name: 'jobs_list',
   description: 'List all background jobs running on the Countly server with pagination and sorting options',
   inputSchema: {
     type: 'object',
@@ -245,7 +245,7 @@ export async function handleListJobs(context: ToolContext, args: any): Promise<T
 }
 
 export const getJobRunsToolDefinition = {
-  name: 'get_job_runs',
+  name: 'job_runs',
   description: 'Get run history and details for a specific background job by name',
   inputSchema: {
     type: 'object',
@@ -339,8 +339,8 @@ export const coreToolHandlers = {
   'get_plugins': 'get_plugins',
   'search': 'search',
   'fetch': 'fetch',
-  'list_jobs': 'list_jobs',
-  'get_job_runs': 'get_job_runs',
+  'jobs_list': 'jobs_list',
+  'job_runs': 'job_runs',
 } as const;
 
 export class CoreTools {
@@ -366,11 +366,11 @@ export class CoreTools {
     return handleFetch(this.context, args);
   }
 
-  async list_jobs(args: any): Promise<ToolResult> {
+  async jobs_list(args: any): Promise<ToolResult> {
     return handleListJobs(this.context, args);
   }
 
-  async get_job_runs(args: any): Promise<ToolResult> {
+  async job_runs(args: any): Promise<ToolResult> {
     return handleGetJobRuns(this.context, args);
   }
 }

@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getLiveUsersToolDefinition = {
-  name: 'get_live_users',
+  name: 'live_users',
   description: 'Get current online user count and new user count for this moment. Shows users currently using the app in real-time.',
   inputSchema: {
     type: 'object',
@@ -55,7 +55,7 @@ export async function handleGetLiveUsers(context: ToolContext, args: any): Promi
 // ============================================================================
 
 export const getLiveMetricsToolDefinition = {
-  name: 'get_live_metrics',
+  name: 'live_metrics',
   description: 'Get breakdown by countries, devices and carriers for users currently online. Shows demographic distribution of live users.',
   inputSchema: {
     type: 'object',
@@ -105,7 +105,7 @@ export async function handleGetLiveMetrics(context: ToolContext, args: any): Pro
 // ============================================================================
 
 export const getLiveLastHourToolDefinition = {
-  name: 'get_live_last_hour',
+  name: 'live_last_hour',
   description: 'Get online user and new user count data for the last hour. Returns minute-by-minute data with 60 data points.',
   inputSchema: {
     type: 'object',
@@ -154,7 +154,7 @@ export async function handleGetLiveLastHour(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const getLiveLastDayToolDefinition = {
-  name: 'get_live_last_day',
+  name: 'live_last_day',
   description: 'Get online user and new user count for the last day. Returns hour-by-hour data with 24 data points.',
   inputSchema: {
     type: 'object',
@@ -203,7 +203,7 @@ export async function handleGetLiveLastDay(context: ToolContext, args: any): Pro
 // ============================================================================
 
 export const getLiveLast30DaysToolDefinition = {
-  name: 'get_live_last_30_days',
+  name: 'live_last_30_days',
   description: 'Get online user and new user count for the last 30 days. Returns daily data with 30 data points.',
   inputSchema: {
     type: 'object',
@@ -252,7 +252,7 @@ export async function handleGetLiveLast30Days(context: ToolContext, args: any): 
 // ============================================================================
 
 export const getLiveOverallToolDefinition = {
-  name: 'get_live_overall',
+  name: 'live_overall',
   description: 'Get maximum values for online user count and new user count. Shows peak concurrent usage records.',
   inputSchema: {
     type: 'object',
@@ -310,12 +310,12 @@ export const liveToolDefinitions = [
 ];
 
 export const liveToolHandlers = {
-  'get_live_users': 'getLiveUsers',
-  'get_live_metrics': 'getLiveMetrics',
-  'get_live_last_hour': 'getLiveLastHour',
-  'get_live_last_day': 'getLiveLastDay',
-  'get_live_last_30_days': 'getLiveLast30Days',
-  'get_live_overall': 'getLiveOverall',
+  'live_users': 'getLiveUsers',
+  'live_metrics': 'getLiveMetrics',
+  'live_last_hour': 'getLiveLastHour',
+  'live_last_day': 'getLiveLastDay',
+  'live_last_30_days': 'getLiveLast30Days',
+  'live_overall': 'getLiveOverall',
 } as const;
 
 export class LiveTools {

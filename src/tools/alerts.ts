@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const createAlertToolDefinition = {
-  name: 'create_alert',
+  name: 'alerts_create',
   description: 'Create or update an alert configuration. Supports various alert types including crashes, sessions, users, events, views, and more.',
   inputSchema: {
     type: 'object',
@@ -131,7 +131,7 @@ export async function handleCreateAlert(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const deleteAlertToolDefinition = {
-  name: 'delete_alert',
+  name: 'alerts_delete',
   description: 'Delete an alert',
   inputSchema: {
     type: 'object',
@@ -173,7 +173,7 @@ export async function handleDeleteAlert(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const listAlertsToolDefinition = {
-  name: 'list_alerts',
+  name: 'alerts_list',
   description: 'List all alerts for an application',
   inputSchema: {
     type: 'object',
@@ -218,9 +218,9 @@ export const alertsToolDefinitions = [
 ];
 
 export const alertsToolHandlers = {
-  'create_alert': 'createAlert',
-  'delete_alert': 'deleteAlert',
-  'list_alerts': 'listAlerts',
+  'alerts_create': 'createAlert',
+  'alerts_delete': 'deleteAlert',
+  'alerts_list': 'listAlerts',
 } as const;
 
 export class AlertsTools {
