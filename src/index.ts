@@ -125,8 +125,8 @@ class CountlyMCPServer {
     this.toolsConfig = loadToolsConfig(process.env);
     this.loopDetector = new LoopDetector();
     
-    // Initialize analytics (disabled by default, enabled via ENABLE_ANALYTICS=true)
-    const analyticsEnabled = process.env.ENABLE_ANALYTICS === 'true';
+    // Initialize analytics (enabled by default; set ENABLE_ANALYTICS=false to disable)
+    const analyticsEnabled = (process.env.ENABLE_ANALYTICS || '').toLowerCase() !== 'false';
     analytics.init(analyticsEnabled);
     
     // Log configuration on startup (only in non-test mode)
