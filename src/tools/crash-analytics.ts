@@ -1,11 +1,12 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // RESOLVE_CRASH TOOL
 // ============================================================================
 
 export const resolveCrashToolDefinition = {
-  name: 'resolve_crash',
+  name: 'crashes_resolve',
   description: 'Mark a crash group as resolved',
   inputSchema: {
     type: 'object',
@@ -15,10 +16,6 @@ export const resolveCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to resolve' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -32,7 +29,16 @@ export async function handleResolveCrash(context: ToolContext, args: any): Promi
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/resolve', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/resolve', { params }),
+
+
+    'Failed to execute request to /i/crashes/resolve'
+
+
+  );
   
   return {
     content: [
@@ -49,7 +55,7 @@ export async function handleResolveCrash(context: ToolContext, args: any): Promi
 // ============================================================================
 
 export const unresolveCrashToolDefinition = {
-  name: 'unresolve_crash',
+  name: 'crashes_unresolve',
   description: 'Mark a crash group as unresolved',
   inputSchema: {
     type: 'object',
@@ -59,10 +65,6 @@ export const unresolveCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to unresolve' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -76,7 +78,16 @@ export async function handleUnresolveCrash(context: ToolContext, args: any): Pro
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/unresolve', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/unresolve', { params }),
+
+
+    'Failed to execute request to /i/crashes/unresolve'
+
+
+  );
   
   return {
     content: [
@@ -93,7 +104,7 @@ export async function handleUnresolveCrash(context: ToolContext, args: any): Pro
 // ============================================================================
 
 export const viewCrashToolDefinition = {
-  name: 'view_crash',
+  name: 'crashes_get',
   description: 'View data for specific crash group',
   inputSchema: {
     type: 'object',
@@ -108,10 +119,6 @@ export const viewCrashToolDefinition = {
       },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -127,7 +134,16 @@ export async function handleViewCrash(context: ToolContext, args: any): Promise<
     period,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [
@@ -144,7 +160,7 @@ export async function handleViewCrash(context: ToolContext, args: any): Promise<
 // ============================================================================
 
 export const hideCrashToolDefinition = {
-  name: 'hide_crash',
+  name: 'crashes_hide',
   description: 'Hide a crash group from view',
   inputSchema: {
     type: 'object',
@@ -154,10 +170,6 @@ export const hideCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to hide' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -171,7 +183,16 @@ export async function handleHideCrash(context: ToolContext, args: any): Promise<
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/hide', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/hide', { params }),
+
+
+    'Failed to execute request to /i/crashes/hide'
+
+
+  );
   
   return {
     content: [
@@ -188,7 +209,7 @@ export async function handleHideCrash(context: ToolContext, args: any): Promise<
 // ============================================================================
 
 export const showCrashToolDefinition = {
-  name: 'show_crash',
+  name: 'crashes_show',
   description: 'Show a hidden crash group',
   inputSchema: {
     type: 'object',
@@ -198,10 +219,6 @@ export const showCrashToolDefinition = {
       crash_id: { type: 'string', description: 'Crash ID to show' },
     },
     required: ['crash_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -215,7 +232,16 @@ export async function handleShowCrash(context: ToolContext, args: any): Promise<
     args: JSON.stringify({ crash_id }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/show', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/show', { params }),
+
+
+    'Failed to execute request to /i/crashes/show'
+
+
+  );
   
   return {
     content: [
@@ -232,7 +258,7 @@ export async function handleShowCrash(context: ToolContext, args: any): Promise<
 // ============================================================================
 
 export const addCrashCommentToolDefinition = {
-  name: 'add_crash_comment',
+  name: 'crashes_comment_add',
   description: 'Add a comment to a crash group',
   inputSchema: {
     type: 'object',
@@ -243,10 +269,6 @@ export const addCrashCommentToolDefinition = {
       comment: { type: 'string', description: 'Comment text to add' },
     },
     required: ['crash_id', 'comment'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -264,7 +286,16 @@ export async function handleAddCrashComment(context: ToolContext, args: any): Pr
     }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/add_comment', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/add_comment', { params }),
+
+
+    'Failed to execute request to /i/crashes/add_comment'
+
+
+  );
   
   return {
     content: [
@@ -281,7 +312,7 @@ export async function handleAddCrashComment(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const editCrashCommentToolDefinition = {
-  name: 'edit_crash_comment',
+  name: 'crashes_comment_update',
   description: 'Edit an existing comment on a crash group',
   inputSchema: {
     type: 'object',
@@ -293,10 +324,6 @@ export const editCrashCommentToolDefinition = {
       comment: { type: 'string', description: 'New comment text' },
     },
     required: ['crash_id', 'comment_id', 'comment'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -315,7 +342,16 @@ export async function handleEditCrashComment(context: ToolContext, args: any): P
     }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/edit_comment', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/edit_comment', { params }),
+
+
+    'Failed to execute request to /i/crashes/edit_comment'
+
+
+  );
   
   return {
     content: [
@@ -332,7 +368,7 @@ export async function handleEditCrashComment(context: ToolContext, args: any): P
 // ============================================================================
 
 export const deleteCrashCommentToolDefinition = {
-  name: 'delete_crash_comment',
+  name: 'crashes_comment_delete',
   description: 'Delete a comment from a crash group',
   inputSchema: {
     type: 'object',
@@ -343,10 +379,6 @@ export const deleteCrashCommentToolDefinition = {
       comment_id: { type: 'string', description: 'ID of the comment to delete' },
     },
     required: ['crash_id', 'comment_id'],
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -364,7 +396,16 @@ export async function handleDeleteCrashComment(context: ToolContext, args: any):
     }),
   };
 
-  const response = await context.httpClient.get('/i/crashes/delete_comment', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/crashes/delete_comment', { params }),
+
+
+    'Failed to execute request to /i/crashes/delete_comment'
+
+
+  );
   
   return {
     content: [
@@ -381,7 +422,7 @@ export async function handleDeleteCrashComment(context: ToolContext, args: any):
 // ============================================================================
 
 export const listCrashGroupsToolDefinition = {
-  name: 'list_crash_groups',
+  name: 'crash_groups_list',
   description: 'List crash groups for an app with optional filtering',
   inputSchema: {
     type: 'object',
@@ -397,10 +438,6 @@ export const listCrashGroupsToolDefinition = {
       skip: { type: 'number', description: 'Number of records to skip for pagination', default: 0 },
       limit: { type: 'number', description: 'Maximum number of records to return', default: 10 },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -418,7 +455,16 @@ export async function handleListCrashGroups(context: ToolContext, args: any): Pr
     iDisplayLength: limit,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [
@@ -435,7 +481,7 @@ export async function handleListCrashGroups(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const getCrashStatisticsToolDefinition = {
-  name: 'get_crash_statistics',
+  name: 'crashes_stats_get',
   description: 'Get overall crash statistics and graph data for an app',
   inputSchema: {
     type: 'object',
@@ -448,10 +494,6 @@ export const getCrashStatisticsToolDefinition = {
         default: '30days' 
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -467,7 +509,16 @@ export async function handleGetCrashStatistics(context: ToolContext, args: any):
     period,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [
@@ -497,16 +548,16 @@ export const crashAnalyticsToolDefinitions = [
 ];
 
 export const crashAnalyticsToolHandlers = {
-  'resolve_crash': 'resolveCrash',
-  'unresolve_crash': 'unresolveCrash',
-  'view_crash': 'viewCrash',
-  'hide_crash': 'hideCrash',
-  'show_crash': 'showCrash',
-  'add_crash_comment': 'addCrashComment',
-  'edit_crash_comment': 'editCrashComment',
-  'delete_crash_comment': 'deleteCrashComment',
-  'list_crash_groups': 'listCrashGroups',
-  'get_crash_statistics': 'getCrashStatistics',
+  'crashes_resolve': 'resolveCrash',
+  'crashes_unresolve': 'unresolveCrash',
+  'crashes_get': 'viewCrash',
+  'crashes_hide': 'hideCrash',
+  'crashes_show': 'showCrash',
+  'crashes_comment_add': 'addCrashComment',
+  'crashes_comment_update': 'editCrashComment',
+  'crashes_comment_delete': 'deleteCrashComment',
+  'crash_groups_list': 'listCrashGroups',
+  'crashes_stats_get': 'getCrashStatistics',
 } as const;
 
 export class CrashAnalyticsTools {

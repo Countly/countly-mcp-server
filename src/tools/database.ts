@@ -1,11 +1,12 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // LIST_DATABASES TOOL
 // ============================================================================
 
 export const listDatabasesToolDefinition = {
-  name: 'list_databases',
+  name: 'databases_list',
   description: 'List all available databases and their collections',
   inputSchema: {
     type: 'object',
@@ -19,7 +20,16 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
     ...context.getAuthParams(),
   };
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -36,7 +46,7 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
 // ============================================================================
 
 export const queryDatabaseToolDefinition = {
-  name: 'query_database',
+  name: 'databases_query',
   description: 'Query documents from a database collection with filtering, sorting, and pagination',
   inputSchema: {
     type: 'object',
@@ -94,7 +104,16 @@ params.sort = sort;
 params.sSearch = search;
 }
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -111,7 +130,7 @@ params.sSearch = search;
 // ============================================================================
 
 export const getDocumentToolDefinition = {
-  name: 'get_document',
+  name: 'databases_document',
   description: 'Get a specific document by ID from a collection',
   inputSchema: {
     type: 'object',
@@ -150,7 +169,16 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
     }
   }
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -167,7 +195,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const aggregateCollectionToolDefinition = {
-  name: 'aggregate_collection',
+  name: 'collections_aggregate',
   description: 'Run MongoDB aggregation pipeline on a collection',
   inputSchema: {
     type: 'object',
@@ -206,7 +234,16 @@ export async function handleAggregateCollection(context: ToolContext, args: any)
     }
   }
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -223,7 +260,7 @@ export async function handleAggregateCollection(context: ToolContext, args: any)
 // ============================================================================
 
 export const getCollectionIndexesToolDefinition = {
-  name: 'get_collection_indexes',
+  name: 'collections_indexes',
   description: 'Get indexes for a specific collection',
   inputSchema: {
     type: 'object',
@@ -250,7 +287,16 @@ export async function handleGetCollectionIndexes(context: ToolContext, args: any
     action: 'get_indexes',
   };
 
-  const response = await context.httpClient.get('/o/db', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/db', { params }),
+
+
+    'Failed to execute request to /o/db'
+
+
+  );
   
   return {
     content: [
@@ -267,7 +313,7 @@ export async function handleGetCollectionIndexes(context: ToolContext, args: any
 // ============================================================================
 
 export const getDbStatisticsToolDefinition = {
-  name: 'get_db_statistics',
+  name: 'databases_stats',
   description: 'Get MongoDB statistics (mongotop and mongostat)',
   inputSchema: {
     type: 'object',
@@ -290,7 +336,13 @@ export async function handleGetDbStatistics(context: ToolContext, args: any): Pr
   };
 
   const endpoint = stat_type === 'mongotop' ? '/o/db/mongotop' : '/o/db/mongostat';
-  const response = await context.httpClient.get(endpoint, { params });
+  const response = await safeApiCall(
+
+    () => context.httpClient.get(endpoint, { params }),
+
+    'Failed to execute request to API request'
+
+  );
   
   return {
     content: [
@@ -316,12 +368,12 @@ export const databaseToolDefinitions = [
 ];
 
 export const databaseToolHandlers = {
-  'list_databases': 'listDatabases',
-  'query_database': 'queryDatabase',
-  'get_document': 'getDocument',
-  'aggregate_collection': 'aggregateCollection',
-  'get_collection_indexes': 'getCollectionIndexes',
-  'get_db_statistics': 'getDbStatistics',
+  'databases_list': 'listDatabases',
+  'databases_query': 'queryDatabase',
+  'databases_document': 'getDocument',
+  'collections_aggregate': 'aggregateCollection',
+  'collections_indexes': 'getCollectionIndexes',
+  'databases_stats': 'getDbStatistics',
 } as const;
 
 export class DatabaseTools {

@@ -58,6 +58,101 @@ import { viewsToolDefinitions, viewsToolHandlers, viewsToolMetadata, ViewsTools 
 
 export { viewsToolDefinitions, viewsToolHandlers, viewsToolMetadata, ViewsTools };
 
+// Drill
+import { drillToolDefinitions, drillToolHandlers, drillToolMetadata, DrillTools } from './drill.js';
+
+export { drillToolDefinitions, drillToolHandlers, drillToolMetadata, DrillTools };
+
+// User Profiles
+import { userProfilesToolDefinitions, userProfilesToolHandlers, userProfilesToolMetadata, UserProfilesTools } from './user-profiles.js';
+
+export { userProfilesToolDefinitions, userProfilesToolHandlers, userProfilesToolMetadata, UserProfilesTools };
+
+// Cohorts
+import { cohortsToolDefinitions, cohortsToolHandlers, cohortsToolMetadata, CohortsTools } from './cohorts.js';
+
+export { cohortsToolDefinitions, cohortsToolHandlers, cohortsToolMetadata, CohortsTools };
+
+// Funnels
+import { funnelsToolDefinitions, funnelsToolHandlers, funnelsToolMetadata, FunnelsTools } from './funnels.js';
+
+export { funnelsToolDefinitions, funnelsToolHandlers, funnelsToolMetadata, FunnelsTools };
+
+// Formulas
+import { formulasToolDefinitions, formulasToolHandlers, formulasToolMetadata, FormulasTools } from './formulas.js';
+
+export { formulasToolDefinitions, formulasToolHandlers, formulasToolMetadata, FormulasTools };
+
+// Live (Concurrent Users)
+import { liveToolDefinitions, liveToolHandlers, liveToolMetadata, LiveTools } from './live.js';
+
+export { liveToolDefinitions, liveToolHandlers, liveToolMetadata, LiveTools };
+
+// Retention
+import { retentionToolDefinitions, retentionToolHandlers, retentionToolMetadata, RetentionTools } from './retention.js';
+
+export { retentionToolDefinitions, retentionToolHandlers, retentionToolMetadata, RetentionTools };
+
+// Remote Config
+import { remoteConfigToolDefinitions, remoteConfigToolHandlers, remoteConfigToolMetadata, RemoteConfigTools } from './remote-config.js';
+
+export { remoteConfigToolDefinitions, remoteConfigToolHandlers, remoteConfigToolMetadata, RemoteConfigTools };
+
+// A/B Testing
+import { abTestingToolDefinitions, abTestingToolHandlers, abTestingToolMetadata, ABTestingTools } from './ab-testing.js';
+
+export { abTestingToolDefinitions, abTestingToolHandlers, abTestingToolMetadata, ABTestingTools };
+
+// Logger
+import { loggerToolDefinitions, loggerToolHandlers, loggerToolMetadata, LoggerTools } from './logger.js';
+
+export { loggerToolDefinitions, loggerToolHandlers, loggerToolMetadata, LoggerTools };
+
+// SDKs
+import { sdksToolDefinitions, sdksToolHandlers, sdksToolMetadata, SDKsTools } from './sdks.js';
+
+export { sdksToolDefinitions, sdksToolHandlers, sdksToolMetadata, SDKsTools };
+
+// Compliance Hub
+import { complianceHubToolDefinitions, complianceHubToolHandlers, complianceHubToolMetadata, ComplianceHubTools } from './compliance-hub.js';
+
+export { complianceHubToolDefinitions, complianceHubToolHandlers, complianceHubToolMetadata, ComplianceHubTools };
+
+// Filtering Rules
+import { filteringRulesToolDefinitions, filteringRulesToolHandlers, filteringRulesToolMetadata, FilteringRulesTools } from './filtering-rules.js';
+
+export { filteringRulesToolDefinitions, filteringRulesToolHandlers, filteringRulesToolMetadata, FilteringRulesTools };
+
+// Datapoint
+import { datapointToolDefinitions, datapointToolHandlers, datapointToolMetadata, DatapointTools } from './datapoint.js';
+
+export { datapointToolDefinitions, datapointToolHandlers, datapointToolMetadata, DatapointTools };
+
+// Server Logs
+import { serverLogsToolDefinitions, serverLogsToolHandlers, serverLogsToolMetadata, ServerLogsTools } from './server-logs.js';
+
+export { serverLogsToolDefinitions, serverLogsToolHandlers, serverLogsToolMetadata, ServerLogsTools };
+
+// Email Reports
+import { emailReportsToolDefinitions, emailReportsToolHandlers, emailReportsToolMetadata, EmailReportsTools } from './email-reports.js';
+
+export { emailReportsToolDefinitions, emailReportsToolHandlers, emailReportsToolMetadata, EmailReportsTools };
+
+// Dashboards
+import { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetadata, DashboardsTools } from './dashboards.js';
+
+export { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetadata, DashboardsTools };
+
+// Times of Day
+import { timesOfDayTools, timesOfDayHandlers } from './times-of-day.js';
+
+export { timesOfDayTools, timesOfDayHandlers };
+
+// Hooks
+import { hooksTools, hooksHandlers } from './hooks.js';
+
+export { hooksTools, hooksHandlers };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -78,6 +173,25 @@ export function getAllToolDefinitions() {
     ...databaseToolDefinitions,
     ...crashAnalyticsToolDefinitions,
     ...viewsToolDefinitions,
+    ...drillToolDefinitions,
+    ...userProfilesToolDefinitions,
+    ...cohortsToolDefinitions,
+    ...funnelsToolDefinitions,
+    ...formulasToolDefinitions,
+    ...liveToolDefinitions,
+    ...retentionToolDefinitions,
+    ...remoteConfigToolDefinitions,
+    ...abTestingToolDefinitions,
+    ...loggerToolDefinitions,
+    ...sdksToolDefinitions,
+    ...complianceHubToolDefinitions,
+    ...filteringRulesToolDefinitions,
+    ...datapointToolDefinitions,
+    ...serverLogsToolDefinitions,
+    ...emailReportsToolDefinitions,
+    ...dashboardsToolDefinitions,
+    ...timesOfDayTools,
+    ...hooksTools,
   ];
 }
 
@@ -98,6 +212,25 @@ export function getAllToolHandlers() {
     ...databaseToolHandlers,
     ...crashAnalyticsToolHandlers,
     ...viewsToolHandlers,
+    ...drillToolHandlers,
+    ...userProfilesToolHandlers,
+    ...cohortsToolHandlers,
+    ...funnelsToolHandlers,
+    ...formulasToolHandlers,
+    ...liveToolHandlers,
+    ...retentionToolHandlers,
+    ...remoteConfigToolHandlers,
+    ...abTestingToolHandlers,
+    ...loggerToolHandlers,
+    ...sdksToolHandlers,
+    ...complianceHubToolHandlers,
+    ...filteringRulesToolHandlers,
+    ...datapointToolHandlers,
+    ...serverLogsToolHandlers,
+    ...emailReportsToolHandlers,
+    ...dashboardsToolHandlers,
+    ...timesOfDayHandlers,
+    ...hooksHandlers,
   };
 }
 
@@ -118,5 +251,22 @@ export function getAllToolMetadata() {
     databaseToolMetadata,
     crashAnalyticsToolMetadata,
     viewsToolMetadata,
+    drillToolMetadata,
+    userProfilesToolMetadata,
+    cohortsToolMetadata,
+    funnelsToolMetadata,
+    formulasToolMetadata,
+    liveToolMetadata,
+    retentionToolMetadata,
+    remoteConfigToolMetadata,
+    abTestingToolMetadata,
+    loggerToolMetadata,
+    sdksToolMetadata,
+    complianceHubToolMetadata,
+    filteringRulesToolMetadata,
+    datapointToolMetadata,
+    serverLogsToolMetadata,
+    emailReportsToolMetadata,
+    dashboardsToolMetadata,
   ];
 }

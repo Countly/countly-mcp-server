@@ -9,97 +9,321 @@ export interface ToolsConfig {
   [category: string]: Set<CrudOperation>;
 }
 
+export interface ToolCategoryConfig {
+  operations: Record<string, CrudOperation>;
+  requiresPlugin?: string; // Optional plugin name required for this category
+  availableByDefault?: boolean; // If false, requires plugin check (default: true)
+}
+
 /**
  * Tool categories and their operations mapping
+ * 
+ * Categories can be marked with:
+ * - requiresPlugin: Name of the plugin required (e.g., "alerts", "crashes")
+ * - availableByDefault: If false, requires checking /o/system/plugins first
  */
-export const TOOL_CATEGORIES: Record<string, { operations: Record<string, CrudOperation> }> = {
+export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   core: {
     operations: {
-      'search': 'R',
-      'fetch': 'R',
-    }
+      'ping': 'R',
+      'get_version': 'R',
+      'get_plugins': 'R',
+      'jobs_list': 'R',
+      'job_runs': 'R',
+    },
+    availableByDefault: true,
   },
   apps: {
     operations: {
-      'list_apps': 'R',
-      'get_app_by_name': 'R',
-      'create_app': 'C',
-      'update_app': 'U',
-      'delete_app': 'D',
-      'reset_app': 'D',
-    }
+      'apps_list': 'R',
+      'apps_get_by_name': 'R',
+      'apps_create': 'C',
+      'apps_update': 'U',
+      'apps_delete': 'D',
+      'apps_reset': 'D',
+    },
+    availableByDefault: true,
   },
   analytics: {
     operations: {
-      'get_analytics_data': 'R',
-      'get_dashboard_data': 'R',
-      'get_events_data': 'R',
-      'get_events_overview': 'R',
-      'get_top_events': 'R',
-      'get_slipping_away_users': 'R',
-    }
+      'query_data': 'R',
+      'app_analytics_summary': 'R',
+      'slipping_users': 'R',
+      'session_frequency': 'R',
+      'user_loyalty': 'R',
+      'session_durations': 'R',
+    },
+    availableByDefault: true,
   },
   crashes: {
     operations: {
-      'list_crash_groups': 'R',
-      'get_crash_statistics': 'R',
-      'view_crash': 'R',
-      'add_crash_comment': 'C',
-      'edit_crash_comment': 'U',
-      'delete_crash_comment': 'D',
-      'resolve_crash': 'U',
-      'unresolve_crash': 'U',
-      'hide_crash': 'U',
-      'show_crash': 'U',
-    }
+      'crash_groups_list': 'R',
+      'crashes_stats_get': 'R',
+      'crashes_get': 'R',
+      'crashes_comment_add': 'C',
+      'crashes_comment_update': 'U',
+      'crashes_comment_delete': 'D',
+      'crashes_resolve': 'U',
+      'crashes_unresolve': 'U',
+      'crashes_hide': 'U',
+      'crashes_show': 'U',
+    },
+    requiresPlugin: 'crashes',
+    availableByDefault: false,
   },
   notes: {
     operations: {
-      'list_notes': 'R',
-      'create_note': 'C',
-      'delete_note': 'D',
-    }
+      'notes_list': 'R',
+      'notes_create': 'C',
+      'notes_delete': 'D',
+    },
+    availableByDefault: true,
   },
   events: {
     operations: {
-      'create_event': 'C',
-    }
+      'events_create': 'C',
+      'events_list': 'R',
+    },
+    availableByDefault: true,
   },
   alerts: {
     operations: {
-      'list_alerts': 'R',
-      'create_alert': 'C', // Also handles updates
-      'delete_alert': 'D',
-    }
+      'alerts_list': 'R',
+      'alerts_create': 'C', // Also handles updates
+      'alerts_delete': 'D',
+    },
+    requiresPlugin: 'alerts',
+    availableByDefault: false,
   },
   views: {
     operations: {
-      'get_views_table': 'R',
-      'get_view_segments': 'R',
-      'get_views_data': 'R',
-    }
+      'views_table': 'R',
+      'views_segments': 'R',
+      'views_data': 'R',
+    },
+    requiresPlugin: 'views',
+    availableByDefault: false,
   },
   database: {
     operations: {
-      'query_database': 'R',
-      'list_databases': 'R',
-      'get_document': 'R',
-      'aggregate_collection': 'R',
-      'get_collection_indexes': 'R',
-      'get_db_statistics': 'R',
-    }
+      'databases_query': 'R',
+      'databases_list': 'R',
+      'databases_document': 'R',
+      'collections_aggregate': 'R',
+      'collections_indexes': 'R',
+      'databases_stats': 'R',
+    },
+    requiresPlugin: 'dbviewer',
+    availableByDefault: false,
   },
   dashboard_users: {
     operations: {
-      'get_all_dashboard_users': 'R',
-    }
+      'dashboard_users': 'R',
+    },
+    availableByDefault: true,
   },
   app_users: {
     operations: {
-      'create_app_user': 'C',
-      'edit_app_user': 'U',
-      'delete_app_user': 'D',
-    }
+      'app_users_create': 'C',
+      'app_users_update': 'U',
+      'app_users_delete': 'D',
+    },
+    availableByDefault: true,
+  },
+  drill: {
+    operations: {
+      'drill_bookmarks_list': 'R',
+      'drill_bookmarks_create': 'C',
+      'drill_bookmarks_delete': 'D',
+      'metadata_get': 'R',
+      'queriable_fields_list': 'R',
+    },
+    requiresPlugin: 'drill',
+    availableByDefault: false,
+  },
+  user_profiles: {
+    operations: {
+      'user_profiles_query': 'R',
+      'user_profiles_breakdown': 'R',
+      'user_profiles_get': 'R',
+    },
+    requiresPlugin: 'users',
+    availableByDefault: false,
+  },
+  cohorts: {
+    operations: {
+      'cohorts_list': 'R',
+      'cohorts_data': 'R',
+      'cohorts_create': 'C',
+      'cohorts_update': 'U',
+      'cohorts_delete': 'D',
+    },
+    requiresPlugin: 'cohorts',
+    availableByDefault: false,
+  },
+  funnels: {
+    operations: {
+      'funnels_list': 'R',
+      'funnels_data': 'R',
+      'funnels_step_users': 'R',
+      'funnels_dropoff_users': 'R',
+      'funnels_create': 'C',
+      'funnels_update': 'U',
+      'funnels_delete': 'D',
+    },
+    requiresPlugin: 'funnels',
+    availableByDefault: false,
+  },
+  formulas: {
+    operations: {
+      'formulas_run': 'R',
+      'formulas_list': 'R',
+      'formulas_delete': 'D',
+      'formulas_save': 'C',
+    },
+    requiresPlugin: 'formulas',
+    availableByDefault: false,
+  },
+  live: {
+    operations: {
+      'live_users': 'R',
+      'live_metrics': 'R',
+      'live_last_hour': 'R',
+      'live_last_day': 'R',
+      'live_last_30_days': 'R',
+      'live_overall': 'R',
+    },
+    requiresPlugin: 'concurrent_users',
+    availableByDefault: false,
+  },
+  retention: {
+    operations: {
+      'retention': 'R',
+    },
+    requiresPlugin: 'retention_segments',
+    availableByDefault: false,
+  },
+  remote_config: {
+    operations: {
+      'remote_configs_list': 'R',
+      'remote_config_conditions_add': 'C',
+      'remote_config_conditions_update': 'U',
+      'remote_config_conditions_delete': 'D',
+      'remote_config_parameters_add': 'C',
+      'remote_config_parameters_update': 'U',
+      'remote_config_parameters_delete': 'D',
+    },
+    requiresPlugin: 'remote-config',
+    availableByDefault: false,
+  },
+  ab_testing: {
+    operations: {
+      'ab_experiments_list': 'R',
+      'ab_experiments_details': 'R',
+      'ab_experiments_create': 'C',
+      'ab_experiments_start': 'U',
+      'ab_experiments_stop': 'U',
+      'ab_experiments_delete': 'D',
+    },
+    requiresPlugin: 'ab-testing',
+    availableByDefault: false,
+  },
+  logger: {
+    operations: {
+      'sdk_logs_list': 'R',
+    },
+    requiresPlugin: 'logger',
+    availableByDefault: false,
+  },
+  sdks: {
+    operations: {
+      'sdk_stats_get': 'R',
+      'sdk_config_get': 'R',
+    },
+    requiresPlugin: 'sdks',
+    availableByDefault: false,
+  },
+  compliance_hub: {
+    operations: {
+      'consents_stats': 'R',
+      'consents_list': 'R',
+      'consents_history_search': 'R',
+    },
+    requiresPlugin: 'compliance-hub',
+    availableByDefault: false,
+  },
+  filtering_rules: {
+    operations: {
+      'filtering_rules_list': 'R',
+      'filtering_rules_create': 'C',
+      'filtering_rules_update': 'U',
+      'filtering_rules_delete': 'D',
+      'filtering_rules_toggle_status': 'U',
+    },
+    requiresPlugin: 'blocks',
+    availableByDefault: false,
+  },
+  datapoint: {
+    operations: {
+      'datapoints_stats': 'R',
+      'datapoints_top_apps': 'R',
+      'datapoints_punch_card': 'R',
+    },
+    requiresPlugin: 'server-stats',
+    availableByDefault: false,
+  },
+  server_logs: {
+    operations: {
+      'server_logs_files_list': 'R',
+      'server_logs_contents': 'R',
+    },
+    requiresPlugin: 'errorlogs',
+    availableByDefault: false,
+  },
+  email_reports: {
+    operations: {
+      'email_reports_list': 'R',
+      'email_reports_core_create': 'C',
+      'email_reports_dashboard_create': 'C',
+      'email_reports_update': 'U',
+      'email_reports_preview': 'R',
+      'email_reports_send': 'C',
+      'email_reports_delete': 'D',
+    },
+    requiresPlugin: 'reports',
+    availableByDefault: false,
+  },
+  dashboards: {
+    operations: {
+      'dashboards_list': 'R',
+      'dashboards_data': 'R',
+      'dashboards_create': 'C',
+      'dashboards_update': 'U',
+      'dashboards_delete': 'D',
+      'dashboards_widget_add': 'C',
+      'dashboards_widget_update': 'U',
+      'dashboards_widget_remove': 'D',
+    },
+    requiresPlugin: 'dashboards',
+    availableByDefault: false,
+  },
+  times_of_day: {
+    operations: {
+      'times_of_day': 'R',
+    },
+    requiresPlugin: 'times-of-day',
+    availableByDefault: false,
+  },
+  hooks: {
+    operations: {
+      'hooks_list': 'R',
+      'hooks_test': 'R',
+      'hooks_create': 'C',
+      'hooks_update': 'U',
+      'hooks_delete': 'D',
+    },
+    requiresPlugin: 'hooks',
+    availableByDefault: false,
   },
 };
 
@@ -212,4 +436,95 @@ export function getConfigSummary(config: ToolsConfig): string {
   }
   
   return lines.join('\n');
+}
+
+/**
+ * Check if a category requires plugin verification
+ */
+export function requiresPluginCheck(category: string): boolean {
+  const categoryConfig = TOOL_CATEGORIES[category];
+  return categoryConfig?.availableByDefault === false;
+}
+
+/**
+ * Get the required plugin name for a category
+ */
+export function getRequiredPlugin(category: string): string | undefined {
+  return TOOL_CATEGORIES[category]?.requiresPlugin;
+}
+
+/**
+ * Check if a category is available based on installed plugins
+ */
+export function isCategoryAvailable(category: string, installedPlugins: string[]): boolean {
+  const categoryConfig = TOOL_CATEGORIES[category];
+  
+  if (!categoryConfig) {
+    return false;
+  }
+  
+  // If available by default, no plugin check needed
+  if (categoryConfig.availableByDefault !== false) {
+    return true;
+  }
+  
+  // Check if required plugin is installed
+  const requiredPlugin = categoryConfig.requiresPlugin;
+  if (!requiredPlugin) {
+    // No plugin specified but not available by default - should not happen
+    return false;
+  }
+  
+  return installedPlugins.includes(requiredPlugin);
+}
+
+/**
+ * Filter tool definitions based on configuration and available plugins
+ */
+export function filterToolsByPlugins<T extends { name: string }>(
+  tools: T[],
+  config: ToolsConfig,
+  installedPlugins: string[]
+): T[] {
+  return tools.filter(tool => {
+    // First check if tool is allowed by config
+    if (!isToolAllowed(tool.name, config)) {
+      return false;
+    }
+    
+    // Find which category this tool belongs to
+    for (const [category, categoryData] of Object.entries(TOOL_CATEGORIES)) {
+      if (tool.name in categoryData.operations) {
+        // Check if category is available based on plugins
+        return isCategoryAvailable(category, installedPlugins);
+      }
+    }
+    
+    // If tool is not in any category, allow it by default
+    return true;
+  });
+}
+
+/**
+ * Get list of categories that require plugin checks
+ */
+export function getCategoriesRequiringPluginCheck(): string[] {
+  return Object.entries(TOOL_CATEGORIES)
+    .filter(([_, config]) => config.availableByDefault === false)
+    .map(([category, _]) => category);
+}
+
+/**
+ * Get mapping of categories to their required plugins
+ */
+export function getPluginRequirements(): Record<string, string> {
+  const requirements: Record<string, string> = {};
+  
+  for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
+    if (config.requiresPlugin) {
+      requirements[category] = config.requiresPlugin;
+    }
+  }
+  
+  return requirements;
 }

@@ -1,0 +1,85 @@
+{
+    "name": "countly-mcp-server",
+    "version": "1.0.1",
+    "description": "Model Context Protocol server for Countly Analytics Platform",
+    "protocol": {
+        "version": "2025-06-18",
+        "name": "Model Context Protocol"
+    },
+    "endpoints": {
+        "mcp": "/mcp",
+        "health": "/health"
+    },
+    "transports": [
+        "stdio",
+        "http-sse"
+    ],
+    "capabilities": {
+        "tools": {
+            "count": 134,
+            "categories": 30,
+            "listChanged": true
+        },
+        "resources": {
+            "supported": true,
+            "subscribe": false,
+            "listChanged": false,
+            "types": [
+                "app-config",
+                "event-schemas",
+                "analytics-overview"
+            ],
+            "uri_scheme": "countly://"
+        },
+        "prompts": {
+            "supported": true,
+            "count": 8,
+            "listChanged": false,
+            "templates": [
+                "analyze_crash_trends",
+                "generate_engagement_report",
+                "compare_app_versions",
+                "user_retention_analysis",
+                "funnel_optimization",
+                "event_health_check",
+                "identify_churn_risk",
+                "performance_dashboard"
+            ]
+        },
+        "features": [
+            "analytics",
+            "crash-analytics",
+            "app-management",
+            "user-management",
+            "events",
+            "views",
+            "dashboards",
+            "alerts",
+            "hooks",
+            "database-operations",
+            "resources",
+            "prompts"
+        ]
+    },
+    "authentication": {
+        "methods": [
+            "environment-variables",
+            "http-headers",
+            "url-parameters",
+            "token-file"
+        ],
+        "required": true
+    },
+    "documentation": {
+        "readme": "https://github.com/countly/countly-mcp-server/blob/main/README.md",
+        "tools": "https://github.com/countly/countly-mcp-server/blob/main/TOOLS_CONFIGURATION.md",
+        "contributing": "https://github.com/countly/countly-mcp-server/blob/main/CONTRIBUTING.md"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/countly/countly-mcp-server"
+    },
+    "license": "MIT",
+    "vendor": "Countly",
+    "homepage": "https://count.ly"
+}

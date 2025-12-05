@@ -1,11 +1,12 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // GET_VIEWS_TABLE TOOL
 // ============================================================================
 
 export const getViewsTableToolDefinition = {
-  name: 'get_views_table',
+  name: 'views_table',
   description: 'Get list of views and totals for each view in the application',
   inputSchema: {
     type: 'object',
@@ -26,10 +27,6 @@ export const getViewsTableToolDefinition = {
         default: ['u','n','t','s','e','d','b','br','uvc']
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -48,7 +45,16 @@ export async function handleGetViewsTable(context: ToolContext, args: any): Prom
     visibleColumns: JSON.stringify(visibleColumns),
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   const viewCount = response.data?.aaData?.length || 0;
   
@@ -67,7 +73,7 @@ export async function handleGetViewsTable(context: ToolContext, args: any): Prom
 // ============================================================================
 
 export const getViewSegmentsToolDefinition = {
-  name: 'get_view_segments',
+  name: 'views_segments',
   description: 'Get available segments for views in the application',
   inputSchema: {
     type: 'object',
@@ -80,10 +86,6 @@ export const getViewSegmentsToolDefinition = {
         default: '30days' 
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -98,7 +100,16 @@ export async function handleGetViewSegments(context: ToolContext, args: any): Pr
     period,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   const segments = response.data?.segments || response.data || [];
   const segmentCount = Array.isArray(segments) ? segments.length : Object.keys(segments).length;
@@ -118,7 +129,7 @@ export async function handleGetViewSegments(context: ToolContext, args: any): Pr
 // ============================================================================
 
 export const getViewsDataToolDefinition = {
-  name: 'get_views_data',
+  name: 'views_data',
   description: 'Get data breakdown by time for selected views with optional segment filtering',
   inputSchema: {
     type: 'object',
@@ -138,10 +149,6 @@ export const getViewsDataToolDefinition = {
       segment: { type: 'string', description: 'Optional segment key to filter by', default: '' },
       segmentVal: { type: 'string', description: 'Optional segment value to filter by', default: '' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -159,7 +166,16 @@ export async function handleGetViewsData(context: ToolContext, args: any): Promi
     segmentVal,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   return {
     content: [
@@ -182,9 +198,9 @@ export const viewsToolDefinitions = [
 ];
 
 export const viewsToolHandlers = {
-  'get_views_table': 'getViewsTable',
-  'get_view_segments': 'getViewSegments',
-  'get_views_data': 'getViewsData',
+  'views_table': 'getViewsTable',
+  'views_segments': 'getViewSegments',
+  'views_data': 'getViewsData',
 } as const;
 
 export class ViewsTools {

@@ -1,11 +1,12 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_ALERT TOOL
 // ============================================================================
 
 export const createAlertToolDefinition = {
-  name: 'create_alert',
+  name: 'alerts_create',
   description: 'Create or update an alert configuration. Supports various alert types including crashes, sessions, users, events, views, and more.',
   inputSchema: {
     type: 'object',
@@ -64,13 +65,10 @@ export const createAlertToolDefinition = {
             type: ['string', 'null'], 
             description: 'Optional filter key. For crashes: "App Version". For events: custom segment name. For rating: "Rating". For nps: "NPS scale". Set to null if no filter' 
           },
-          filterValue: { 
-            oneOf: [
-              { type: 'string' },
-              { type: 'array', items: { type: 'string' } },
-              { type: 'null' }
-            ],
-            description: 'Optional filter value. For crashes: array of version strings (e.g. ["22:02:0"]). For rating: array of numbers 1-5. For nps: "detractor"/"passive"/"promoter". For events: string value. Set to null if no filter' 
+          filterValue: {
+            type: ['string', 'array', 'null'],
+            items: { type: 'string' },
+            description: 'Optional filter value. For crashes: array of version strings (e.g. ["22:02:0"]). For rating: array of numbers 1-5. For nps: "detractor"/"passive"/"promoter". For events: string value. Set to null if no filter'
           },
           alertBy: { 
             type: 'string',
@@ -100,10 +98,6 @@ export const createAlertToolDefinition = {
         required: ['alertName', 'alertDataType', 'alertDataSubType', 'selectedApps', 'alertBy', 'enabled', 'compareDescribe', 'alertValues']
       },
     },
-    anyOf: [
-      { required: ['app_id', 'alert_config'] },
-      { required: ['app_name', 'alert_config'] }
-    ],
   },
 };
 
@@ -117,7 +111,10 @@ export async function handleCreateAlert(context: ToolContext, args: any): Promis
     alert_config: typeof alert_config === 'string' ? alert_config : JSON.stringify(alert_config),
   };
 
-  const response = await context.httpClient.get('/i/alert/save', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/alert/save', { params }),
+    'Failed to create/update alert'
+  );
   
   return {
     content: [
@@ -134,7 +131,7 @@ export async function handleCreateAlert(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const deleteAlertToolDefinition = {
-  name: 'delete_alert',
+  name: 'alerts_delete',
   description: 'Delete an alert',
   inputSchema: {
     type: 'object',
@@ -143,10 +140,6 @@ export const deleteAlertToolDefinition = {
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
       alert_id: { type: 'string', description: 'Alert ID to delete' },
     },
-    anyOf: [
-      { required: ['app_id', 'alert_id'] },
-      { required: ['app_name', 'alert_id'] }
-    ],
   },
 };
 
@@ -160,7 +153,10 @@ export async function handleDeleteAlert(context: ToolContext, args: any): Promis
     alertID: alert_id,
   };
 
-  const response = await context.httpClient.get('/i/alert/delete', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/alert/delete', { params }),
+    'Failed to delete alert'
+  );
   
   return {
     content: [
@@ -177,7 +173,7 @@ export async function handleDeleteAlert(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const listAlertsToolDefinition = {
-  name: 'list_alerts',
+  name: 'alerts_list',
   description: 'List all alerts for an application',
   inputSchema: {
     type: 'object',
@@ -185,10 +181,6 @@ export const listAlertsToolDefinition = {
       app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -200,7 +192,10 @@ export async function handleListAlerts(context: ToolContext, args: any): Promise
     app_id,
   };
 
-  const response = await context.httpClient.get('/o/alert/list', { params });
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/alert/list', { params }),
+    'Failed to list alerts'
+  );
   
   return {
     content: [
@@ -223,9 +218,9 @@ export const alertsToolDefinitions = [
 ];
 
 export const alertsToolHandlers = {
-  'create_alert': 'createAlert',
-  'delete_alert': 'deleteAlert',
-  'list_alerts': 'listAlerts',
+  'alerts_create': 'createAlert',
+  'alerts_delete': 'deleteAlert',
+  'alerts_list': 'listAlerts',
 } as const;
 
 export class AlertsTools {

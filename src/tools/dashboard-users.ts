@@ -1,11 +1,12 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // GET_ALL_DASHBOARD_USERS TOOL
 // ============================================================================
 
 export const getAllDashboardUsersToolDefinition = {
-  name: 'get_all_dashboard_users',
+  name: 'dashboard_users',
   description: 'Get a list of all dashboard users (admin/management users who access the Countly dashboard)',
   inputSchema: {
     type: 'object',
@@ -19,7 +20,16 @@ export async function handleGetAllDashboardUsers(context: ToolContext, _: any): 
     ...context.getAuthParams(),
   };
 
-  const response = await context.httpClient.get('/o/users/all', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o/users/all', { params }),
+
+
+    'Failed to execute request to /o/users/all'
+
+
+  );
   
   return {
     content: [
@@ -40,7 +50,7 @@ export const dashboardUsersToolDefinitions = [
 ];
 
 export const dashboardUsersToolHandlers = {
-  'get_all_dashboard_users': 'getAllDashboardUsers',
+  'dashboard_users': 'getAllDashboardUsers',
 } as const;
 
 export class DashboardUsersTools {

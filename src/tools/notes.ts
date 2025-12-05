@@ -1,11 +1,12 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_NOTE TOOL
 // ============================================================================
 
 export const createNoteToolDefinition = {
-  name: 'create_note',
+  name: 'notes_create',
   description: 'Create a new note',
   inputSchema: {
     type: 'object',
@@ -19,10 +20,6 @@ export const createNoteToolDefinition = {
       category: { type: 'string', description: 'Optional category (e.g., "sessionHomeWidget" to display on session dashboard graph)' },
       emails: { type: 'array', items: { type: 'string' }, description: 'Optional array of email addresses' },
     },
-    anyOf: [
-      { required: ['app_id', 'note', 'ts', 'noteType', 'color'] },
-      { required: ['app_name', 'note', 'ts', 'noteType', 'color'] }
-    ],
   },
 };
 
@@ -59,7 +56,16 @@ export async function handleCreateNote(context: ToolContext, args: any): Promise
     args: JSON.stringify(noteArgs),
   };
 
-  const response = await context.httpClient.get('/i/notes/save', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/notes/save', { params }),
+
+
+    'Failed to execute request to /i/notes/save'
+
+
+  );
   
   return {
     content: [
@@ -76,7 +82,7 @@ export async function handleCreateNote(context: ToolContext, args: any): Promise
 // ============================================================================
 
 export const listNotesToolDefinition = {
-  name: 'list_notes',
+  name: 'notes_list',
   description: 'List all notes for an application within a time period',
   inputSchema: {
     type: 'object',
@@ -89,10 +95,6 @@ export const listNotesToolDefinition = {
         default: '30days' 
       },
     },
-    anyOf: [
-      { required: ['app_id'] },
-      { required: ['app_name'] }
-    ],
   },
 };
 
@@ -128,7 +130,16 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
     period: periodParam,
   };
 
-  const response = await context.httpClient.get('/o', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/o', { params }),
+
+
+    'Failed to execute request to /o'
+
+
+  );
   
   const notes = response.data?.notes || response.data || [];
   const noteCount = Array.isArray(notes) ? notes.length : Object.keys(notes).length;
@@ -148,7 +159,7 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
 // ============================================================================
 
 export const deleteNoteToolDefinition = {
-  name: 'delete_note',
+  name: 'notes_delete',
   description: 'Delete a note',
   inputSchema: {
     type: 'object',
@@ -167,7 +178,16 @@ export async function handleDeleteNote(context: ToolContext, args: any): Promise
     note_id,
   };
 
-  const response = await context.httpClient.get('/i/notes/delete', { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.get('/i/notes/delete', { params }),
+
+
+    'Failed to execute request to /i/notes/delete'
+
+
+  );
   
   return {
     content: [
@@ -190,9 +210,9 @@ export const notesToolDefinitions = [
 ];
 
 export const notesToolHandlers = {
-  'create_note': 'createNote',
-  'list_notes': 'listNotes',
-  'delete_note': 'deleteNote',
+  'notes_create': 'createNote',
+  'notes_list': 'listNotes',
+  'notes_delete': 'deleteNote',
 } as const;
 
 export class NotesTools {

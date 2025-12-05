@@ -1,11 +1,12 @@
 import { ToolContext, ToolResult } from './types.js';
+import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
 // CREATE_APP_USER TOOL
 // ============================================================================
 
 export const createAppUserToolDefinition = {
-  name: 'create_app_user',
+  name: 'app_users_create',
   description: 'Create a new app user (end-user of your application being tracked by Countly)',
   inputSchema: {
     type: 'object',
@@ -64,10 +65,6 @@ export const createAppUserToolDefinition = {
         required: ['did']
       },
     },
-    anyOf: [
-      { required: ['app_id', 'data'] },
-      { required: ['app_name', 'data'] }
-    ],
   },
 };
 
@@ -81,7 +78,16 @@ export async function handleCreateAppUser(context: ToolContext, args: any): Prom
     data: typeof data === 'string' ? data : JSON.stringify(data),
   };
 
-  const response = await context.httpClient.post('/i/app_users/create', null, { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.post('/i/app_users/create', null, { params }),
+
+
+    'Failed to execute request to /i/app_users/create'
+
+
+  );
   
   return {
     content: [
@@ -98,7 +104,7 @@ export async function handleCreateAppUser(context: ToolContext, args: any): Prom
 // ============================================================================
 
 export const editAppUserToolDefinition = {
-  name: 'edit_app_user',
+  name: 'app_users_update',
   description: 'Update existing app user(s) using MongoDB query and update operations. Allows bulk updates matching specific criteria.',
   inputSchema: {
     type: 'object',
@@ -153,10 +159,6 @@ export const editAppUserToolDefinition = {
         additionalProperties: true
       }
     },
-    anyOf: [
-      { required: ['app_id', 'query', 'update'] },
-      { required: ['app_name', 'query', 'update'] }
-    ],
   },
 };
 
@@ -171,7 +173,16 @@ export async function handleEditAppUser(context: ToolContext, args: any): Promis
     update: typeof update === 'string' ? update : JSON.stringify(update),
   };
 
-  const response = await context.httpClient.post('/i/app_users/update', null, { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.post('/i/app_users/update', null, { params }),
+
+
+    'Failed to execute request to /i/app_users/update'
+
+
+  );
   
   return {
     content: [
@@ -188,7 +199,7 @@ export async function handleEditAppUser(context: ToolContext, args: any): Promis
 // ============================================================================
 
 export const deleteAppUserToolDefinition = {
-  name: 'delete_app_user',
+  name: 'app_users_delete',
   description: 'Delete app user(s) matching a MongoDB query. Can delete single or multiple users based on the query criteria.',
   inputSchema: {
     type: 'object',
@@ -206,10 +217,6 @@ export const deleteAppUserToolDefinition = {
         default: false 
       },
     },
-    anyOf: [
-      { required: ['app_id', 'query'] },
-      { required: ['app_name', 'query'] }
-    ],
   },
 };
 
@@ -224,7 +231,16 @@ export async function handleDeleteAppUser(context: ToolContext, args: any): Prom
     force,
   };
 
-  const response = await context.httpClient.post('/i/app_users/delete', null, { params });
+  const response = await safeApiCall(
+
+
+    () => context.httpClient.post('/i/app_users/delete', null, { params }),
+
+
+    'Failed to execute request to /i/app_users/delete'
+
+
+  );
   
   return {
     content: [
@@ -247,9 +263,9 @@ export const appUsersToolDefinitions = [
 ];
 
 export const appUsersToolHandlers = {
-  'create_app_user': 'createAppUser',
-  'edit_app_user': 'editAppUser',
-  'delete_app_user': 'deleteAppUser',
+  'app_users_create': 'createAppUser',
+  'app_users_update': 'editAppUser',
+  'app_users_delete': 'deleteAppUser',
 } as const;
 
 export class AppUsersTools {
