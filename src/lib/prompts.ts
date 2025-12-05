@@ -339,9 +339,9 @@ function generateFunnelOptimizationPrompt(args: Record<string, string>): PromptR
 
 Please:
 1. Use funnels_list to find the funnel
-2. Use funnels_details_data to get conversion metrics
-3. Use funnels_details_steps to analyze each step
-4. Use funnels_details_sessions to understand user behavior
+2. Use funnels_data to get conversion metrics
+3. Use funnels_step_users to analyze each step
+4. Use funnels_dropoff_users to understand user behavior
 
 Provide analysis including:
 - Overall conversion rate

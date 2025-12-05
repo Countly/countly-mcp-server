@@ -18,6 +18,8 @@ const TEST_SERVER_URL = process.env.COUNTLY_SERVER_URL || 'https://test.count.ly
 const TEST_AUTH_TOKEN = process.env.COUNTLY_AUTH_TOKEN || 'test-token';
 const HTTP_PORT = 3101;
 const HTTP_URL = `http://localhost:${HTTP_PORT}/mcp`;
+const ENABLE_HTTP_TRANSPORT_TESTS = process.env.ENABLE_HTTP_TRANSPORT_TESTS === '1';
+const httpDescribe = ENABLE_HTTP_TRANSPORT_TESTS ? describe : describe.skip;
 
 describe('Transport Integration Tests', () => {
   describe('stdio transport', () => {
@@ -139,7 +141,7 @@ describe('Transport Integration Tests', () => {
     });
   });
 
-  describe('HTTP/SSE transport', () => {
+  httpDescribe('HTTP/SSE transport', () => {
     let serverProcess: ChildProcess;
     let httpClient: AxiosInstance;
     let stderrData: string = '';

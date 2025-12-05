@@ -124,15 +124,18 @@ export const createDashboardTool = {
 };
 
 async function handleCreateDashboard(args: z.infer<typeof createDashboardTool.inputSchema>, context: ToolContext) {
-  const params = {
+  const params: Record<string, string> = {
     ...context.getAuthParams(),
     name: args.name,
-    share_with: args.share_with,
+    share_with: args.share_with || 'all-users',
     send_email_invitation: args.send_email_invitation ? 'true' : 'false',
     use_refresh_rate: args.use_refresh_rate ? 'true' : 'false',
-    refreshRate: args.refreshRate.toString(),
-    theme: args.theme.toString(),
+    theme: (args.theme ?? 0).toString(),
   };
+
+  if (args.refreshRate !== undefined) {
+    params.refreshRate = args.refreshRate.toString();
+  }
 
   const response = await safeApiCall(
     () => context.httpClient.get('/i/dashboards/create', { params }),
@@ -254,21 +257,179 @@ async function handleDeleteDashboard(args: z.infer<typeof deleteDashboardTool.in
  */
 export const addDashboardWidgetTool = {
   name: 'dashboards_widget_add',
-  description: 'Add a widget to a dashboard. Widgets can display various metrics like analytics, events, or custom data.',
+  description: 'Add a widget to a dashboard. Widgets display analytics, events, or custom data. IMPORTANT: Widget must be provided as a complete JSON object with all required fields for the widget type.',
   inputSchema: z.object({
     dashboard_id: z.string()
       .describe('Dashboard ID to add widget to'),
     widget: z.object({
-      title: z.string().describe('Widget title'),
-      feature: z.string().describe('Feature type (e.g., "core", "events", "crashes")'),
-      widget_type: z.string().describe('Widget type (e.g., "analytics", "events", "top-events")'),
-      app_count: z.string().optional().describe('App count type: "single" or "multiple"'),
-      data_type: z.string().optional().describe('Data type (e.g., "session", "user", "event")'),
-      metrics: z.array(z.string()).optional().describe('Metrics to display (e.g., ["t"] for total sessions, ["u"] for users)'),
-      apps: z.array(z.string()).optional().describe('Array of app IDs to include'),
-      visualization: z.string().optional().describe('Visualization type (e.g., "time-series", "bar", "pie", "number")'),
-      custom_period: z.string().optional().describe('Custom period if different from dashboard period'),
-    }).passthrough().describe('Widget configuration object'),
+      title: z.string()
+        .describe('Widget title (can be empty string)'),
+      feature: z.string()
+        .describe('Feature type: "core" (analytics/sessions), "events" (event data), "crashes" (crash analytics), "drill" (custom queries), "sdk" (SDK stats), "cohorts" (user cohorts), "formulas" (custom formulas), "push" (push notifications), "funnels" (conversion funnels), "revenue" (revenue tracking), "times_of_day" (session timing), "retention_segments" (retention analysis), "users" (user profiles)'),
+      widget_type: z.string()
+        .describe('Widget type: "analytics" (session/user metrics), "events" (event tracking), "drill" (custom drill queries), "sdk" (SDK statistics), "cohorts" (cohort visualization), "formulas" (formula results), "note" (text note), "push" (push message stats), "funnels" (funnel visualization), "revenue" (revenue charts), "times-of-day" (time-based heatmap), "retention_segments" (retention charts), "crashes" (crash metrics), "users" (user table)'),
+      app_count: z.string()
+        .optional()
+        .describe('App count type: "single" (one app) or "multiple" (multiple apps). Required for analytics, events, crashes widgets.'),
+      data_type: z.string()
+        .optional()
+        .describe('Data type: "session" (session metrics), "user" (user metrics), "event" (event metrics), "sdk" (SDK statistics). Required for analytics/sdk widgets.'),
+      metrics: z.array(z.string())
+        .optional()
+        .describe('Metrics array. Analytics: ["t"] (total), ["u"] (unique users), ["n"] (new users), ["d"] (duration), ["e"] (events). Events: ["c"] (count), ["s"] (sum), ["dur"] (duration). Crashes: ["crf"] (crash-free rate), ["crnf"] (crash-free new users), ["cruf"] (unique crashes). Push: ["sent"], ["actioned"]. Can combine multiple.'),
+      apps: z.union([z.array(z.string()), z.string()])
+        .optional()
+        .describe('Array of app IDs or "*" for all apps. Required for most widgets except note widgets.'),
+      visualization: z.string()
+        .optional()
+        .describe('Visualization: "time-series" (line chart over time), "bar" (bar chart), "pie" (pie chart), "number" (single number), "table" (data table), "line" (simple line), "series" (for formulas), "punchcard" (heatmap for times_of_day), "over-time" (for cohorts).'),
+      custom_period: z.union([z.string(), z.boolean(), z.null()])
+        .optional()
+        .describe('Time period: "30days", "7days", "60days", "yesterday", "month", "hour", null (dashboard default), false (no override), true (use query period), or empty string "".'),
+      position: z.array(z.number())
+        .optional()
+        .describe('Widget position [x, y] in dashboard grid. Auto-positioned if not specified. Examples: [0, 0] (top-left), [4, 0] (second column), [0, 4] (first column, second row).'),
+      size: z.array(z.number())
+        .optional()
+        .describe('Widget size [width, height] in grid units. Default [4, 4]. Common: [4, 4] (small square), [6, 4] (wide), [8, 4] (extra wide), [4, 6] (tall), [2, 4] (narrow), [1, 3] (note). Max width usually 12.'),
+      // SDK widget specific
+      displaytype: z.string()
+        .optional()
+        .describe('SDK widget display: "percentage" (show as %), "number" (show as count). Only for widget_type="sdk".'),
+      selectedSDK: z.string()
+        .optional()
+        .describe('Selected SDK: "javascript_native_web", "java-native-android", "ios", etc. Only for widget_type="sdk".'),
+      // Drill widget specific
+      drill_query: z.array(z.object({
+        _id: z.string().optional(),
+        period: z.union([z.string(), z.boolean()]).optional(),
+      }))
+        .optional()
+        .describe('Drill query config. Array with {_id: "bookmark_id", period: true/false}. Only for widget_type="drill".'),
+      drill_report: z.array(z.string())
+        .optional()
+        .describe('Drill report IDs array. Only for widget_type="drill" or "users".'),
+      metric: z.array(z.string())
+        .optional()
+        .describe('Metric array for drill: ["users"], ["times"], ["sum"]. Only for widget_type="drill".'),
+      bucket: z.string()
+        .optional()
+        .describe('Bucket interval: "daily", "weekly", "monthly". Only for widget_type="drill".'),
+      comparison: z.string()
+        .optional()
+        .describe('Comparison type (usually empty string ""). Only for drill/formulas widgets.'),
+      bar_color: z.number()
+        .optional()
+        .describe('Bar color index (1-10). Only for drill/funnels widgets.'),
+      isPluginWidget: z.boolean()
+        .optional()
+        .describe('True for plugin widgets (drill, cohorts, formulas, push, funnels, revenue, times_of_day, retention_segments, users).'),
+      // Events widget specific
+      events: z.array(z.string())
+        .optional()
+        .describe('Event keys in format "app_id***Event Name". Only for widget_type="events".'),
+      // Cohorts widget specific
+      cohorts: z.array(z.string())
+        .optional()
+        .describe('Cohort IDs array. Only for widget_type="cohorts".'),
+      visualitionType: z.string()
+        .optional()
+        .describe('Cohort visualization: "over-time". Only for widget_type="cohorts".'),
+      barChartTotalUsers: z.string()
+        .optional()
+        .describe('Bar chart total users setting (e.g., "1"). Only for widget_type="cohorts".'),
+      selectedPeriod: z.string()
+        .optional()
+        .describe('Selected period (e.g., "30days"). Only for widget_type="cohorts".'),
+      // Formulas widget specific
+      cmetric_refs: z.array(z.object({
+        _id: z.string().optional(),
+        period: z.union([z.string(), z.boolean()]).optional(),
+        bucket: z.string().optional(),
+        previous: z.boolean().optional(),
+      }))
+        .optional()
+        .describe('Formula metric references. Array with {_id: "formula_id", period: true, bucket: "daily", previous: false}. Only for widget_type="formulas".'),
+      cmetricName: z.string()
+        .optional()
+        .describe('Custom metric name (can be empty). Only for widget_type="formulas".'),
+      cmetrics: z.array(z.string())
+        .optional()
+        .describe('Custom metric IDs array. Only for widget_type="formulas".'),
+      statsMetric: z.string()
+        .optional()
+        .describe('Stats metric (usually empty). Only for widget_type="formulas".'),
+      allowPeriodOverride: z.union([z.boolean(), z.undefined()])
+        .optional()
+        .describe('Allow period override. For drill/formulas/users widgets.'),
+      // Note widget specific
+      contenthtml: z.string()
+        .optional()
+        .describe('HTML content for note. Only for widget_type="note". Example: "&lt;p&gt;This is a note&lt;/p&gt;".'),
+      // Funnels widget specific
+      funnel_type: z.array(z.string())
+        .optional()
+        .describe('Funnel type IDs in format "app_id***funnel_id". Only for widget_type="funnels".'),
+      funnel_view_type: z.string()
+        .optional()
+        .describe('Funnel view type (e.g., "1"). Only for widget_type="funnels".'),
+      client_fetch: z.boolean()
+        .optional()
+        .describe('Client fetch flag. Only for widget_type="funnels".'),
+      filter_id: z.union([z.number(), z.string()])
+        .optional()
+        .describe('Filter ID (0 or filter ID). Only for widget_type="funnels".'),
+      // Revenue widget specific
+      revenue_type: z.string()
+        .optional()
+        .describe('Revenue type: "revenue", "iap", etc. Only for widget_type="revenue".'),
+      revenue_types: z.array(z.string())
+        .optional()
+        .describe('Revenue types array (can be empty). Only for widget_type="revenue".'),
+      metric_compare_type: z.string()
+        .optional()
+        .describe('Metric compare: "prev_period", "none". Only for widget_type="revenue".'),
+      // Times of day widget specific
+      period: z.string()
+        .optional()
+        .describe('Period for times_of_day/retention_segments: "current", "d30". Only for widget_type="times-of-day"/"retention_segments".'),
+      visualization_graph_type: z.string()
+        .optional()
+        .describe('Graph type: "graph1". Only for widget_type="retention_segments".'),
+      // Retention widget specific
+      retention_data_type: z.string()
+        .optional()
+        .describe('Retention data type: "[CLY]_session", event key. Only for widget_type="retention_segments".'),
+      retention_type: z.string()
+        .optional()
+        .describe('Retention type: "full", "classic", "rolling". Only for widget_type="retention_segments".'),
+      interval: z.string()
+        .optional()
+        .describe('Interval: "adaily", "aweekly", "amonthly". Only for widget_type="retention_segments".'),
+      visualization_type: z.string()
+        .optional()
+        .describe('Visualization type for retention: "time-series", "table". Only for widget_type="retention_segments".'),
+      selected_span: z.number()
+        .optional()
+        .describe('Selected span (e.g., 30). Only for widget_type="retention_segments".'),
+      // Users widget specific
+      numberOfResults: z.number()
+        .optional()
+        .describe('Number of results to show (e.g., 10). Only for widget_type="users".'),
+      selectedQueries: z.array(z.string())
+        .optional()
+        .describe('Selected query IDs for user filtering. Only for widget_type="users".'),
+      visibleColumns: z.array(z.string())
+        .optional()
+        .describe('Visible columns: ["name", "cc", "d", "p", "sc", "picture"]. Only for widget_type="users".'),
+      status: z.string()
+        .optional()
+        .describe('Widget status: "completed". Auto-managed by system.'),
+      allowBuckets: z.boolean()
+        .optional()
+        .describe('Allow buckets. For drill widgets.'),
+    }).passthrough()
+      .describe('Widget configuration object. Different widget types require different fields.\n\n**Analytics (Session) - Basic:**\n{"title": "Sessions", "feature": "core", "widget_type": "analytics", "app_count": "single", "data_type": "session", "metrics": ["t", "u", "n"], "apps": ["app_id"], "visualization": "time-series", "custom_period": "30days", "position": [0, 0], "size": [4, 4]}\n\n**Events Widget:**\n{"title": "", "feature": "events", "widget_type": "events", "app_count": "single", "apps": ["app_id"], "visualization": "time-series", "events": ["app_id***Event Name"], "metrics": ["c", "s", "dur"], "custom_period": null, "position": [4, 0], "size": [4, 4]}\n\n**SDK Widget:**\n{"title": "", "feature": "sdk", "widget_type": "sdk", "data_type": "sdk", "metrics": ["t"], "apps": ["app_id"], "visualization": "time-series", "displaytype": "percentage", "selectedSDK": "java-native-android", "custom_period": null, "position": [0, 4], "size": [4, 4]}\n\n**Cohorts Widget:**\n{"title": "", "feature": "cohorts", "widget_type": "cohorts", "apps": ["app_id"], "cohorts": ["cohort_id"], "visualitionType": "over-time", "barChartTotalUsers": "1", "selectedPeriod": "30days", "isPluginWidget": true, "position": [0, 4], "size": [2, 4]}\n\n**Formulas Widget:**\n{"title": "", "feature": "formulas", "apps": ["app_id"], "cmetric_refs": [{"_id": "formula_id", "period": true, "bucket": "daily", "previous": false}], "widget_type": "formulas", "cmetricName": "", "comparison": "none", "visualization": "series", "statsMetric": "", "bucket": "daily", "custom_period": false, "isPluginWidget": true, "cmetrics": ["metric_hash"], "position": [2, 4], "size": [4, 4], "allowPeriodOverride": true}\n\n**Note Widget:**\n{"widget_type": "note", "feature": "core", "apps": "*", "contenthtml": "&lt;p&gt;This is a note&lt;/p&gt;", "position": [6, 4], "size": [1, 3]}\n\n**Push Widget:**\n{"title": "", "feature": "push", "widget_type": "push", "isPluginWidget": true, "apps": ["app_id"], "app_count": "single", "visualization": "time-series", "metrics": ["sent", "actioned"], "position": [7, 4], "size": [4, 4]}\n\n**Funnels Widget:**\n{"feature": "funnels", "widget_type": "funnels", "apps": ["app_id"], "funnel_type": ["app_id***funnel_id"], "funnel_view_type": "1", "bar_color": 1, "client_fetch": true, "isPluginWidget": true, "custom_period": "", "title": "", "filter_id": 0, "position": [0, 10], "size": [4, 6]}\n\n**Revenue Widget:**\n{"feature": "revenue", "widget_type": "revenue", "isPluginWidget": true, "title": "", "apps": ["app_id"], "custom_period": "", "revenue_type": "revenue", "revenue_types": [], "metric_compare_type": "prev_period", "events": [], "visualization": "time-series", "position": [4, 8], "size": [2, 4]}\n\n**Times of Day Widget:**\n{"title": "", "feature": "times_of_day", "widget_type": "times-of-day", "isPluginWidget": true, "apps": ["app_id"], "data_type": "session", "period": "current", "visualization": "punchcard", "position": [6, 8], "size": [4, 4]}\n\n**Retention Segments Widget:**\n{"feature": "retention_segments", "widget_type": "retention_segments", "apps": ["app_id"], "retention_data_type": "[CLY]_session", "retention_type": "full", "bar_color": 1, "title": "", "interval": "adaily", "visualization_graph_type": "graph1", "period": "d30", "visualization_type": "time-series", "isPluginWidget": true, "selected_span": 30, "position": [4, 14], "size": [4, 6]}\n\n**Crashes Widget:**\n{"title": "", "feature": "crashes", "widget_type": "crashes", "app_count": "single", "apps": ["app_id"], "metrics": ["crf", "crnf", "cruf"], "visualization": "time-series", "isPluginWidget": true, "position": [8, 12], "size": [4, 4]}\n\n**Users Widget:**\n{"title": "", "feature": "users", "widget_type": "users", "app_count": "single", "apps": ["app_id"], "numberOfResults": 10, "selectedQueries": ["query_id"], "visualization": "table", "isPluginWidget": true, "visibleColumns": ["name", "cc", "d", "p", "sc", "picture"], "drill_report": ["report_id"], "position": [8, 16], "size": [4, 6], "status": "completed", "allowPeriodOverride": false}\n\n**Drill Widget (Advanced):**\n{"feature": "drill", "widget_type": "drill", "apps": ["app_id"], "drill_query": [{"_id": "bookmark_id", "period": true}], "visualization": "line", "metric": ["users", "times"], "comparison": "", "bucket": "daily", "custom_period": false, "title": "", "isPluginWidget": true, "bar_color": 1, "drill_report": ["report_id"], "position": [8, 0], "size": [4, 4], "status": "completed", "allowPeriodOverride": true, "allowBuckets": true}'),
   }),
 };
 

@@ -207,80 +207,16 @@ export async function handleGetUserProfileDetails(context: ToolContext, args: an
   };
 }
 
-// ============================================================================
-// ADD USER NOTE TOOL
-// ============================================================================
-
-export const addUserNoteToolDefinition = {
-  name: 'user_profiles_note_add',
-  description: 'Add or update a note on a specific user profile',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
-      },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
-      },
-      user_id: {
-        type: 'string',
-        description: 'User ID to add note to',
-      },
-      note: {
-        type: 'string',
-        description: 'Note text to add',
-      },
-    },
-    required: ['user_id', 'note'],
-  },
-};
-
-export async function handleAddUserNote(context: ToolContext, args: any): Promise<ToolResult> {
-  const appId = await context.resolveAppId(args);
-  const userId = args.user_id;
-  const note = args.note;
-
-  const params = {
-    ...context.getAuthParams(),
-    app_id: appId,
-    user_id: userId,
-    note,
-  };
-
-  const response = await safeApiCall(
-    () => context.httpClient.get('/usernote/edit', { params }),
-    'Failed to add user note'
-  );
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `User note added:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
 export const userProfilesToolDefinitions = [
   queryUserProfilesToolDefinition,
   breakdownUserProfilesToolDefinition,
   getUserProfileDetailsToolDefinition,
-  addUserNoteToolDefinition,
 ];
 
 export const userProfilesToolHandlers = {
   'user_profiles_query': 'user_profiles_query',
   'user_profiles_breakdown': 'user_profiles_breakdown',
   'user_profiles_get': 'user_profiles_get',
-  'user_profiles_note_add': 'user_profiles_note_add',
 } as const;
 
 export class UserProfilesTools {
@@ -296,10 +232,6 @@ export class UserProfilesTools {
 
   async user_profiles_get(args: any): Promise<ToolResult> {
     return handleGetUserProfileDetails(this.context, args);
-  }
-
-  async user_profiles_note_add(args: any): Promise<ToolResult> {
-    return handleAddUserNote(this.context, args);
   }
 }
 

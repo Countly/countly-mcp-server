@@ -54,7 +54,7 @@ describe('Tools Configuration', () => {
 
     it('should have correct number of operations per category', () => {
     const expectedCounts = {
-      core: 7,
+      core: 5,
       apps: 6,
       analytics: 6,
       crashes: 10,
@@ -66,10 +66,10 @@ describe('Tools Configuration', () => {
       dashboard_users: 1,
       app_users: 3,
       drill: 5,
-      user_profiles: 4,
+      user_profiles: 3,
       cohorts: 5,
-      funnels: 8,
-      formulas: 3,
+      funnels: 7,
+      formulas: 4,
       live: 6,
       retention: 1,
       remote_config: 7,
@@ -77,13 +77,13 @@ describe('Tools Configuration', () => {
       logger: 1,
       sdks: 2,
       compliance_hub: 3,
-      filtering_rules: 4,
+      filtering_rules: 5,
       datapoint: 3,
       server_logs: 2,
       email_reports: 7,
       dashboards: 8,
       times_of_day: 1,
-      hooks: 6,
+      hooks: 5,
     };    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
       expect(toolCount).toBe(expectedCounts[category as keyof typeof expectedCounts]);
@@ -100,12 +100,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 132 tools', () => {
+    it('should have total of 133 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(132);
+      expect(totalTools).toBe(129);
     });
   });
 

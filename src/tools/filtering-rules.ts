@@ -46,7 +46,7 @@ export async function handleListFilteringRules(context: ToolContext, args: any):
 
 export const createFilteringRuleToolDefinition = {
   name: 'filtering_rules_create',
-  description: 'Create a new filtering rule to block requests. Can block all requests, sessions, or specific events based on MongoDB query conditions (e.g., IP address, app version, device properties).',
+  description: 'Create a new filtering rule to block requests. Can block all requests, sessions, or specific events based on MongoDB query conditions (e.g., IP address, app version, device properties). IMPORTANT: To block specific conditions (like an IP address), you MUST include a "rule" parameter with MongoDB query conditions. An empty rule {} will block ALL matching requests.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -59,11 +59,11 @@ export const createFilteringRuleToolDefinition = {
       },
       name: { 
         type: 'string', 
-        description: 'Human-readable name describing the rule (e.g., "IP address contains 192", "App Version = 5:10:1")'
+        description: 'Human-readable name describing the rule (e.g., "Block IP 127.0.0.1", "Block App Version 5:10:1")'
       },
       rule: { 
         type: 'object', 
-        description: 'MongoDB query object for matching conditions. Use "up." prefix for user properties (e.g., {"up.ip": {"rgxcn": ["192"]}} for IP regex, {"up.av": {"$in": ["5:10:1"]}} for app version)',
+        description: 'MongoDB query object for matching conditions. REQUIRED for specific filtering. Use "up." prefix for user properties. Common examples: Block specific IP: {"up.ip": {"$in": ["127.0.0.1"]}}, Block IP range with regex: {"up.ip": {"$regex": "^192\\.168\\."}}, Block app version: {"up.av": {"$in": ["5:10:1"]}}, Block device: {"up.d": {"$in": ["iPhone"]}}. Leave empty {} ONLY to block all requests matching the type.',
         default: {}
       },
       key: { 
@@ -125,7 +125,7 @@ export async function handleCreateFilteringRule(context: ToolContext, args: any)
 
 export const updateFilteringRuleToolDefinition = {
   name: 'filtering_rules_update',
-  description: 'Update an existing filtering rule. Can modify conditions, enable/disable rules, or change the rule type.',
+  description: 'Update an existing filtering rule. Can modify conditions, enable/disable rules, or change the rule type. IMPORTANT: To block specific conditions (like an IP address), you MUST include a "rule" parameter with MongoDB query conditions.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -146,7 +146,7 @@ export const updateFilteringRuleToolDefinition = {
       },
       rule: { 
         type: 'object', 
-        description: 'MongoDB query object for matching conditions',
+        description: 'MongoDB query object for matching conditions. REQUIRED for specific filtering. Use "up." prefix for user properties. Common examples: Block specific IP: {"up.ip": {"$in": ["127.0.0.1"]}}, Block IP range with regex: {"up.ip": {"$regex": "^192\\.168\\."}}, Block app version: {"up.av": {"$in": ["5:10:1"]}}, Block device: {"up.d": {"$in": ["iPhone"]}}. Leave empty {} ONLY to block all requests matching the type.',
         default: {}
       },
       key: { 
@@ -249,6 +249,51 @@ export async function handleDeleteFilteringRule(context: ToolContext, args: any)
 }
 
 // ============================================================================
+// TOGGLE_FILTERING_RULE_STATUS TOOL
+// ============================================================================
+
+export const toggleFilteringRuleStatusToolDefinition = {
+  name: 'filtering_rules_toggle_status',
+  description: 'Toggle the status (enabled/disabled) of one or more filtering rules. Allows you to quickly enable or disable rules without modifying other settings.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      blocks: {
+        type: 'object',
+        description: 'Object mapping rule IDs to their new status. Keys are rule IDs, values are boolean (true=enabled, false=disabled). Example: {"rule_id_1": false, "rule_id_2": true}',
+      },
+    },
+    required: ['blocks'],
+  },
+};
+
+export async function handleToggleFilteringRuleStatus(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    blocks: JSON.stringify(args.blocks),
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/blocks/toggle_status', { params }),
+    'Failed to toggle filtering rule status'
+  );
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Filtering rule status toggled successfully for app ${app_id}.\n\n${JSON.stringify(response.data, null, 2)}`,
+      },
+    ],
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -257,6 +302,7 @@ export const filteringRulesToolDefinitions = [
   createFilteringRuleToolDefinition,
   updateFilteringRuleToolDefinition,
   deleteFilteringRuleToolDefinition,
+  toggleFilteringRuleStatusToolDefinition,
 ];
 
 export const filteringRulesToolHandlers = {
@@ -264,6 +310,7 @@ export const filteringRulesToolHandlers = {
   'filtering_rules_create': 'filtering_rules_create',
   'filtering_rules_update': 'filtering_rules_update',
   'filtering_rules_delete': 'filtering_rules_delete',
+  'filtering_rules_toggle_status': 'filtering_rules_toggle_status',
 } as const;
 
 // ============================================================================
@@ -287,6 +334,10 @@ export class FilteringRulesTools {
 
   async filtering_rules_delete(args: any): Promise<ToolResult> {
     return handleDeleteFilteringRule(this.context, args);
+  }
+
+  async filtering_rules_toggle_status(args: any): Promise<ToolResult> {
+    return handleToggleFilteringRuleStatus(this.context, args);
   }
 }
 

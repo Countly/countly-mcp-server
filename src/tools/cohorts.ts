@@ -42,6 +42,10 @@ export const listCohortsToolDefinition = {
         description: 'Maximum number of records to return',
         default: 10,
       },
+      search: {
+        type: 'string',
+        description: 'Search term to filter cohorts by name',
+      },
     },
   },
 };
@@ -55,6 +59,7 @@ export async function handleListCohorts(
   const type = input.type as string | undefined;
   const skip = withDefault(input.skip as number | undefined, 0);
   const limit = withDefault(input.limit as number | undefined, 10);
+  const search = input.search as string | undefined;
 
   const appId = await context.resolveAppId({ app_id, app_name });
 
@@ -71,6 +76,9 @@ export async function handleListCohorts(
   if (type) {
     queryParams.type = type;
   }
+  if (search) {
+    queryParams.sSearch = search;
+  }
 
   const response = await safeApiCall(
     () => context.httpClient.get('/o', { params: queryParams }),
@@ -83,12 +91,12 @@ export async function handleListCohorts(
 }
 
 // ============================================================================
-// GET COHORT TOOL
+// GET COHORT DATA TOOL
 // ============================================================================
 
-export const getCohortToolDefinition = {
-  name: 'cohorts_details',
-  description: 'Get detailed information about a specific cohort including its configuration, user count, and current state.',
+export const getCohortDataToolDefinition = {
+  name: 'cohorts_data',
+  description: 'Get cohort data over a time period.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -102,20 +110,26 @@ export const getCohortToolDefinition = {
       },
       cohort_id: {
         type: 'string',
-        description: 'Cohort ID to retrieve',
+        description: 'Cohort ID to retrieve data for',
+      },
+      period: {
+        type: 'string',
+        description: 'Period string for data (e.g., "12months", "30days")',
+        default: '12months',
       },
     },
     required: ['cohort_id'],
   },
 };
 
-export async function handleGetCohort(
+export async function handleGetCohortData(
   context: ToolContext,
   input: Record<string, unknown>
 ): Promise<ToolResult> {
   const app_id = input.app_id as string | undefined;
   const app_name = input.app_name as string | undefined;
   const cohort_id = input.cohort_id as string;
+  const period = withDefault(input.period as string | undefined, '12months');
 
   const appId = await context.resolveAppId({ app_id, app_name });
 
@@ -123,11 +137,12 @@ export async function handleGetCohort(
     () => context.httpClient.get('/o', {
       params: {
         app_id: appId,
-        method: 'get_cohort',
-        cohort: cohort_id,
+        method: 'cohortdata',
+        cohorts: JSON.stringify([cohort_id]),
+        period,
       },
     }),
-    'Failed to get cohort'
+    'Failed to get cohort data'
   );
 
   return {
@@ -486,7 +501,7 @@ export async function handleDeleteCohort(
 
 export const cohortsToolDefinitions = [
   listCohortsToolDefinition,
-  getCohortToolDefinition,
+  getCohortDataToolDefinition,
   createCohortToolDefinition,
   updateCohortToolDefinition,
   deleteCohortToolDefinition,
@@ -494,7 +509,7 @@ export const cohortsToolDefinitions = [
 
 export const cohortsToolHandlers = {
   'cohorts_list': 'cohorts_list',
-  'cohorts_details': 'cohorts_details',
+  'cohorts_data': 'cohorts_data',
   'cohorts_create': 'cohorts_create',
   'cohorts_update': 'cohorts_update',
   'cohorts_delete': 'cohorts_delete',
@@ -507,8 +522,8 @@ export class CohortsTools {
     return handleListCohorts(this.context, args);
   }
 
-  async cohorts_details(args: any): Promise<ToolResult> {
-    return handleGetCohort(this.context, args);
+  async cohorts_data(args: any): Promise<ToolResult> {
+    return handleGetCohortData(this.context, args);
   }
 
   async cohorts_create(args: any): Promise<ToolResult> {

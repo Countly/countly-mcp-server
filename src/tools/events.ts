@@ -6,7 +6,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 // ============================================================================
 
 export const getEventsAndSegmentsToolDefinition = {
-  name: 'events_segments',
+  name: 'events_list',
   description: 'List all events and their segments for an application. This shows exactly how events appear in the database, including both custom events and internal Countly events.',
   inputSchema: {
     type: 'object',
@@ -268,7 +268,7 @@ export const eventsToolDefinitions = [
 
 export const eventsToolHandlers = {
   'events_create': 'createEvent',
-  'events_segments': 'getEventsAndSegments',
+  'events_list': 'getEventsAndSegments',
 } as const;
 
 export class EventsTools {

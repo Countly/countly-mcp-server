@@ -49,7 +49,7 @@ These categories are always available without plugin checks:
 ## Tool Categories
 
 ### core
-**Tools**: `ping`, `get_version`, `get_plugins`, `search`, `fetch`
+**Tools**: `ping`, `get_version`, `get_plugins`, `jobs_list`, `job_runs`
 
 **Operations**:
 - R: All core tools (read-only)
@@ -58,7 +58,7 @@ These categories are always available without plugin checks:
 - `ping`: Check if Countly server is healthy and reachable
 - `get_version`: Check what version of Countly is running on the server
 - `get_plugins`: Check what plugins are enabled on the Countly server
-- `search` and `fetch`: Provide MCP Connector required functionality for ChatGPT and similar clients
+- `jobs_list` / `job_runs`: Background job visibility for MCP
 
 ### apps
 **Tools**: `apps_list`, `apps_get_by_name`, `apps_create`, `apps_update`, `apps_delete`, `apps_reset`
@@ -75,7 +75,7 @@ These categories are always available without plugin checks:
 **Operations**:
 - R: All analytics tools (read-only)
 
-**Note**: Analytics tools provide various data insights about applications. `slipping_users` retrieves app users (end-users) who are becoming inactive based on inactivity period. `events_segments` shows both custom events and internal Countly events with their exact database structure.
+**Note**: Analytics tools provide various data insights about applications. `slipping_users` retrieves app users (end-users) who are becoming inactive based on inactivity period. `events_list` shows both custom events and internal Countly events with their exact database structure.
 
 ### crashes
 **Tools**: `crash_groups_list`, `crashes_stats_get`, `crashes_get`, `crashes_comment_add`, `crashes_comment_update`, `crashes_comment_delete`, `crashes_resolve`, `uncrashes_resolve`, `crashes_hide`, `crashes_show`
@@ -97,11 +97,11 @@ These categories are always available without plugin checks:
 - D: notes_delete
 
 ### events
-**Tools**: `events_create`, `events_segments`, `get_events_data`
+**Tools**: `events_create`, `events_list`, `get_events_data`
 
 **Operations**:
 - C: events_create
-- R: events_segments, get_events_data
+- R: events_list, get_events_data
 
 ### alerts
 **Tools**: `alerts_list`, `alerts_create`, `alerts_delete`
@@ -324,7 +324,7 @@ if (plugins.includes('drill')) {
 ```
 
 ### user_profiles
-**Tools**: `user_profiles_query`, `user_profiles_breakdown`, `user_profiles_get`, `user_profiles_note_add`
+**Tools**: `user_profiles_query`, `user_profiles_breakdown`, `user_profiles_get`
 
 **Requires plugin**: `users`
 
@@ -353,17 +353,11 @@ async function userProfileExamples() {
     uid: 'user123'
   });
   
-  // Add note to user profile
-  await tools.user_profiles_note_add({
-    app_name: 'MyApp',
-    uid: 'user123',
-    note: 'User upgraded to premium plan'
-  });
 }
 ```
 
 ### cohorts
-**Tools**: `cohorts_list`, `cohorts_details`, `cohorts_create`, `cohorts_update`, `cohorts_delete`
+**Tools**: `cohorts_list`, `cohorts_data`, `cohorts_create`, `cohorts_update`, `cohorts_delete`
 
 **Requires plugin**: `cohorts`
 
@@ -379,10 +373,11 @@ async function cohortExamples() {
     limit: 10
   });
   
-  // Get specific cohort details
-  const cohort = await tools.cohorts_details({
+  // Get cohort data
+  const cohortData = await tools.cohorts_data({
     app_name: 'MyApp',
-    cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c'
+    cohort_id: 'e8b5dfea315315c3a4d4bbc077999c2c',
+    period: '12months'
   });
   
   // Create behavioral cohort
@@ -441,7 +436,7 @@ async function cohortExamples() {
 ```
 
 ### funnels
-**Tools**: `funnels_list`, `funnels_details`, `funnels_details_data`, `funnels_details_step_users`, `funnels_details_dropoff_users`, `funnels_create`, `funnels_update`, `funnels_delete`
+**Tools**: `funnels_list`, `funnels_data`, `funnels_step_users`, `funnels_dropoff_users`, `funnels_create`, `funnels_update`, `funnels_delete`
 
 **Requires plugin**: `funnels`
 
@@ -454,12 +449,6 @@ async function funnelExamples() {
   const funnels = await tools.funnels_list({
     app_name: 'MyApp',
     limit: 10
-  });
-  
-  // Get specific funnel details
-  const funnel = await tools.funnels_details({
-    app_name: 'MyApp',
-    funnel_id: '3a3adcf59207776125297286960504ff'
   });
   
   // Create a purchase funnel
@@ -499,7 +488,7 @@ async function funnelExamples() {
   });
   
   // Get funnel analytics data for last 30 days
-  const data = await tools.funnels_details_data({
+  const data = await tools.funnels_data({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff',
     period: '30days',
@@ -507,7 +496,7 @@ async function funnelExamples() {
   });
   
   // Get users who reached step 2 (Added to Cart)
-  const stepUsers = await tools.funnels_details_step_users({
+  const stepUsers = await tools.funnels_step_users({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff',
     step: 2,
@@ -515,7 +504,7 @@ async function funnelExamples() {
   });
   
   // Get users who dropped off between step 2 and 3
-  const dropoffUsers = await tools.funnels_details_dropoff_users({
+  const dropoffUsers = await tools.funnels_dropoff_users({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff',
     from_step: 2,

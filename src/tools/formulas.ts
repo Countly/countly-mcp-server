@@ -7,7 +7,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const runFormulaToolDefinition = {
   name: 'formulas_run',
-  description: 'Run a formula calculation on number properties using mathematical equations. Formulas can combine various metrics like sessions, events, users with filters and segments.',
+  description: 'Run a formula calculation on number properties using mathematical equations. Formulas can combine various metrics like sessions, events, users with filters and segments. IMPORTANT: Each variable must be a separate formula object in the array, not all variables in one object.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -15,7 +15,7 @@ export const runFormulaToolDefinition = {
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
       formula: {
         type: 'string',
-        description: 'Formula definition as JSON string. Array of formula objects with variables. Each variable has: id, symbol (e.g., "A", "B"), selectedFunction (e.g., "number-of-sessions", "event-count"), selectedEvent (event key if using events), selectedSegment, queryWrapper with query object for filtering, and ex object with _do and _args. Example: [{"id":0,"variables":[{"id":0,"symbol":"A","selectedFunction":"number-of-sessions","ex":{"_do":"numberOf","_args":["sessions"]}}]}]'
+        description: 'Formula definition as JSON string. MUST be an array where EACH VARIABLE is a SEPARATE object (not all variables in one object). Each formula object contains: id (number), variables (array with single variable object). Each variable object MUST include: id (number), symbol (string: "A", "B", etc.), selectedFunction (string: "number-of-sessions", "number-of-users", "event-count", etc.), selectedEvent (string: event key or empty), selectedSegment (string: segment or empty), selectedCohort (string: cohort or empty), selectedNumericValue (number: 0), selectedOperator (string: "add"), queryWrapper (object: {"query":{},"queryText":""}), group (object: {"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0}), ex (object: {"_do":"numberOf","_args":["sessions"|"users"|etc]}). Example for sessions/users: [{"id":0,"variables":[{"id":0,"symbol":"A","selectedFunction":"number-of-sessions","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["sessions"]}}]},{"id":1,"variables":[{"id":1,"symbol":"B","selectedFunction":"number-of-users","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["users"]}}]}]'
       },
       period: {
         type: 'string',
@@ -23,7 +23,7 @@ export const runFormulaToolDefinition = {
       },
       bucket: {
         type: 'string',
-        description: 'Time bucket breakdown as JSON array. Options: ["daily"], ["weekly"], ["monthly"], ["single"], or combinations like ["daily","weekly","monthly","single"]. Defaults to ["single"].'
+        description: 'Time bucket breakdown as JSON array string. Options: ["daily"], ["weekly"], ["monthly"], ["single"], or combinations like ["daily","weekly","monthly","single"]. Defaults to ["single"].'
       },
       format: {
         type: 'string',
@@ -215,6 +215,106 @@ export async function handleDeleteFormula(context: ToolContext, args: any): Prom
 }
 
 // ============================================================================
+// SAVE_FORMULA TOOL
+// ============================================================================
+
+export const saveFormulaToolDefinition = {
+  name: 'formulas_save',
+  description: 'Save a formula for later use. The formula will be stored and can be retrieved using formulas_list.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      title: {
+        type: 'string',
+        description: 'Human-readable title for the formula (e.g., "Sessions per User")'
+      },
+      description: {
+        type: 'string',
+        description: 'Optional description of what the formula calculates',
+        default: ''
+      },
+      key: {
+        type: 'string',
+        description: 'Unique identifier key for the formula (e.g., "sessions_per_user"). Use "unnamed_formula" if not specified.',
+        default: 'unnamed_formula'
+      },
+      visibility: {
+        type: 'string',
+        enum: ['private', 'public'],
+        description: 'Visibility of the formula. "private" (only you) or "public" (shared with team)',
+        default: 'private'
+      },
+      format: {
+        type: 'string',
+        enum: ['float', 'integer', 'percentage'],
+        description: 'Result format type',
+        default: 'float'
+      },
+      dplaces: {
+        type: 'number',
+        description: 'Number of decimal places for the result',
+        default: 2
+      },
+      unit: {
+        type: 'string',
+        description: 'Unit of measurement (e.g., "%", "$", "ms")',
+        default: ''
+      },
+      formula: {
+        type: 'string',
+        description: 'Formula definition as JSON string. MUST be an array where EACH VARIABLE is a SEPARATE object. Same format as formulas_run tool. Example: [{"id":0,"variables":[{"id":0,"symbol":"A","selectedFunction":"number-of-sessions","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["sessions"]}}]},{"id":1,"variables":[{"id":1,"symbol":"B","selectedFunction":"number-of-users","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["users"]}}]}]'
+      },
+      shared_email_edit: {
+        type: 'array',
+        description: 'Array of email addresses for users who can edit this formula',
+        items: { type: 'string' },
+        default: []
+      },
+    },
+    required: ['title', 'formula'],
+  },
+};
+
+export async function handleSaveFormula(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+
+  const metric = {
+    title: args.title,
+    description: args.description || '',
+    key: args.key || 'unnamed_formula',
+    visibility: args.visibility || 'private',
+    format: args.format || 'float',
+    dplaces: args.dplaces !== undefined ? args.dplaces : 2,
+    unit: args.unit || '',
+    formula: args.formula,
+    shared_email_edit: args.shared_email_edit || [],
+    app: app_id,
+  };
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    metric: JSON.stringify(metric),
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/calculated_metrics/save', { params }),
+    'Failed to save formula'
+  );
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Formula "${args.title}" saved successfully for app ${app_id}.\n\n${JSON.stringify(response.data, null, 2)}`,
+      },
+    ],
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -222,12 +322,14 @@ export const formulasToolDefinitions = [
   runFormulaToolDefinition,
   listFormulasToolDefinition,
   deleteFormulaToolDefinition,
+  saveFormulaToolDefinition,
 ];
 
 export const formulasToolHandlers = {
   'formulas_run': 'runFormula',
   'formulas_list': 'listFormulas',
   'formulas_delete': 'deleteFormula',
+  'formulas_save': 'saveFormula',
 } as const;
 
 export class FormulasTools {
@@ -243,6 +345,10 @@ export class FormulasTools {
 
   async deleteFormula(args: any): Promise<ToolResult> {
     return handleDeleteFormula(this.context, args);
+  }
+
+  async saveFormula(args: any): Promise<ToolResult> {
+    return handleSaveFormula(this.context, args);
   }
 }
 

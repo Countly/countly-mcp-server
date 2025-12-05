@@ -125,19 +125,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `formulas_delete`: Delete formulas
   - `get_formula_data`: Get calculated formula data
 
-- **Funnels Module** (8 tools): Conversion funnel analysis based on `funnels` plugin
+- **Funnels Module** (7 tools): Conversion funnel analysis based on `funnels` plugin
   - `funnels_list`: List all configured funnels
-  - `funnels_details`: Get specific funnel details
+  - `funnels_data`: Get funnel conversion data
+  - `funnels_step_users`: Get users who reached a specific step
+  - `funnels_dropoff_users`: Get users who dropped off between steps
   - `funnels_create`: Create conversion funnels with multiple steps
   - `funnels_update`: Update funnel configuration
   - `funnels_delete`: Delete funnels
-  - `funnels_details_data`: Get funnel conversion data
-  - `funnels_details_sessions`: Get user sessions that matched funnel
-  - `funnels_details_steps`: Get detailed step-by-step breakdown
 
 - **Cohorts Module** (8 tools): User cohort management based on `cohorts` plugin
   - `cohorts_list`: List all cohorts
-  - `cohorts_details`: Get specific cohort details
+  - `cohorts_data`: Get cohort data over a period
   - `cohorts_create`: Create user cohorts with conditions
   - `cohorts_update`: Update cohort configuration
   - `cohorts_delete`: Delete cohorts

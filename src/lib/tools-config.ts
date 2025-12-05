@@ -28,8 +28,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'ping': 'R',
       'get_version': 'R',
       'get_plugins': 'R',
-      'search': 'R',
-      'fetch': 'R',
       'jobs_list': 'R',
       'job_runs': 'R',
     },
@@ -84,7 +82,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   events: {
     operations: {
       'events_create': 'C',
-      'events_segments': 'R',
+      'events_list': 'R',
     },
     availableByDefault: true,
   },
@@ -148,7 +146,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'user_profiles_query': 'R',
       'user_profiles_breakdown': 'R',
       'user_profiles_get': 'R',
-      'user_profiles_note_add': 'C',
     },
     requiresPlugin: 'users',
     availableByDefault: false,
@@ -156,7 +153,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   cohorts: {
     operations: {
       'cohorts_list': 'R',
-      'cohorts_details': 'R',
+      'cohorts_data': 'R',
       'cohorts_create': 'C',
       'cohorts_update': 'U',
       'cohorts_delete': 'D',
@@ -167,7 +164,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   funnels: {
     operations: {
       'funnels_list': 'R',
-      'funnels_details': 'R',
       'funnels_data': 'R',
       'funnels_step_users': 'R',
       'funnels_dropoff_users': 'R',
@@ -183,6 +179,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'formulas_run': 'R',
       'formulas_list': 'R',
       'formulas_delete': 'D',
+      'formulas_save': 'C',
     },
     requiresPlugin: 'formulas',
     availableByDefault: false,
@@ -261,6 +258,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'filtering_rules_create': 'C',
       'filtering_rules_update': 'U',
       'filtering_rules_delete': 'D',
+      'filtering_rules_toggle_status': 'U',
     },
     requiresPlugin: 'blocks',
     availableByDefault: false,
@@ -323,7 +321,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'hooks_create': 'C',
       'hooks_update': 'U',
       'hooks_delete': 'D',
-      'hooks_internal_triggers_get': 'R',
     },
     requiresPlugin: 'hooks',
     availableByDefault: false,

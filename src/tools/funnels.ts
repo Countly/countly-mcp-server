@@ -38,6 +38,10 @@ export const listFunnelsToolDefinition = {
         description: 'Maximum number of records to return',
         default: 10,
       },
+      search: {
+        type: 'string',
+        description: 'Search term to filter funnels by name',
+      },
     },
   },
 };
@@ -50,6 +54,7 @@ export async function handleListFunnels(
   const app_name = input.app_name as string | undefined;
   const skip = withDefault(input.skip as number | undefined, 0);
   const limit = withDefault(input.limit as number | undefined, 10);
+  const search = input.search as string | undefined;
 
   const appId = await context.resolveAppId({ app_id, app_name });
 
@@ -63,63 +68,13 @@ export async function handleListFunnels(
     'selectedDynamicCols[]': 'result',
     sEcho: '0',
   };
+  if (search) {
+    queryParams.sSearch = search;
+  }
 
   const response = await safeApiCall(
     () => context.httpClient.get('/o', { params: queryParams }),
     'Failed to list funnels'
-  );
-
-  return {
-    content: [{ type: 'text', text: JSON.stringify(response.data, null, 2) }],
-  };
-}
-
-// ============================================================================
-// GET FUNNEL TOOL
-// ============================================================================
-
-export const getFunnelToolDefinition = {
-  name: 'funnels_details',
-  description: 'Get detailed information about a specific funnel including its configuration, steps, and performance data.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      app_id: {
-        type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
-      },
-      app_name: {
-        type: 'string',
-        description: 'Application name (alternative to app_id)',
-      },
-      funnel_id: {
-        type: 'string',
-        description: 'Funnel ID to retrieve',
-      },
-    },
-    required: ['funnel_id'],
-  },
-};
-
-export async function handleGetFunnel(
-  context: ToolContext,
-  input: Record<string, unknown>
-): Promise<ToolResult> {
-  const app_id = input.app_id as string | undefined;
-  const app_name = input.app_name as string | undefined;
-  const funnel_id = input.funnel_id as string;
-
-  const appId = await context.resolveAppId({ app_id, app_name });
-
-  const response = await safeApiCall(
-    () => context.httpClient.get('/o', {
-      params: {
-        app_id: appId,
-        method: 'get_funnel',
-        funnel: funnel_id,
-      },
-    }),
-    'Failed to get funnel'
   );
 
   return {
@@ -676,7 +631,6 @@ export async function handleDeleteFunnel(
 
 export const funnelsToolDefinitions = [
   listFunnelsToolDefinition,
-  getFunnelToolDefinition,
   getFunnelDataToolDefinition,
   getFunnelStepUsersToolDefinition,
   getFunnelDropoffUsersToolDefinition,
@@ -687,7 +641,6 @@ export const funnelsToolDefinitions = [
 
 export const funnelsToolHandlers = {
   'funnels_list': 'funnels_list',
-  'funnels_details': 'funnels_details',
   'funnels_data': 'funnels_data',
   'funnels_step_users': 'funnels_step_users',
   'funnels_dropoff_users': 'funnels_dropoff_users',
@@ -701,10 +654,6 @@ export class FunnelsTools {
 
   async funnels_list(args: any): Promise<ToolResult> {
     return handleListFunnels(this.context, args);
-  }
-
-  async funnels_details(args: any): Promise<ToolResult> {
-    return handleGetFunnel(this.context, args);
   }
 
   async funnels_data(args: any): Promise<ToolResult> {

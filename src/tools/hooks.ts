@@ -111,7 +111,7 @@ export const createHookTool = {
   description: `Create a new webhook/hook. Hooks can be triggered by:
 - IncomingDataTrigger: Triggered by specific events with optional filters
 - APIEndPointTrigger: Creates a unique endpoint URL that can be called externally
-- InternalEventTrigger: Triggered by internal Countly events (crashes, user changes, etc.)
+- InternalEventTrigger: Triggered by internal Countly events. Available events: /i/apps/create (new app created), /i/apps/update (app updated), /i/apps/delete (app deleted), /i/apps/reset (app reset), /i/users/create (dashboard user created), /i/users/update (dashboard user updated), /i/users/delete (dashboard user deleted), /systemlogs (system logs), /master (master events), /crashes/new (new crash received), /cohort/enter (user enters cohort), /cohort/exit (user exits cohort), /i/app_users/create (app user created), /i/app_users/update (app user updated), /i/app_users/delete (app user deleted), /hooks/trigger (another hook triggered), /alerts/trigger (alert triggered), /i/remote-config/add-parameter, /i/remote-config/update-parameter, /i/remote-config/remove-parameter, /i/remote-config/add-condition, /i/remote-config/update-condition, /i/remote-config/remove-condition
 - ScheduledTrigger: Triggered on a schedule (cron expression)
 
 Effects can include:
@@ -134,7 +134,7 @@ Effects can include:
     trigger_type: z.enum(['IncomingDataTrigger', 'APIEndPointTrigger', 'InternalEventTrigger', 'ScheduledTrigger'])
       .describe('Type of trigger'),
     trigger_config: z.string()
-      .describe('Trigger configuration as JSON string. For IncomingDataTrigger: {event: ["app_id***event_key"], filter: "..."}. For APIEndPointTrigger: {path: "uuid", method: "get|post"}. For InternalEventTrigger: {eventType: "/crashes/new|/cohort/enter|etc", cohortID: null, hookID: null, alertID: null}. For ScheduledTrigger: {period1: "day|week|month", cron: "0 6 * * *", period3: 6, timezone2: "timezone"}'),
+      .describe('Trigger configuration as JSON string. For IncomingDataTrigger: {event: ["app_id***event_key"], filter: "..."}. For APIEndPointTrigger: {path: "uuid", method: "get|post"}. For InternalEventTrigger: {eventType: "/crashes/new" or "/cohort/enter" or any other internal event from the list above, cohortID: null, hookID: null, alertID: null}. For ScheduledTrigger: {period1: "day|week|month", cron: "0 6 * * *", period3: 6, timezone2: "timezone"}'),
     effects: z.string()
       .describe('Array of effects as JSON string. Each effect has type and configuration. HTTPEffect: {url, method, requestData, headers}. EmailEffect: {address: ["email"], emailTemplate: "text"}. CustomCodeEffect: {code: "javascript"}'),
     enabled: z.boolean()
@@ -343,53 +343,6 @@ async function handleDeleteHook(args: z.infer<typeof deleteHookTool.inputSchema>
   };
 }
 
-/**
- * Tool: hooks_internal_triggers_get
- * Get list of available internal events that can trigger hooks
- */
-export const getInternalTriggersTool = {
-  name: 'hooks_internal_triggers_get',
-  description: 'Get list of available internal Countly events that can be used as triggers for hooks',
-  inputSchema: z.object({}),
-};
-
-async function handleGetInternalTriggers(_args: z.infer<typeof getInternalTriggersTool.inputSchema>, _context: ToolContext) {
-  const internalEvents = [
-    { event: '/i/apps/create', description: 'When a new app is created' },
-    { event: '/i/apps/update', description: 'When an app is updated' },
-    { event: '/i/apps/delete', description: 'When an app is deleted' },
-    { event: '/i/apps/reset', description: 'When an app is reset' },
-    { event: '/i/users/create', description: 'When a dashboard user is created' },
-    { event: '/i/users/update', description: 'When a dashboard user is updated' },
-    { event: '/i/users/delete', description: 'When a dashboard user is deleted' },
-    { event: '/systemlogs', description: 'System log events' },
-    { event: '/master', description: 'Master events' },
-    { event: '/crashes/new', description: 'When a new crash/error is received' },
-    { event: '/cohort/enter', description: 'When a user enters a cohort' },
-    { event: '/cohort/exit', description: 'When a user exits a cohort' },
-    { event: '/i/app_users/create', description: 'When an app user is created' },
-    { event: '/i/app_users/update', description: 'When an app user is updated' },
-    { event: '/i/app_users/delete', description: 'When an app user is deleted' },
-    { event: '/hooks/trigger', description: 'When another hook is triggered' },
-    { event: '/alerts/trigger', description: 'When an alert is triggered' },
-    { event: '/i/remote-config/add-parameter', description: 'When a remote config parameter is added' },
-    { event: '/i/remote-config/update-parameter', description: 'When a remote config parameter is updated' },
-    { event: '/i/remote-config/remove-parameter', description: 'When a remote config parameter is removed' },
-    { event: '/i/remote-config/add-condition', description: 'When a remote config condition is added' },
-    { event: '/i/remote-config/update-condition', description: 'When a remote config condition is updated' },
-    { event: '/i/remote-config/remove-condition', description: 'When a remote config condition is removed' },
-  ];
-
-  return {
-    content: [
-      {
-        type: 'text' as const,
-        text: `Available internal events for hook triggers:\n\n${JSON.stringify(internalEvents, null, 2)}`,
-      },
-    ],
-  };
-}
-
 // Export tools array
 export const hooksTools = [
   listHooksTool,
@@ -397,7 +350,6 @@ export const hooksTools = [
   createHookTool,
   updateHookTool,
   deleteHookTool,
-  getInternalTriggersTool,
 ];
 
 // Export handlers map
@@ -407,5 +359,4 @@ export const hooksHandlers = {
   hooks_create: handleCreateHook,
   hooks_update: handleUpdateHook,
   hooks_delete: handleDeleteHook,
-  hooks_internal_triggers_get: handleGetInternalTriggers,
 };

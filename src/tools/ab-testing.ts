@@ -2,6 +2,79 @@ import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Ensures that all remote config parameters used in experiment variants exist.
+ * Creates missing parameters with default values collected from all variants.
+ */
+async function ensureRemoteConfigParameters(
+  context: ToolContext,
+  app_id: string,
+  variants: any[]
+): Promise<void> {
+  // Get existing remote config parameters
+  const listParams = {
+    ...context.getAuthParams(),
+    app_id,
+    method: 'remote-config',
+  };
+
+  const existingConfigsResponse = await safeApiCall(
+    () => context.httpClient.get('/o', { params: listParams }),
+    'Failed to list remote configs'
+  );
+
+  const existingParameters = existingConfigsResponse.data?.parameters || [];
+  const existingParamKeys = new Set(existingParameters.map((p: any) => p.parameter_key));
+
+  // Collect all parameter names and their values from variants
+  const parameterMap = new Map<string, { description: string; values: Set<any> }>();
+
+  for (const variant of variants) {
+    if (variant.parameters && Array.isArray(variant.parameters)) {
+      for (const param of variant.parameters) {
+        if (!parameterMap.has(param.name)) {
+          parameterMap.set(param.name, {
+            description: param.description || `Parameter for A/B experiment`,
+            values: new Set(),
+          });
+        }
+        parameterMap.get(param.name)!.values.add(param.value);
+      }
+    }
+  }
+
+  // Create missing parameters
+  for (const [paramName, paramInfo] of parameterMap.entries()) {
+    if (!existingParamKeys.has(paramName)) {
+      // Use the first value as default
+      const defaultValue = Array.from(paramInfo.values)[0];
+
+      const parameter = {
+        parameter_key: paramName,
+        default_value: defaultValue,
+        description: paramInfo.description,
+        conditions: [],
+        status: 'Running',
+      };
+
+      const createParams = {
+        ...context.getAuthParams(),
+        app_id,
+        parameter: JSON.stringify(parameter),
+      };
+
+      await safeApiCall(
+        () => context.httpClient.get('/i/remote-config/add-parameter', { params: createParams }),
+        `Failed to create remote config parameter: ${paramName}`
+      );
+    }
+  }
+}
+
+// ============================================================================
 // LIST_AB_EXPERIMENTS TOOL
 // ============================================================================
 
@@ -101,10 +174,13 @@ export const createABExperimentToolDefinition = {
       name: { type: 'string', description: 'Experiment name' },
       description: { type: 'string', description: 'Experiment description' },
       type: { type: 'string', enum: ['remote-config', 'code'], default: 'remote-config', description: 'Experiment type' },
+      show_target_users: { type: 'boolean', default: true, description: 'Whether to show target users configuration' },
       target_users: {
         type: 'object',
         properties: {
           percentage: { type: 'string', description: 'Percentage of users to include (e.g., "50" for 50%)' },
+          byVal: { type: 'array', items: { type: 'string' }, description: 'Array of user IDs to target' },
+          byValText: { type: 'string', description: 'Text representation of targeted user IDs' },
           condition: { type: 'object', description: 'MongoDB query for user conditions (e.g., {"up.age": {"$gt": 30}})' },
           condition_definition: { type: 'string', description: 'Human-readable condition description' },
         },
@@ -141,12 +217,18 @@ export const createABExperimentToolDefinition = {
         items: {
           type: 'object',
           properties: {
-            user_segmentation: { type: 'string', description: 'User segmentation query as JSON string' },
-            steps: { type: 'string', description: 'Goal steps as JSON string array' },
+            user_segmentation: { 
+              type: 'string', 
+              description: 'User segmentation query as JSON string. Format: \'{"query":{<MongoDB query>},"queryText":"<human-readable description>"}\'  Example: \'{"query":{"custom.Subscription Plan":{"$in":["Premium"]}},"queryText":"Subscription Plan = Premium"}\'' 
+            },
+            steps: { 
+              type: 'string', 
+              description: 'Goal steps as JSON string array. Each step defines user behavior to track. Format: \'[{"type":"did"|"didnot","event":"<event_name>","times":"{\\"$gte\\":<number>}","period":"<days>days"|"0days","query":"{}","queryText":"","byVal":"","group":<number>,"conj":"and"|"or"}]\' Example: \'[{"type":"did","event":"Subscription Purchased","times":"{\\"$gte\\":1}","period":"0days","query":"{}","queryText":"","byVal":"","group":0,"conj":"and"}]\'' 
+            },
           },
           required: ['user_segmentation', 'steps'],
         },
-        description: 'Optional array of experiment goals',
+        description: 'Optional array of experiment goals. Goals define what user actions you want to optimize for (e.g., conversions, purchases). Each goal has user segmentation filters and behavioral steps that users must complete.',
       },
       expiration: { type: 'boolean', default: true, description: 'Whether experiment auto-concludes' },
       days: { type: 'string', default: '30', description: 'Duration in days before auto-conclusion' },
@@ -160,14 +242,19 @@ export const createABExperimentToolDefinition = {
 export async function handleCreateABExperiment(context: ToolContext, args: any): Promise<ToolResult> {
   const app_id = await context.resolveAppId(args);
 
+  // Check and create missing remote config parameters for remote-config type experiments
+  if ((args.type || 'remote-config') === 'remote-config') {
+    await ensureRemoteConfigParameters(context, app_id, args.variants);
+  }
+
   // Build experiment object
   const experiment = {
     name: args.name,
-    description: args.description,
-    show_target_users: true,
+    description: args.description || '',
+    show_target_users: args.show_target_users !== undefined ? args.show_target_users : true,
     target_users: {
-      byVal: [],
-      byValText: '',
+      byVal: args.target_users.byVal || [],
+      byValText: args.target_users.byValText || '',
       percentage: args.target_users.percentage,
       condition: args.target_users.condition || {},
       condition_definition: args.target_users.condition_definition || '',
@@ -180,6 +267,9 @@ export async function handleCreateABExperiment(context: ToolContext, args: any):
     improvementRate: args.improvementRate || '10',
     type: args.type || 'remote-config',
   };
+
+  // Log the experiment object for debugging
+  console.log('Creating experiment:', JSON.stringify(experiment, null, 2));
 
   const params = {
     ...context.getAuthParams(),

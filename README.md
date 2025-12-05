@@ -242,7 +242,7 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
 **Available Categories:**
-- `CORE` - Core tools (search, fetch) (2 tools)
+- `CORE` - Core tools (ping, get_version, get_plugins, jobs_list, job_runs) (5 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
 - `CRASHES` - Crash analytics and management (10 tools)
@@ -254,7 +254,7 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 - `DASHBOARD_USERS` - Dashboard user management (1 tool)
 - `APP_USERS` - App user management (3 tools)
 
-**Total: 45 tools across 11 categories**
+**Total: 42 tools across 11 categories**
 
 For complete documentation, examples, and per-tool CRUD mappings, see **[TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md)**.
 
@@ -423,8 +423,6 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`ping`** - Check if Countly server is healthy and reachable
 - **`get_version`** - Check what version of Countly is running on the server
 - **`get_plugins`** - Get list of installed plugins on the server
-- **`search`** - Search for relevant content in Countly data
-- **`fetch`** - Retrieve specific documents by ID
 - **`jobs_list`** - List all background jobs running on the Countly server with pagination and sorting
 - **`job_runs`** - Get run history and details for a specific background job by name
 
@@ -446,7 +444,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 
 ### Events
 - **`events_create`** - Define event with metadata and configuration
-- **`events_segments`** - List all events and their segments, including internal Countly events with exact database structure
+- **`events_list`** - List all events and their segments, including internal Countly events with exact database structure
 - **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
 
 ### Dashboard User Management
@@ -498,21 +496,19 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`user_profiles_query`** - Query users with MongoDB filters
 - **`user_profiles_breakdown`** - Break down user counts by properties
 - **`user_profiles_get`** - Get specific user details by UID
-- **`user_profiles_note_add`** - Add notes to user profiles
 
 ### Cohorts (requires `cohorts` plugin)
 - **`cohorts_list`** - List all user cohorts with filtering
-- **`cohorts_details`** - Get detailed cohort information
+- **`cohorts_data`** - Get cohort data over a period
 - **`cohorts_create`** - Create behavioral cohort based on user actions
 - **`cohorts_update`** - Update cohort configuration
 - **`cohorts_delete`** - Delete a cohort
 
 ### Funnels (requires `funnels` plugin)
 - **`funnels_list`** - List all conversion funnels
-- **`funnels_details`** - Get funnel configuration details
-- **`funnels_details_data`** - Get funnel analytics data with filtering
-- **`funnels_details_step_users`** - Get users who reached a specific step
-- **`funnels_details_dropoff_users`** - Get users who dropped off between steps
+- **`funnels_data`** - Get funnel analytics data with filtering
+- **`funnels_step_users`** - Get users who reached a specific step
+- **`funnels_dropoff_users`** - Get users who dropped off between steps
 - **`funnels_create`** - Create conversion funnel with event sequence
 - **`funnels_update`** - Update funnel configuration
 - **`funnels_delete`** - Delete a funnel

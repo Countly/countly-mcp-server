@@ -152,7 +152,7 @@ describe('Prompts', () => {
       expect(result.messages[0].content.text).toContain('FunnelApp');
       expect(result.messages[0].content.text).toContain('PurchaseFunnel');
       expect(result.messages[0].content.text).toContain('funnels_list');
-      expect(result.messages[0].content.text).toContain('funnels_details_data');
+      expect(result.messages[0].content.text).toContain('funnels_data');
     });
 
     it('should generate event health check prompt', () => {
