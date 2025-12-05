@@ -269,7 +269,7 @@ export const updateEmailReportTool = {
     sendPdf: z.boolean()
       .optional()
       .describe('Whether to send report as PDF'),
-    report_data: z.record(z.any())
+    report_data: z.record(z.string(), z.any())
       .optional()
       .describe('Additional report data fields to update'),
   }),
