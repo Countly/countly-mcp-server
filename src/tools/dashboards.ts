@@ -277,15 +277,15 @@ export const addDashboardWidgetTool = {
       metrics: z.array(z.string())
         .optional()
         .describe('Metrics array. Analytics: ["t"] (total), ["u"] (unique users), ["n"] (new users), ["d"] (duration), ["e"] (events). Events: ["c"] (count), ["s"] (sum), ["dur"] (duration). Crashes: ["crf"] (crash-free rate), ["crnf"] (crash-free new users), ["cruf"] (unique crashes). Push: ["sent"], ["actioned"]. Can combine multiple.'),
-      apps: z.union([z.array(z.string()), z.string()])
+      apps: z.array(z.string())
         .optional()
-        .describe('Array of app IDs or "*" for all apps. Required for most widgets except note widgets.'),
+        .describe('Array of app IDs. Use ["*"] for all apps. Required for most widgets except note widgets.'),
       visualization: z.string()
         .optional()
         .describe('Visualization: "time-series" (line chart over time), "bar" (bar chart), "pie" (pie chart), "number" (single number), "table" (data table), "line" (simple line), "series" (for formulas), "punchcard" (heatmap for times_of_day), "over-time" (for cohorts).'),
-      custom_period: z.union([z.string(), z.boolean(), z.null()])
+      custom_period: z.string().nullable()
         .optional()
-        .describe('Time period: "30days", "7days", "60days", "yesterday", "month", "hour", null (dashboard default), false (no override), true (use query period), or empty string "".'),
+        .describe('Time period: "30days", "7days", "60days", "yesterday", "month", "hour", null (dashboard default), "false" (no override), "true" (use query period), or empty string "".'),
       position: z.array(z.number())
         .optional()
         .describe('Widget position [x, y] in dashboard grid. Auto-positioned if not specified. Examples: [0, 0] (top-left), [4, 0] (second column), [0, 4] (first column, second row).'),
@@ -302,10 +302,10 @@ export const addDashboardWidgetTool = {
       // Drill widget specific
       drill_query: z.array(z.object({
         _id: z.string().optional(),
-        period: z.union([z.string(), z.boolean()]).optional(),
+        period: z.string().optional(),
       }))
         .optional()
-        .describe('Drill query config. Array with {_id: "bookmark_id", period: true/false}. Only for widget_type="drill".'),
+        .describe('Drill query config. Array with {_id: "bookmark_id", period: "true"/"false" as string}. Only for widget_type="drill".'),
       drill_report: z.array(z.string())
         .optional()
         .describe('Drill report IDs array. Only for widget_type="drill" or "users".'),
@@ -344,12 +344,12 @@ export const addDashboardWidgetTool = {
       // Formulas widget specific
       cmetric_refs: z.array(z.object({
         _id: z.string().optional(),
-        period: z.union([z.string(), z.boolean()]).optional(),
+        period: z.string().optional(),
         bucket: z.string().optional(),
         previous: z.boolean().optional(),
       }))
         .optional()
-        .describe('Formula metric references. Array with {_id: "formula_id", period: true, bucket: "daily", previous: false}. Only for widget_type="formulas".'),
+        .describe('Formula metric references. Array with {_id: "formula_id", period: "true" as string, bucket: "daily", previous: false}. Only for widget_type="formulas".'),
       cmetricName: z.string()
         .optional()
         .describe('Custom metric name (can be empty). Only for widget_type="formulas".'),
@@ -359,7 +359,7 @@ export const addDashboardWidgetTool = {
       statsMetric: z.string()
         .optional()
         .describe('Stats metric (usually empty). Only for widget_type="formulas".'),
-      allowPeriodOverride: z.union([z.boolean(), z.undefined()])
+      allowPeriodOverride: z.boolean()
         .optional()
         .describe('Allow period override. For drill/formulas/users widgets.'),
       // Note widget specific
@@ -376,9 +376,9 @@ export const addDashboardWidgetTool = {
       client_fetch: z.boolean()
         .optional()
         .describe('Client fetch flag. Only for widget_type="funnels".'),
-      filter_id: z.union([z.number(), z.string()])
+      filter_id: z.string()
         .optional()
-        .describe('Filter ID (0 or filter ID). Only for widget_type="funnels".'),
+        .describe('Filter ID ("0" or filter ID string). Only for widget_type="funnels".'),
       // Revenue widget specific
       revenue_type: z.string()
         .optional()
