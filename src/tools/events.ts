@@ -190,68 +190,58 @@ function getSegmentTypeDescription(type: string): string {
 
 export const createEventToolDefinition = {
   name: 'events_create',
-  description: 'Create/configure an event definition with display name and description',
+  description: 'Create or update an event definition with display name and description. Note: segments are created automatically when events are sent from SDK.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
       app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      key: { type: 'string', description: 'Event key/name' },
-      name: { type: 'string', description: 'Display name for the event' },
+      key: { type: 'string', description: 'Event key (required)' },
+      name: { type: 'string', description: 'Display name for the event (defaults to key if not provided)' },
       description: { type: 'string', description: 'Description for the event' },
-      category: { type: 'string', description: 'Optional event category' },
-      segments: { 
-        type: 'array', 
-        description: 'Array of segment definitions',
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Segment name/key' },
-            type: { type: 'string', description: 'Segment type (s=string, n=number, b=boolean, l=list, d=date in millisecond timestamp)' },
-            required: { type: 'boolean', description: 'Whether segment is required' },
-            description: { type: 'string', description: 'Segment description' }
-          }
-        }
-      },
+      category: { type: 'string', description: 'Category ID to assign the event to' },
     },
+    required: ['key'],
   },
 };
 
 export async function handleCreateEvent(context: ToolContext, args: any): Promise<ToolResult> {
   const app_id = await context.resolveAppId(args);
-  const { key, name, description, category, segments } = args;
-  
-  const eventData: any = {
-    key,
-    name,
-    description: description || '',
-    category: category || null,
-    isEditMode: false,
-    segments: segments || []
+  const { key, name, description, category } = args;
+
+  if (!key) {
+    throw new Error('Event key is required');
+  }
+
+  // Build event_map in the format expected by Countly API
+  const eventMap: Record<string, any> = {
+    [key]: {
+      name: name || key,
+      description: description || '',
+    }
   };
+
+  // Only add category if provided
+  if (category) {
+    eventMap[key].category = category;
+  }
 
   const params = {
     ...context.getAuthParams(),
     app_id,
-    event: JSON.stringify(eventData),
+    event_map: JSON.stringify(eventMap),
   };
 
   const response = await safeApiCall(
-
-
-    () => context.httpClient.get('/i/data-manager/event', { params }),
-
-
-    'Failed to execute request to /i/data-manager/event'
-
-
+    () => context.httpClient.get('/i/events/edit_map', { params }),
+    'Failed to create/update event definition'
   );
-  
+
   return {
     content: [
       {
         type: 'text',
-        text: `Event definition created for "${name}" (${key}) in app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
+        text: `Event definition created/updated for "${name || key}" (${key}) in app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
   };
