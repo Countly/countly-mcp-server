@@ -343,7 +343,7 @@ class CountlyMCPServer {
         if (authToken) {
           this.setAuthHeader(authToken);
         }
-        const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
+        const getAuthParams = () => (authToken ? { api_key: authToken } : {});
         const resources = await listResources(
           this.httpClient,
           this.appCache,
@@ -380,7 +380,7 @@ class CountlyMCPServer {
         if (authToken) {
           this.setAuthHeader(authToken);
         }
-        const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
+        const getAuthParams = () => (authToken ? { api_key: authToken } : {});
         const { uri } = request.params;
         const content = await readResource(
           uri,
@@ -469,9 +469,9 @@ class CountlyMCPServer {
 
   // Helper Methods
   private getAuthParams(): {} {
-    // Return auth_token as query param for endpoints that require it (e.g., /o/apps/mine)
+    // Return api_key as query param for endpoints that require it (e.g., /o/apps/mine)
     if (this.config.authToken) {
-      return { auth_token: this.config.authToken };
+      return { api_key: this.config.authToken };
     }
     return {};
   }

@@ -161,7 +161,7 @@ async function getAppsForCache(
     const params: any = {};
     // If auth is in headers, also try sending as query param for compatibility
     if (authHeader) {
-      params.auth_token = authHeader;
+      params.api_key = authHeader;
     }
     const response = await httpClient.get('/o/apps/mine', { params });
     
