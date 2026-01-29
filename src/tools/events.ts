@@ -248,17 +248,68 @@ export async function handleCreateEvent(context: ToolContext, args: any): Promis
 }
 
 // ============================================================================
+// DELETE_EVENTS TOOL
+// ============================================================================
+
+export const deleteEventsToolDefinition = {
+  name: 'events_delete',
+  description: 'Delete events and all their data from the application. WARNING: This action is irreversible!',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      events: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Array of event keys to delete (e.g., ["wallet_connection_failed"])'
+      },
+    },
+    required: ['events'],
+  },
+};
+
+export async function handleDeleteEvents(context: ToolContext, args: any): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(args);
+  const { events } = args;
+
+  if (!events || !Array.isArray(events) || events.length === 0) {
+    throw new Error('events parameter must be a non-empty array of event keys');
+  }
+
+  const params = {
+    ...context.getAuthParams(),
+    app_id,
+    events: JSON.stringify(events),
+  };
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/i/events/delete_events', { params }),
+    'Failed to delete events'
+  );
+
+  return {
+    content: [{
+      type: 'text',
+      text: `Successfully deleted events: ${events.join(', ')}\nApp ID: ${app_id}\nResponse: ${JSON.stringify(response.data, null, 2)}`,
+    }],
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
 export const eventsToolDefinitions = [
   createEventToolDefinition,
   getEventsAndSegmentsToolDefinition,
+  deleteEventsToolDefinition,
 ];
 
 export const eventsToolHandlers = {
   'events_create': 'createEvent',
   'events_list': 'getEventsAndSegments',
+  'events_delete': 'deleteEvents',
 } as const;
 
 export class EventsTools {
@@ -270,6 +321,10 @@ export class EventsTools {
 
   async getEventsAndSegments(args: any): Promise<ToolResult> {
     return handleGetEventsAndSegments(this.context, args);
+  }
+
+  async deleteEvents(args: any): Promise<ToolResult> {
+    return handleDeleteEvents(this.context, args);
   }
 }
 
