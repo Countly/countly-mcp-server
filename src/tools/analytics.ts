@@ -362,16 +362,8 @@ export const queryDataToolDefinition = {
       },
     },
     required: ['query_type'],
-    allOf: [
-      {
-        if: { properties: { query_type: { const: 'analytics' } } },
-        then: { required: ['method'] }
-      },
-      {
-        if: { properties: { query_type: { const: 'drill' } } },
-        then: { required: ['query_object'] }
-      }
-    ]
+    // Note: Conditional validation (method required for analytics, query_object for drill)
+    // is handled in handleQueryData() to avoid Claude API schema limitations
   },
 };
 
