@@ -33,11 +33,11 @@ describe('Events Tools', () => {
 
       expect(mockContext.resolveAppId).toHaveBeenCalledWith({ app_id: 'app123', key: 'test_event', name: 'Test Event' });
       expect(mockContext.httpClient.get).toHaveBeenCalledWith(
-        '/i/data-manager/event',
+        '/i/events/edit_map',
         expect.objectContaining({
           params: expect.objectContaining({
             app_id: 'app123',
-            event: expect.stringContaining('"key":"test_event"')
+            event_map: expect.stringContaining('"test_event"')
           })
         })
       );
@@ -66,11 +66,11 @@ describe('Events Tools', () => {
         category: 'ecommerce'
       });
       expect(mockContext.httpClient.get).toHaveBeenCalledWith(
-        '/i/data-manager/event',
+        '/i/events/edit_map',
         expect.objectContaining({
           params: expect.objectContaining({
             app_id: 'app123',
-            event: expect.stringContaining('"key":"purchase_event"')
+            event_map: expect.stringContaining('"purchase_event"')
           })
         })
       );
