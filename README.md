@@ -86,6 +86,39 @@ Before starting, ensure you have:
 - Node.js 18+ (for local installation) OR Docker (recommended)
 - MCP client supporting protocol version 2025-03-26 (Streamable HTTP)
 
+### Using npx (No Installation)
+
+Run the published package directly with `npx` — no clone or build required:
+
+```bash
+# stdio mode (for MCP clients like Claude Desktop, VS Code)
+COUNTLY_SERVER_URL=https://your-countly-instance.com \
+COUNTLY_AUTH_TOKEN=your-countly-auth-token \
+npx -y countly-mcp-server
+
+# HTTP mode
+COUNTLY_SERVER_URL=https://your-countly-instance.com \
+COUNTLY_AUTH_TOKEN=your-countly-auth-token \
+npx -y countly-mcp-server --http
+```
+
+Example MCP client configuration (stdio):
+
+```json
+{
+  "mcpServers": {
+    "countly": {
+      "command": "npx",
+      "args": ["-y", "countly-mcp-server"],
+      "env": {
+        "COUNTLY_SERVER_URL": "https://your-countly-instance.com",
+        "COUNTLY_AUTH_TOKEN": "your-countly-auth-token"
+      }
+    }
+  }
+}
+```
+
 ### Using Docker (Recommended)
 
 1. **Create a token file:**
