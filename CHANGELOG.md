@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **npx execution support** (#107): The server can now be run directly via `npx countly-mcp-server` without cloning or building. Exposed `build/index.js` as a `bin` entry in `package.json` and added a `prepack` script so the published tarball always contains a freshly built entrypoint. README documents the new usage path with an example MCP client configuration.
-- **Events module**: new `events_delete` tool (#47) — deletes events and all their data for an application via `/i/events/delete_events`.
+- **Events module**: new `events_delete` tool (#47): deletes events and all their data for an application via `/i/events/delete_events`.
 
 ### Fixed
 - **Schema compatibility**: replaced `z.union` with simple types in dashboard widget schemas to match MCP client expectations.
@@ -273,5 +273,7 @@ Initial release of Countly MCP Server.
 - Comprehensive test suite
 - GitHub Actions CI/CD integration
 
+[1.2.0]: https://github.com/Countly/countly-mcp-server/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Countly/countly-mcp-server/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Countly/countly-mcp-server/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Countly/countly-mcp-server/releases/tag/v1.0.0
