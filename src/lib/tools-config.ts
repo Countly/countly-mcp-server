@@ -83,6 +83,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     operations: {
       'events_create': 'C',
       'events_list': 'R',
+      'events_delete': 'D',
     },
     availableByDefault: true,
   },
