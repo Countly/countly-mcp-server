@@ -7,15 +7,15 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getSDKStatsToolDefinition = {
   name: 'sdk_stats_get',
-  description: 'Get statistics about SDKs sending data to the server. Shows SDK names, versions, request type breakdown, and health check information.',
+  description: 'Get per-SDK usage statistics for an app (SDK names, versions, request-type breakdown, health checks) via /o?method=sdks. Requires the sdks plugin. For the SDK configuration sent back to clients use sdk_config_get.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds]',
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".',
         default: '30days'
       },
     },
@@ -54,12 +54,12 @@ export async function handleGetSDKStats(context: ToolContext, args: any): Promis
 
 export const getSDKConfigToolDefinition = {
   name: 'sdk_config_get',
-  description: 'Get SDK configuration settings passed to SDKs to control their behavior. Shows enabled features, tracking settings, and other SDK control parameters.',
+  description: 'Get the SDK configuration object Countly serves to client SDKs for this app (feature flags, tracking toggles, rate limits) via /o?method=sdk-config. Requires the sdks plugin. For per-SDK traffic stats use sdk_stats_get.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };

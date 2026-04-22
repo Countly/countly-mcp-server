@@ -7,12 +7,12 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const createAppUserToolDefinition = {
   name: 'app_users_create',
-  description: 'Create a new app user (end-user of your application being tracked by Countly)',
+  description: 'Create an app-user profile (end-user tracked in the app, keyed by device ID) via /i/app_users/create. This is for end-user profiles; to create a Countly dashboard/admin login, that is not exposed here.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       data: { 
         type: 'object',
         description: 'User profile data object containing standard and/or custom fields',
@@ -105,12 +105,12 @@ export async function handleCreateAppUser(context: ToolContext, args: any): Prom
 
 export const editAppUserToolDefinition = {
   name: 'app_users_update',
-  description: 'Update existing app user(s) using MongoDB query and update operations. Allows bulk updates matching specific criteria.',
+  description: 'Update app-user profiles matching a MongoDB query via /i/app_users/update, using MongoDB update operators ($set, $inc, $push, etc.). Can affect many users at once. To read user data use user_profiles_query.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       query: {
         type: 'object',
         description: 'MongoDB query object to find users to update. Examples: {"uid": "user123"} to update specific user, {"custom.plan": "free"} to update all free plan users, {} to update all users (use with caution)',
@@ -200,21 +200,21 @@ export async function handleEditAppUser(context: ToolContext, args: any): Promis
 
 export const deleteAppUserToolDefinition = {
   name: 'app_users_delete',
-  description: 'Delete app user(s) matching a MongoDB query. Can delete single or multiple users based on the query criteria.',
+  description: 'Delete app-user profiles matching a MongoDB query via /i/app_users/delete. By default rejects multi-match deletions unless force=true. WARNING: irreversible.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      query: { 
-        type: 'object', 
-        description: 'MongoDB query object to find users to delete. Examples: {"uid": "user123"} to delete specific user, {"custom.plan": "expired"} to delete all users with expired plan, {"did": "device-id"} to delete by device ID',
-        additionalProperties: true 
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      query: {
+        type: 'object',
+        description: 'MongoDB query object selecting which users to delete. Examples: {"uid":"user123"} (one user), {"custom.plan":"expired"} (all users with expired plan), {"did":"device-id"} (by device ID). Use force=true for multi-match.',
+        additionalProperties: true
       },
-      force: { 
-        type: 'boolean', 
-        description: 'Force delete if multiple users match the query. Set to true to allow deletion of multiple users at once.', 
-        default: false 
+      force: {
+        type: 'boolean',
+        description: 'When true, allow deleting more than one matching user. Defaults to false.',
+        default: false
       },
     },
   },

@@ -15,36 +15,36 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const listCohortsToolDefinition = {
   name: 'cohorts_list',
-  description: 'List all user cohorts with filtering and pagination. Cohorts are groups of users based on behavior or manually created segments.',
+  description: 'List user cohorts (behavioral or manual user groupings) with pagination, type filter, and name search. Requires the cohorts plugin. For historical size data of a specific cohort use cohorts_data.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       type: {
         type: 'string',
         enum: ['auto', 'manual'],
-        description: 'Filter by cohort type (auto for behavioral cohorts, manual for manually created cohorts)',
+        description: 'Restrict results by cohort type: "auto" (behavioral, rebuilt continuously) or "manual" (static user lists). Omit for both.',
       },
       skip: {
         type: 'number',
-        description: 'Number of records to skip for pagination',
+        description: 'Number of records to skip for pagination. Defaults to 0.',
         default: 0,
       },
       limit: {
         type: 'number',
-        description: 'Maximum number of records to return',
+        description: 'Maximum number of records to return. Defaults to 10.',
         default: 10,
       },
       search: {
         type: 'string',
-        description: 'Search term to filter cohorts by name',
+        description: 'Case-insensitive substring filter on cohort name.',
       },
     },
   },
@@ -96,25 +96,25 @@ export async function handleListCohorts(
 
 export const getCohortDataToolDefinition = {
   name: 'cohorts_data',
-  description: 'Get cohort data over a time period.',
+  description: 'Get time-series membership data for a single cohort over a period (how the cohort population evolved). Requires the cohorts plugin. To list available cohorts use cohorts_list.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       cohort_id: {
         type: 'string',
-        description: 'Cohort ID to retrieve data for',
+        description: 'Cohort identifier to retrieve data for. Obtain it from cohorts_list.',
       },
       period: {
         type: 'string',
-        description: 'Period string for data (e.g., "12months", "30days")',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", "12months", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "12months".',
         default: '12months',
       },
     },
@@ -156,46 +156,46 @@ export async function handleGetCohortData(
 
 export const createCohortToolDefinition = {
   name: 'cohorts_create',
-  description: 'Create a new behavioral cohort based on user actions and properties. Define steps with events users did or did not perform, with time periods and filters.',
+  description: 'Create a behavioral cohort from event-based steps plus optional user-property filters via /i/cohorts/add. Requires the cohorts plugin. For editing an existing cohort use cohorts_update.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       name: {
         type: 'string',
-        description: 'Cohort name',
+        description: 'Cohort display name.',
       },
       description: {
         type: 'string',
-        description: 'Cohort description',
+        description: 'Free-form cohort description shown in the UI.',
       },
       visibility: {
         type: 'string',
         enum: ['global', 'private'],
-        description: 'Cohort visibility (global = visible to all, private = only to creator)',
+        description: 'Who can see the cohort: "global" (all dashboard users) or "private" (only the creator). Defaults to "global".',
         default: 'global',
       },
       steps: {
         type: 'string',
-        description: 'JSON string array of behavioral steps. Each step must have: type ("did" or "didnot"), event (event key like "[CLY]_session" or "[CLY]_view"), times (JSON string like "{\\"$gte\\":1}"), period (like "7days" or "0days" for all time), query (MongoDB filter JSON string for additional filters like "{\\"up.av\\":{\\"$in\\":[\\"5:10:0\\"]}}"), queryText (human readable description), group (step group number starting from 0), conj ("and" or "or" conjunction)',
+        description: 'JSON-encoded array of behavioral steps. Each step has: type ("did" or "didnot"), event (event key e.g. "[CLY]_session" or "[CLY]_view"), times (JSON string e.g. "{\\"$gte\\":1}"), period (e.g. "7days" or "0days" for all time), query (MongoDB filter JSON string e.g. "{\\"up.av\\":{\\"$in\\":[\\"5:10:0\\"]}}"), queryText (human-readable label), group (step-group number starting at 0), conj ("and" or "or").',
       },
       user_segmentation: {
         type: 'string',
-        description: 'Optional JSON string with additional user property filters. Format: {"query": {...MongoDB filter...}, "queryText": "human readable description"}',
+        description: 'Optional JSON-encoded user-property filter: {"query":{<MongoDB filter>},"queryText":"<description>"}. Applied in addition to the behavioral steps.',
       },
       shared_email_edit: {
         type: 'array',
         items: {
           type: 'string',
         },
-        description: 'Array of email addresses to share edit access with',
+        description: 'Email addresses of dashboard users granted edit access. Defaults to [].',
         default: [],
       },
     },
@@ -281,49 +281,49 @@ export async function handleCreateCohort(
 
 export const updateCohortToolDefinition = {
   name: 'cohorts_update',
-  description: 'Update an existing cohort configuration including name, description, steps, and sharing settings.',
+  description: 'Update an existing cohort via /i/cohorts/edit. Only supplied fields change; others are preserved from the current cohort. Requires the cohorts plugin.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       cohort_id: {
         type: 'string',
-        description: 'Cohort ID to update',
+        description: 'Cohort identifier to update. Obtain it from cohorts_list.',
       },
       name: {
         type: 'string',
-        description: 'New cohort name',
+        description: 'New cohort name. Omit to keep current.',
       },
       description: {
         type: 'string',
-        description: 'New cohort description',
+        description: 'New cohort description. Omit to keep current.',
       },
       visibility: {
         type: 'string',
         enum: ['global', 'private'],
-        description: 'Cohort visibility',
+        description: 'New visibility: "global" (everyone) or "private" (creator only). Omit to keep current.',
       },
       steps: {
         type: 'string',
-        description: 'JSON string array of behavioral steps (same format as cohorts_create)',
+        description: 'JSON-encoded behavioral steps array (same schema as cohorts_create.steps). Omit to keep current.',
       },
       user_segmentation: {
         type: 'string',
-        description: 'JSON string with user property filters',
+        description: 'JSON-encoded user-property filter {"query":{...},"queryText":"..."}. Omit to keep current.',
       },
       shared_email_edit: {
         type: 'array',
         items: {
           type: 'string',
         },
-        description: 'Array of email addresses to share edit access with',
+        description: 'Email addresses granted edit access. Omit to keep current list.',
       },
     },
     required: ['cohort_id'],
@@ -448,21 +448,21 @@ export async function handleUpdateCohort(
 
 export const deleteCohortToolDefinition = {
   name: 'cohorts_delete',
-  description: 'Delete a cohort. This action cannot be undone.',
+  description: 'Delete a cohort definition via /i/cohorts/delete. Requires the cohorts plugin. WARNING: irreversible.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       cohort_id: {
         type: 'string',
-        description: 'Cohort ID to delete',
+        description: 'Cohort identifier to delete. Obtain it from cohorts_list.',
       },
     },
     required: ['cohort_id'],

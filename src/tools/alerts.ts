@@ -7,12 +7,12 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const createAlertToolDefinition = {
   name: 'alerts_create',
-  description: 'Create or update an alert configuration. Supports various alert types including crashes, sessions, users, events, views, and more.',
+  description: 'Create or update an alert (threshold monitor on crashes, sessions, users, events, views, cohorts, NPS, ratings, revenue, etc.) via /i/alert/save. Requires the alerts plugin. Pass an existing alert_config._id to update; omit or null to create. Delivery is email or webhook.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Target app ID of the alert (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       alert_config: { 
         type: 'object',
         description: 'Alert configuration object',
@@ -132,13 +132,13 @@ export async function handleCreateAlert(context: ToolContext, args: any): Promis
 
 export const deleteAlertToolDefinition = {
   name: 'alerts_delete',
-  description: 'Delete an alert',
+  description: 'Delete an alert configuration via /i/alert/delete. Requires the alerts plugin. WARNING: irreversible. To temporarily disable instead, update the alert with enabled=false via alerts_create.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      alert_id: { type: 'string', description: 'Alert ID to delete' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      alert_id: { type: 'string', description: 'Alert identifier to delete. Obtain it from alerts_list.' },
     },
   },
 };
@@ -174,12 +174,12 @@ export async function handleDeleteAlert(context: ToolContext, args: any): Promis
 
 export const listAlertsToolDefinition = {
   name: 'alerts_list',
-  description: 'List all alerts for an application',
+  description: 'List configured alerts for an app via /o/alert/list (names, monitored metrics, thresholds, delivery channels, enabled state). Requires the alerts plugin.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };

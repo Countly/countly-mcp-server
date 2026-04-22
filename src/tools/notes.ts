@@ -7,18 +7,18 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const createNoteToolDefinition = {
   name: 'notes_create',
-  description: 'Create a new note',
+  description: 'Create a timestamped note on an app (annotation that appears on dashboard graphs) via /i/notes/save. Notes are handy for marking releases, incidents, or campaigns.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      note: { type: 'string', description: 'Note content text' },
-      ts: { type: 'number', description: 'Timestamp for the note (Unix timestamp in seconds)' },
-      noteType: { type: 'string', description: 'Note type (e.g., "public", "private")' },
-      color: { type: 'string', description: 'Note color (e.g., "blue", "red", "green", "yellow")', enum: ['turquoise', 'yellow', 'orange', 'pink', 'blue'] },
-      category: { type: 'string', description: 'Optional category (e.g., "sessionHomeWidget" to display on session dashboard graph)' },
-      emails: { type: 'array', items: { type: 'string' }, description: 'Optional array of email addresses' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      note: { type: 'string', description: 'Note body text shown in the dashboard.' },
+      ts: { type: 'number', description: 'Note anchor timestamp. Unix seconds (< 10^10) are auto-converted to milliseconds; milliseconds are passed through.' },
+      noteType: { type: 'string', description: 'Visibility tier, typically "public" or "private".' },
+      color: { type: 'string', description: 'Badge color. One of "turquoise", "yellow", "orange", "pink", "blue".', enum: ['turquoise', 'yellow', 'orange', 'pink', 'blue'] },
+      category: { type: 'string', description: 'Optional placement category, e.g. "sessionHomeWidget" to pin the note on the session dashboard graph.' },
+      emails: { type: 'array', items: { type: 'string' }, description: 'Optional email addresses to notify.' },
     },
   },
 };
@@ -83,16 +83,16 @@ export async function handleCreateNote(context: ToolContext, args: any): Promise
 
 export const listNotesToolDefinition = {
   name: 'notes_list',
-  description: 'List all notes for an application within a time period',
+  description: 'List dashboard notes (annotations) for an app within a time period via /o?method=notes. String periods are converted to [start,end] millisecond ranges by the tool. To add a note use notes_create.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")', 
-        default: '30days' 
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Defaults to "30days".',
+        default: '30days'
       },
     },
   },
@@ -160,11 +160,11 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
 
 export const deleteNoteToolDefinition = {
   name: 'notes_delete',
-  description: 'Delete a note',
+  description: 'Delete a single note by its _id via /i/notes/delete. WARNING: irreversible. Unlike other tools in this file, this endpoint is app-agnostic and does not require app_id.',
   inputSchema: {
     type: 'object',
     properties: {
-      note_id: { type: 'string', description: 'Note ID to delete' },
+      note_id: { type: 'string', description: 'Note identifier (_id) to delete. Obtain it from notes_list.' },
     },
     required: ['note_id'],
   },

@@ -7,57 +7,57 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const runFormulaToolDefinition = {
   name: 'formulas_run',
-  description: 'Run a formula calculation on number properties using mathematical equations. Formulas can combine various metrics like sessions, events, users with filters and segments. IMPORTANT: Each variable must be a separate formula object in the array, not all variables in one object.',
+  description: 'Execute a calculated-metric formula combining sessions, users, events, and numeric values with filters and segments, via /o?method=calculated_metrics. Requires the formulas plugin. IMPORTANT: each variable is a SEPARATE object in the formula array (not all variables inside one object). To persist a formula use formulas_save.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       formula: {
         type: 'string',
-        description: 'Formula definition as JSON string. MUST be an array where EACH VARIABLE is a SEPARATE object (not all variables in one object). Each formula object contains: id (number), variables (array with single variable object). Each variable object MUST include: id (number), symbol (string: "A", "B", etc.), selectedFunction (string: "number-of-sessions", "number-of-users", "event-count", etc.), selectedEvent (string: event key or empty), selectedSegment (string: segment or empty), selectedCohort (string: cohort or empty), selectedNumericValue (number: 0), selectedOperator (string: "add"), queryWrapper (object: {"query":{},"queryText":""}), group (object: {"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0}), ex (object: {"_do":"numberOf","_args":["sessions"|"users"|etc]}). Example for sessions/users: [{"id":0,"variables":[{"id":0,"symbol":"A","selectedFunction":"number-of-sessions","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["sessions"]}}]},{"id":1,"variables":[{"id":1,"symbol":"B","selectedFunction":"number-of-users","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["users"]}}]}]'
+        description: 'Formula as a JSON-encoded array; EACH VARIABLE is its own formula object. Every formula has: id (number), variables (one-element array). Each variable has: id (number), symbol ("A","B",...), selectedFunction ("number-of-sessions", "number-of-users", "event-count", ...), selectedEvent (event key or ""), selectedSegment ("" if none), selectedCohort ("" if none), selectedNumericValue (0), selectedOperator ("add"), queryWrapper ({"query":{},"queryText":""}), group ({"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0}), ex ({"_do":"numberOf","_args":["sessions"]}). Example (sessions/users): [{"id":0,"variables":[{"id":0,"symbol":"A","selectedFunction":"number-of-sessions","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["sessions"]}}]},{"id":1,"variables":[{"id":1,"symbol":"B","selectedFunction":"number-of-users","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["users"]}}]}]'
       },
       period: {
         type: 'string',
-        description: 'Time period for calculation. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range. Defaults to "30days".'
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".'
       },
       bucket: {
         type: 'string',
-        description: 'Time bucket breakdown as JSON array string. Options: ["daily"], ["weekly"], ["monthly"], ["single"], or combinations like ["daily","weekly","monthly","single"]. Defaults to ["single"].'
+        description: 'Time-bucket breakdown as a JSON-encoded array. Options: ["daily"], ["weekly"], ["monthly"], ["single"], or combinations. Defaults to \'["single"]\'.'
       },
       format: {
         type: 'string',
         enum: ['float', 'integer', 'percentage'],
-        description: 'Result format type. Defaults to "float".'
+        description: 'Result formatting. Defaults to "float".'
       },
       dplaces: {
         type: 'number',
-        description: 'Number of decimal places for the result. Defaults to 2.'
+        description: 'Number of decimal places to round to. Defaults to 2.'
       },
       unit: {
         type: 'string',
-        description: 'Unit of measurement for the result (e.g., "%", "$", "ms"). Defaults to empty string.'
+        description: 'Display unit (e.g. "%", "$", "ms"). Defaults to empty string.'
       },
       previous: {
         type: 'boolean',
-        description: 'Include previous period for comparison. Defaults to true.'
+        description: 'When true, also compute the previous period for comparison. Defaults to true.'
       },
       allow_longtask: {
         type: 'boolean',
-        description: 'Allow running longer than nginx timeout. Defaults to false.'
+        description: 'When true, permit execution beyond the nginx timeout (server may queue as a long task). Defaults to false.'
       },
       mode: {
         type: 'string',
         enum: ['unsaved', 'saved'],
-        description: 'Whether to save the formula for later use. Defaults to "unsaved".'
+        description: '"unsaved" runs ad-hoc; "saved" also persists the formula (supply formulaMeta). Defaults to "unsaved".'
       },
       report_name: {
         type: 'string',
-        description: 'Report name if the task runs longer than nginx timeout. Optional.'
+        description: 'Report name used when allow_longtask produces a background task. Optional.'
       },
       formulaMeta: {
         type: 'string',
-        description: 'Formula metadata as JSON string if mode is "saved". Should include: name, description, key, visibility ("private" or "public"), format, dplaces, unit, sharedEmailEdit array. Example: {"name":"My Formula","description":"","key":"my_formula","visibility":"private","format":"float","dplaces":2,"unit":"","sharedEmailEdit":[]}'
+        description: 'Required when mode="saved". JSON string with {name, description, key, visibility ("private"|"public"), format, dplaces, unit, sharedEmailEdit}. Example: \'{"name":"My Formula","description":"","key":"my_formula","visibility":"private","format":"float","dplaces":2,"unit":"","sharedEmailEdit":[]}\'.'
       },
     },
     required: ['formula'],
@@ -123,12 +123,12 @@ export async function handleRunFormula(context: ToolContext, args: any): Promise
 
 export const listFormulasToolDefinition = {
   name: 'formulas_list',
-  description: 'List all saved formulas for an application.',
+  description: 'List saved calculated-metric formulas for an app (metadata and definitions) via /o/calculated_metrics/metrics. Requires the formulas plugin. To run a formula use formulas_run.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -175,15 +175,15 @@ export async function handleListFormulas(context: ToolContext, args: any): Promi
 
 export const deleteFormulaToolDefinition = {
   name: 'formulas_delete',
-  description: 'Delete a saved formula by its ID.',
+  description: 'Delete a saved calculated-metric formula by _id via /i/calculated_metrics/delete. Requires the formulas plugin. WARNING: irreversible.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       formula_id: {
         type: 'string',
-        description: 'The ID of the formula to delete',
+        description: 'Formula identifier (_id) to delete. Obtain it from formulas_list.',
       },
     },
     required: ['formula_id'],
@@ -220,55 +220,55 @@ export async function handleDeleteFormula(context: ToolContext, args: any): Prom
 
 export const saveFormulaToolDefinition = {
   name: 'formulas_save',
-  description: 'Save a formula for later use. The formula will be stored and can be retrieved using formulas_list.',
+  description: 'Persist a calculated-metric formula for later reuse (listable via formulas_list, runnable via formulas_run). Posts to /i/calculated_metrics/save. Requires the formulas plugin.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       title: {
         type: 'string',
-        description: 'Human-readable title for the formula (e.g., "Sessions per User")'
+        description: 'Display title for the saved formula (e.g. "Sessions per User").'
       },
       description: {
         type: 'string',
-        description: 'Optional description of what the formula calculates',
+        description: 'Optional free-form description. Defaults to empty string.',
         default: ''
       },
       key: {
         type: 'string',
-        description: 'Unique identifier key for the formula (e.g., "sessions_per_user"). Use "unnamed_formula" if not specified.',
+        description: 'Stable slug identifier (e.g. "sessions_per_user"). Defaults to "unnamed_formula".',
         default: 'unnamed_formula'
       },
       visibility: {
         type: 'string',
         enum: ['private', 'public'],
-        description: 'Visibility of the formula. "private" (only you) or "public" (shared with team)',
+        description: 'Who can see the formula: "private" (owner only) or "public" (shared with team). Defaults to "private".',
         default: 'private'
       },
       format: {
         type: 'string',
         enum: ['float', 'integer', 'percentage'],
-        description: 'Result format type',
+        description: 'Result format. Defaults to "float".',
         default: 'float'
       },
       dplaces: {
         type: 'number',
-        description: 'Number of decimal places for the result',
+        description: 'Decimal places to round to. Defaults to 2.',
         default: 2
       },
       unit: {
         type: 'string',
-        description: 'Unit of measurement (e.g., "%", "$", "ms")',
+        description: 'Display unit (e.g. "%", "$", "ms"). Defaults to empty string.',
         default: ''
       },
       formula: {
         type: 'string',
-        description: 'Formula definition as JSON string. MUST be an array where EACH VARIABLE is a SEPARATE object. Same format as formulas_run tool. Example: [{"id":0,"variables":[{"id":0,"symbol":"A","selectedFunction":"number-of-sessions","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["sessions"]}}]},{"id":1,"variables":[{"id":1,"symbol":"B","selectedFunction":"number-of-users","selectedEvent":"","selectedSegment":"","selectedCohort":"","selectedNumericValue":0,"selectedOperator":"add","queryWrapper":{"query":{},"queryText":""},"group":{"id":0,"parentId":0,"attemptFrom":false,"previewId":false,"lpt":false,"rpt":false,"before":0,"after":0},"ex":{"_do":"numberOf","_args":["users"]}}]}]'
+        description: 'Formula definition as a JSON-encoded array. Same structure as formulas_run.formula (one variable per formula object). See formulas_run for a full example.'
       },
       shared_email_edit: {
         type: 'array',
-        description: 'Array of email addresses for users who can edit this formula',
+        description: 'Email addresses of dashboard users granted edit access when visibility is "public". Defaults to [].',
         items: { type: 'string' },
         default: []
       },

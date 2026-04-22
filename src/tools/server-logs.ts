@@ -17,14 +17,14 @@ import type { ToolContext } from './types.js';
  */
 export const listServerLogFilesTool = {
   name: 'server_logs_files_list',
-  description: 'List available server log files. Only available in non-Docker deployments. Returns list of log files that can be viewed.',
+  description: 'List server-side log files available via /o/errorlogs (api, dashboard, jobs, etc.) on non-Docker Countly deployments. Requires the errorlogs plugin. To read a log, use server_logs_contents.',
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
   }),
 };
 
@@ -58,20 +58,20 @@ async function handleListServerLogFiles(args: z.infer<typeof listServerLogFilesT
  */
 export const getServerLogContentsTool = {
   name: 'server_logs_contents',
-  description: 'Get contents of a specific server log file. Only available in non-Docker deployments. Retrieve log entries for debugging and monitoring.',
+  description: 'Read the tail of a Countly server log file via /o/errorlogs. Returns up to "bytes" bytes for debugging. Requires the errorlogs plugin (non-Docker deployments only). Not to be confused with sdk_logs_list (SDK request logs).',
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
     log: z.string()
-      .describe('Log file name to retrieve (e.g., "api", "dashboard", "jobs"). Use server_logs_files_list to see available logs.'),
+      .describe('Log file name, e.g. "api", "dashboard", "jobs". Discover valid names via server_logs_files_list.'),
     bytes: z.number()
       .optional()
       .default(100000)
-      .describe('Number of bytes to retrieve from the log file (default: 100000). Larger values return more log content.'),
+      .describe('Number of trailing bytes to return. Defaults to 100000. Larger values return more log history.'),
   }),
 };
 

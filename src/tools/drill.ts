@@ -8,21 +8,21 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getAvailableFieldsToolDefinition = {
   name: 'queriable_fields_list',
-  description: 'List all available fields for querying: user properties (use exact field names with prefixes), event segments (when event specified), and system fields (always available). Use these exact field names in run_query.',
+  description: 'List queryable fields for an app: user properties (up.*), custom properties (custom.*), campaign properties (cmp.*), and (when event is supplied) that event\'s segments; plus the always-available system fields (c, s, dur, did). Requires the drill plugin. Use before building a query_data "drill" query_object. For a full event catalog use metadata_get.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
       event: {
         type: 'string',
-        description: 'Event key to get event-specific segments in addition to user properties. Always include this when analyzing a specific event.'
+        description: 'Optional event key (e.g. "[CLY]_session", "[CLY]_view", or a custom event). When provided, returns that event\'s segment fields in addition to user/custom/campaign properties.'
       },
     },
     required: [],
@@ -153,29 +153,29 @@ function getTypeDescription(type: string): string {
 
 export const listDrillBookmarksToolDefinition = {
   name: 'drill_bookmarks_list',
-  description: 'List all existing drill bookmarks for a specific event',
+  description: 'List saved drill bookmarks (persisted drill query definitions) for an event. Requires the drill plugin. To create one use drill_bookmarks_create; to remove one use drill_bookmarks_delete.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
       event_key: {
         type: 'string',
-        description: 'Event key to list bookmarks for (e.g., "[CLY]_session" for sessions)',
+        description: 'Event key the bookmarks belong to (e.g. "[CLY]_session", "[CLY]_view", or a custom event). Defaults to "[CLY]_session" when omitted.',
       },
       namespace: {
         type: 'string',
-        description: 'Namespace for bookmarks (default: "drill")',
+        description: 'Bookmark namespace. Defaults to "drill".',
       },
       app_level: {
         type: 'string',
-        description: 'App level filter (default: "1")',
+        description: 'Include app-level bookmarks filter flag. Defaults to "1".',
       },
     },
     required: [],
@@ -233,57 +233,57 @@ export async function handleListDrillBookmarks(context: ToolContext, args: any):
 
 export const createDrillBookmarkToolDefinition = {
   name: 'drill_bookmarks_create',
-  description: 'Create a new drill bookmark to save a query for later reuse',
+  description: 'Save a drill query as a reusable bookmark (event, filter, breakdown, visualization) via /i/drill/add_bookmark. Requires the drill plugin. To list existing bookmarks use drill_bookmarks_list.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
       event_key: {
         type: 'string',
-        description: 'Event key for the bookmark (e.g., "[CLY]_session" for sessions)',
+        description: 'Event key this bookmark targets (e.g. "[CLY]_session", "[CLY]_view", or a custom event).',
       },
       name: {
         type: 'string',
-        description: 'Name of the bookmark',
+        description: 'Display name for the bookmark.',
       },
       query_obj: {
         type: 'string',
-        description: 'MongoDB query object as JSON string (e.g., \'{"up.country":"US"}\' or \'{}\')',
+        description: 'MongoDB-style query as a JSON string (e.g. \'{"up.country":"US"}\'). Defaults to \'{}\'.',
       },
       query_text: {
         type: 'string',
-        description: 'Human-readable query description (optional)',
+        description: 'Optional human-readable label for the query, shown in the UI.',
       },
       by_val: {
         type: 'string',
-        description: 'Projection/breakdown values as JSON array string (e.g., \'["av"]\' or \'[]\'), default: "[]"',
+        description: 'Breakdown/projection keys as a JSON array string (e.g. \'["av"]\'). Defaults to \'[]\'.',
       },
       by_val_text: {
         type: 'string',
-        description: 'Human-readable breakdown description (optional)',
+        description: 'Optional human-readable label for the breakdown.',
       },
       desc: {
         type: 'string',
-        description: 'Description of the bookmark (optional)',
+        description: 'Optional free-form description.',
       },
       global: {
         type: 'boolean',
-        description: 'Whether bookmark is global (visible to all users), default: false',
+        description: 'When true, the bookmark is visible to all dashboard users. Defaults to false.',
       },
       namespace: {
         type: 'string',
-        description: 'Namespace for bookmark (default: "drill")',
+        description: 'Bookmark namespace. Defaults to "drill".',
       },
       visualization: {
         type: 'string',
-        description: 'Visualization type (e.g., "timeSeries", "table"), default: "timeSeries"',
+        description: 'Default visualization (e.g. "timeSeries", "table"). Defaults to "timeSeries".',
       },
     },
     required: ['event_key', 'name'],
@@ -356,21 +356,21 @@ export async function handleCreateDrillBookmark(context: ToolContext, args: any)
 
 export const deleteDrillBookmarkToolDefinition = {
   name: 'drill_bookmarks_delete',
-  description: 'Delete a drill bookmark',
+  description: 'Delete a saved drill bookmark via /i/drill/delete_bookmark. Requires the drill plugin. WARNING: irreversible.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
       bookmark_id: {
         type: 'string',
-        description: 'ID of the bookmark to delete',
+        description: 'Bookmark identifier (_id) to delete. Obtain it from drill_bookmarks_list.',
       },
     },
     required: ['bookmark_id'],
@@ -408,17 +408,17 @@ export async function handleDeleteDrillBookmark(context: ToolContext, args: any)
 
 export const getMetadataToolDefinition = {
   name: 'metadata_get',
-  description: 'Get comprehensive metadata for all events, segments, and properties in an app. Includes user properties, custom properties, campaign properties, and event-specific segments if drill plugin is available.',
+  description: 'Get a consolidated metadata report for an app: custom events, built-in events ([CLY]_session, [CLY]_view, [CLY]_crash, [CLY]_push_action) with their segments, plus system fields. When the drill plugin is available, also includes user, custom, and campaign properties and custom-event segments. Requires the drill plugin (metadata is richer, though the tool degrades gracefully). For just field names use queriable_fields_list; for the event catalog alone use events_list.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
     },
     required: [],

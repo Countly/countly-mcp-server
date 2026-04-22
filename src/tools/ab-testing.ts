@@ -80,13 +80,13 @@ async function ensureRemoteConfigParameters(
 
 export const listABExperimentsToolDefinition = {
   name: 'ab_experiments_list',
-  description: 'List all A/B testing experiments for an application. Shows experiment names, statuses, variants, and results.',
+  description: 'List A/B testing experiments for an app (names, statuses, variants, and optionally computed results). Requires the ab-testing plugin. For full per-experiment detail use ab_experiments_details.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      skipCalculation: { type: 'boolean', description: 'Skip calculation of results for better performance', default: true },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      skipCalculation: { type: 'boolean', description: 'When true, skip result aggregation for faster listing. Defaults to true.', default: true },
     },
   },
 };
@@ -123,13 +123,13 @@ export async function handleListABExperiments(context: ToolContext, args: any): 
 
 export const getABExperimentDetailToolDefinition = {
   name: 'ab_experiments_details',
-  description: 'Get detailed information about a specific A/B testing experiment including variants, results, goals, and statistical significance.',
+  description: 'Get full details for one A/B testing experiment via /o/ab-testing/experiment-detail (variants, goals, per-variant results, statistical significance). Requires the ab-testing plugin. For a summary across experiments use ab_experiments_list.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      experiment_id: { type: 'string', description: 'Experiment ID to retrieve details for' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      experiment_id: { type: 'string', description: 'Experiment identifier. Obtain it from ab_experiments_list.' },
     },
     required: ['experiment_id'],
   },
@@ -165,75 +165,75 @@ export async function handleGetABExperimentDetail(context: ToolContext, args: an
 
 export const createABExperimentToolDefinition = {
   name: 'ab_experiments_create',
-  description: 'Create a new A/B testing experiment with multiple variants, user targeting, and goals. Used for testing different features, UI elements, or configurations.',
+  description: 'Create an A/B testing experiment with variants, user targeting, and optional goals. Requires the ab-testing plugin. Creates the experiment in draft; call ab_experiments_start to begin serving variants. For remote-config experiments, missing remote-config parameters referenced by variants are auto-created.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      name: { type: 'string', description: 'Experiment name' },
-      description: { type: 'string', description: 'Experiment description' },
-      type: { type: 'string', enum: ['remote-config', 'code'], default: 'remote-config', description: 'Experiment type' },
-      show_target_users: { type: 'boolean', default: true, description: 'Whether to show target users configuration' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      name: { type: 'string', description: 'Human-readable experiment name shown in the dashboard.' },
+      description: { type: 'string', description: 'Free-form description of what the experiment tests.' },
+      type: { type: 'string', enum: ['remote-config', 'code'], default: 'remote-config', description: 'Experiment delivery mechanism: "remote-config" (served via remote-config parameters) or "code" (client-side flag). Defaults to "remote-config".' },
+      show_target_users: { type: 'boolean', default: true, description: 'Whether the experiment UI shows the targeting block. Defaults to true.' },
       target_users: {
         type: 'object',
         properties: {
-          percentage: { type: 'string', description: 'Percentage of users to include (e.g., "50" for 50%)' },
-          byVal: { type: 'array', items: { type: 'string' }, description: 'Array of user IDs to target' },
-          byValText: { type: 'string', description: 'Text representation of targeted user IDs' },
-          condition: { type: 'object', description: 'MongoDB query for user conditions (e.g., {"up.age": {"$gt": 30}})' },
-          condition_definition: { type: 'string', description: 'Human-readable condition description' },
+          percentage: { type: 'string', description: 'Percentage of eligible users to enroll, as a numeric string (e.g. "50" for 50%).' },
+          byVal: { type: 'array', items: { type: 'string' }, description: 'Specific user IDs to include in the experiment.' },
+          byValText: { type: 'string', description: 'Free-text representation of the user-ID list shown in the UI.' },
+          condition: { type: 'object', description: 'MongoDB-style condition object on user properties (e.g. {"up.age": {"$gt": 30}}). Defaults to empty (no extra filter).' },
+          condition_definition: { type: 'string', description: 'Human-readable label for the condition, shown in the UI.' },
         },
         required: ['percentage'],
-        description: 'User targeting configuration',
+        description: 'User targeting configuration. Percentage is required; other fields narrow the audience.',
       },
       variants: {
         type: 'array',
         items: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Variant name (e.g., "Control group", "Variant A")' },
+            name: { type: 'string', description: 'Variant label (e.g. "Control", "Variant A"). Must be unique within the experiment.' },
             parameters: {
               type: 'array',
               items: {
                 type: 'object',
                 properties: {
-                  name: { type: 'string', description: 'Parameter name' },
-                  description: { type: 'string', description: 'Parameter description' },
-                  value: { type: 'string', description: 'Parameter value' },
+                  name: { type: 'string', description: 'Remote-config parameter key this variant overrides.' },
+                  description: { type: 'string', description: 'Optional human-readable note about the parameter.' },
+                  value: { type: 'string', description: 'Value assigned to the parameter for this variant.' },
                 },
                 required: ['name', 'value'],
               },
-              description: 'Parameters for this variant',
+              description: 'Parameter overrides for this variant.',
             },
           },
           required: ['name', 'parameters'],
         },
         minItems: 2,
-        description: 'Array of experiment variants (minimum 2)',
+        description: 'Variants to test. At least 2 entries required (typically control + one or more challengers).',
       },
       goals: {
         type: 'array',
         items: {
           type: 'object',
           properties: {
-            user_segmentation: { 
-              type: 'string', 
-              description: 'User segmentation query as JSON string. Format: \'{"query":{<MongoDB query>},"queryText":"<human-readable description>"}\'  Example: \'{"query":{"custom.Subscription Plan":{"$in":["Premium"]}},"queryText":"Subscription Plan = Premium"}\'' 
+            user_segmentation: {
+              type: 'string',
+              description: 'User segmentation query as a JSON string in the form \'{"query":{<MongoDB query>},"queryText":"<human-readable description>"}\'. Example: \'{"query":{"custom.Subscription Plan":{"$in":["Premium"]}},"queryText":"Subscription Plan = Premium"}\'.'
             },
-            steps: { 
-              type: 'string', 
-              description: 'Goal steps as JSON string array. Each step defines user behavior to track. Format: \'[{"type":"did"|"didnot","event":"<event_name>","times":"{\\"$gte\\":<number>}","period":"<days>days"|"0days","query":"{}","queryText":"","byVal":"","group":<number>,"conj":"and"|"or"}]\' Example: \'[{"type":"did","event":"Subscription Purchased","times":"{\\"$gte\\":1}","period":"0days","query":"{}","queryText":"","byVal":"","group":0,"conj":"and"}]\'' 
+            steps: {
+              type: 'string',
+              description: 'Goal steps as a JSON-encoded array. Each step specifies user behavior to track. Format: \'[{"type":"did"|"didnot","event":"<event_name>","times":"{\\"$gte\\":<number>}","period":"<days>days"|"0days","query":"{}","queryText":"","byVal":"","group":<number>,"conj":"and"|"or"}]\'. Example: \'[{"type":"did","event":"Subscription Purchased","times":"{\\"$gte\\":1}","period":"0days","query":"{}","queryText":"","byVal":"","group":0,"conj":"and"}]\'.'
             },
           },
           required: ['user_segmentation', 'steps'],
         },
-        description: 'Optional array of experiment goals. Goals define what user actions you want to optimize for (e.g., conversions, purchases). Each goal has user segmentation filters and behavioral steps that users must complete.',
+        description: 'Success metrics to evaluate variants against. Each goal pairs a user-segmentation filter with behavioral steps (events to do/avoid). Omit for exploratory experiments.',
       },
-      expiration: { type: 'boolean', default: true, description: 'Whether experiment auto-concludes' },
-      days: { type: 'string', default: '30', description: 'Duration in days before auto-conclusion' },
-      improvement: { type: 'boolean', default: true, description: 'Whether to auto-conclude on improvement' },
-      improvementRate: { type: 'string', default: '10', description: 'Minimum improvement percentage to auto-conclude' },
+      expiration: { type: 'boolean', default: true, description: 'Whether the experiment auto-concludes after a fixed duration. Defaults to true.' },
+      days: { type: 'string', default: '30', description: 'Duration in days before auto-conclusion (used when expiration is true). Defaults to "30".' },
+      improvement: { type: 'boolean', default: true, description: 'Whether to auto-conclude once a variant beats control by improvementRate. Defaults to true.' },
+      improvementRate: { type: 'string', default: '10', description: 'Minimum improvement percentage to trigger auto-conclusion. Defaults to "10".' },
     },
     required: ['name', 'description', 'target_users', 'variants'],
   },
@@ -298,13 +298,13 @@ export async function handleCreateABExperiment(context: ToolContext, args: any):
 
 export const startABExperimentToolDefinition = {
   name: 'ab_experiments_start',
-  description: 'Start an A/B testing experiment. Once started, the experiment begins collecting data and showing variants to users.',
+  description: 'Start a draft A/B testing experiment so variants begin serving to targeted users and data collection begins. Requires the ab-testing plugin. To halt a running experiment use ab_experiments_stop.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      experiment_id: { type: 'string', description: 'Experiment ID to start' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      experiment_id: { type: 'string', description: 'Experiment identifier to start. Obtain it from ab_experiments_list.' },
     },
     required: ['experiment_id'],
   },
@@ -340,13 +340,13 @@ export async function handleStartABExperiment(context: ToolContext, args: any): 
 
 export const stopABExperimentToolDefinition = {
   name: 'ab_experiments_stop',
-  description: 'Stop a running A/B testing experiment. The experiment will no longer show variants to users but results remain available.',
+  description: 'Stop a running A/B testing experiment; variants stop being served but collected results remain available. Requires the ab-testing plugin. To remove the experiment entirely use ab_experiments_delete.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      experiment_id: { type: 'string', description: 'Experiment ID to stop' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      experiment_id: { type: 'string', description: 'Experiment identifier to stop. Obtain it from ab_experiments_list.' },
     },
     required: ['experiment_id'],
   },
@@ -382,13 +382,13 @@ export async function handleStopABExperiment(context: ToolContext, args: any): P
 
 export const deleteABExperimentToolDefinition = {
   name: 'ab_experiments_delete',
-  description: 'Delete an A/B testing experiment. This permanently removes the experiment and all its data.',
+  description: 'Delete an A/B testing experiment and all its collected data. Requires the ab-testing plugin. WARNING: irreversible. To temporarily halt without data loss use ab_experiments_stop.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      experiment_id: { type: 'string', description: 'Experiment ID to delete' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      experiment_id: { type: 'string', description: 'Experiment identifier to delete. Obtain it from ab_experiments_list.' },
     },
     required: ['experiment_id'],
   },

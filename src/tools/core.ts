@@ -7,7 +7,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const pingToolDefinition = {
   name: 'ping',
-  description: 'Check if Countly server is healthy and reachable',
+  description: 'Ping the Countly server (/o/ping) to verify it is reachable and responding. Takes no arguments. Use as a quick liveness check before running other tools.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -37,7 +37,7 @@ export async function handlePing(context: ToolContext, _args: any): Promise<Tool
 
 export const versionToolDefinition = {
   name: 'get_version',
-  description: 'Check what version of Countly is running on the server',
+  description: 'Return the Countly server version string and edition via /o/system/version. Takes no arguments.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -67,7 +67,7 @@ export async function handleGetVersion(context: ToolContext, _args: any): Promis
 
 export const pluginsToolDefinition = {
   name: 'get_plugins',
-  description: 'Check what plugins are enabled on the Countly server',
+  description: 'List plugins currently enabled on the Countly server via /o/system/plugins. Takes no arguments. Use this to confirm a plugin is available before calling tools that require it (e.g. drill, crashes, cohorts).',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -97,36 +97,36 @@ export async function handleGetPlugins(context: ToolContext, _args: any): Promis
 
 export const listJobsToolDefinition = {
   name: 'jobs_list',
-  description: 'List all background jobs running on the Countly server with pagination and sorting options',
+  description: 'List background/scheduled jobs known to the Countly server (name, schedule, last run, status) via /o?method=jobs. For per-job run history use job_runs.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       skip: {
         type: 'number',
-        description: 'Number of records to skip for pagination (iDisplayStart)',
+        description: 'Number of records to skip for pagination (maps to iDisplayStart). Defaults to 0.',
         default: 0,
       },
       limit: {
         type: 'number',
-        description: 'Maximum number of records to return (iDisplayLength)',
+        description: 'Maximum number of records to return (maps to iDisplayLength). Defaults to 10.',
         default: 10,
       },
       sort_column: {
         type: 'number',
-        description: 'Column index to sort by (iSortCol_0)',
+        description: 'Zero-based column index to sort by (maps to iSortCol_0). Defaults to 0.',
         default: 0,
       },
       sort_direction: {
         type: 'string',
-        description: 'Sort direction: "asc" or "desc" (sSortDir_0)',
+        description: 'Sort direction (maps to sSortDir_0). Defaults to "asc".',
         enum: ['asc', 'desc'],
         default: 'asc',
       },
@@ -167,40 +167,40 @@ export async function handleListJobs(context: ToolContext, args: any): Promise<T
 
 export const getJobRunsToolDefinition = {
   name: 'job_runs',
-  description: 'Get run history and details for a specific background job by name',
+  description: 'Get run history (start, end, status, duration) for a specific background job by name via /o?method=jobs. To discover job names use jobs_list.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       job_name: {
         type: 'string',
-        description: 'Job name to get run history for (e.g., "active_users:generate_active_users")',
+        description: 'Exact job name to fetch runs for (e.g. "active_users:generate_active_users"). Obtain it from jobs_list.',
       },
       skip: {
         type: 'number',
-        description: 'Number of records to skip for pagination (iDisplayStart)',
+        description: 'Number of records to skip for pagination (maps to iDisplayStart). Defaults to 0.',
         default: 0,
       },
       limit: {
         type: 'number',
-        description: 'Maximum number of records to return (iDisplayLength)',
+        description: 'Maximum number of records to return (maps to iDisplayLength). Defaults to 10.',
         default: 10,
       },
       sort_column: {
         type: 'number',
-        description: 'Column index to sort by (iSortCol_0)',
+        description: 'Zero-based column index to sort by (maps to iSortCol_0). Defaults to 2.',
         default: 2,
       },
       sort_direction: {
         type: 'string',
-        description: 'Sort direction: "asc" or "desc" (sSortDir_0)',
+        description: 'Sort direction (maps to sSortDir_0). Defaults to "desc".',
         enum: ['asc', 'desc'],
         default: 'desc',
       },
