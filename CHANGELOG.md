@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **npx execution support** (#107): The server can now be run directly via `npx countly-mcp-server` without cloning or building. Exposed `build/index.js` as a `bin` entry in `package.json` and added a `prepack` script so the published tarball always contains a freshly built entrypoint. README documents the new usage path with an example MCP client configuration.
+- **Events module**: new `events_delete` tool (#47) — deletes events and all their data for an application via `/i/events/delete_events`.
+
+### Fixed
+- **Schema compatibility**: replaced `z.union` with simple types in dashboard widget schemas to match MCP client expectations.
+- **Schema compatibility**: removed unsupported `allOf` from the `query_data` tool schema.
+- **Events**: `events_update` now calls the correct `/i/events/edit_map` endpoint; tests updated accordingly.
+- TypeScript build errors.
+
+### Changed
+- Dependency bumps across runtime and dev dependencies (via Dependabot), including: `@modelcontextprotocol/sdk`, `axios`, `hono`, `@hono/node-server`, `express`, `express-rate-limit`, `body-parser`, `dotenv`, `qs`, `path-to-regexp`, `follow-redirects`, `picomatch`, `vite`, `rollup`, `glob`, `js-yaml`, `flatted`, `minimatch`, `ajv`, and multiple grouped development-dependency updates.
+- CI dependency bumps: `actions/checkout`, `actions/upload-artifact`, `actions/download-artifact`, `docker/setup-buildx-action`, `docker/login-action`, `docker/setup-qemu-action`.
+
 ## [1.1.0] - 2025-11-12
 
 ### Added
