@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-04-22
+
+### Fixed
+- **npx startup crash**: Fixed the main-module detection so the server actually starts when launched through a `bin` symlink. The previous check compared `import.meta.url` directly against `` `file://${process.argv[1]}` ``, which never matched when Node invoked the script through `node_modules/.bin/countly-mcp-server` (argv[1] is the symlink path, `import.meta.url` is the resolved real path). As a result, `npx countly-mcp-server` and MCP clients that launched it would see the process exit immediately after receiving `initialize`. The check now resolves `argv[1]` via `realpathSync` and compares to `pathToFileURL(...).href`.
+
 ## [1.2.0] - 2026-04-22
 
 ### Added
@@ -273,6 +278,7 @@ Initial release of Countly MCP Server.
 - Comprehensive test suite
 - GitHub Actions CI/CD integration
 
+[1.2.1]: https://github.com/Countly/countly-mcp-server/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Countly/countly-mcp-server/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Countly/countly-mcp-server/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Countly/countly-mcp-server/compare/v1.0.0...v1.0.1
