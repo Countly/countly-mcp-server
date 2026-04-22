@@ -59,7 +59,7 @@ describe('Tools Configuration', () => {
       analytics: 6,
       crashes: 10,
       notes: 3,
-      events: 2,
+      events: 3,
       alerts: 3,
       views: 3,
       database: 6,
@@ -105,7 +105,7 @@ describe('Tools Configuration', () => {
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(129);
+      expect(totalTools).toBe(130);
     });
   });
 
