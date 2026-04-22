@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 
 
+import { realpathSync } from 'fs';
 import http from 'http';
 import url from 'url';
 
@@ -1379,8 +1380,20 @@ class CountlyMCPServer {
 // Export the class for testing
 export { CountlyMCPServer };
 
-// Run the server only if this file is executed directly (not imported)
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run the server only if this file is executed directly (not imported).
+// We resolve argv[1] via realpathSync so this works when invoked through
+// a `bin` symlink (e.g. `npx countly-mcp-server`), where process.argv[1]
+// points at the symlink in node_modules/.bin while import.meta.url resolves
+// to the real build/index.js path.
+const isMainModule = (() => {
+  try {
+    return import.meta.url === url.pathToFileURL(realpathSync(process.argv[1])).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
   const server = new CountlyMCPServer();
 
   // Parse command line arguments
