@@ -4,8 +4,11 @@
   "description": "MCP server for Countly Analytics Platform",
   "main": "build/index.js",
   "type": "module",
+  "bin": {
+    "countly-mcp-server": "build/index.js"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && chmod +x build/index.js",
     "dev": "tsc --watch",
     "start": "node build/index.js --http",
     "start:stdio": "node build/index.js",
