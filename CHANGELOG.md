@@ -5,11 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-04-23
 
 ### Removed
-- **Jobs module** — dropped the `jobs_list` and `job_runs` tools from the `core` category. Both called `/o?method=jobs`, which is not documented in the Countly API reference and has no first-party spec; operators looking for background-task visibility should use the documented `/o/tasks/*` endpoints directly.
-- **`views_segments` tool** — removed the `views_segments` tool (was calling `/o?method=get_view_segments`, which is not documented in the Countly API reference). For view segmentation discovery use `metadata_get` or `queriable_fields_list` with the `[CLY]_view` event.
+- **Jobs module** (#112) — dropped the `jobs_list` and `job_runs` tools from the `core` category. Both called `/o?method=jobs`, which is not documented in the Countly API reference; operators looking for background-task visibility should use the documented `/o/tasks/*` endpoints directly.
+- **`views_segments` tool** (#112) — removed the `views_segments` tool (was calling `/o?method=get_view_segments`, which is not documented in the Countly API reference). For view segmentation discovery use `metadata_get` or `queriable_fields_list` with the `[CLY]_view` event.
+
+### Changed
+- **Tool descriptions rewritten for model-pickability** (#110) — rewrote the `description` string and every input-schema field description across all ~128 tool definitions in `src/tools/*.ts`. Descriptions now name the concrete endpoint, include a disambiguation sentence pointing to siblings, standardize `app_id`/`app_name`/`period` wording everywhere, add `WARNING: irreversible` to destructive tools, and add `Requires the <name> plugin` to plugin-gated tools. The original `app_analytics_summary` "will show available apps" false promise and similar lies across other tools are gone. No handler logic, schema types, or runtime behavior changed — description strings only.
+- **`metadata_get` is now always available** (#110) — moved out of the `drill` category into a new `metadata` category with `availableByDefault: true`. The handler already degraded gracefully without the drill plugin (returning custom events, built-in `[CLY]_*` event segments, and system fields); it was just hidden on drill-less servers by its category classification.
+
+### Fixed
+- **`notes_create` TypeError when `color` omitted** (#110) — `handleCreateNote` called `color.toLowerCase()` unconditionally while `color` was optional. Guarded the call and marked `note` and `ts` as `required` in the schema (they were already dereferenced unguarded).
+- **`hooks_update` silent asymmetry on trigger fields** (#110) — the handler silently ignored partial trigger updates when only one of `trigger_type` or `trigger_config` was supplied while still reporting success. Now throws `McpError(InvalidParams)` with a clear message; both fields must be supplied together, or neither.
 
 ## [1.2.1] - 2026-04-22
 
@@ -284,6 +292,7 @@ Initial release of Countly MCP Server.
 - Comprehensive test suite
 - GitHub Actions CI/CD integration
 
+[1.3.0]: https://github.com/Countly/countly-mcp-server/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Countly/countly-mcp-server/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Countly/countly-mcp-server/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Countly/countly-mcp-server/compare/v1.0.1...v1.1.0
