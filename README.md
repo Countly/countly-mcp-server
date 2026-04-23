@@ -239,16 +239,18 @@ The MCP server includes optional anonymous usage analytics to help improve the p
 - HTTP endpoint access patterns
 - Error occurrences (type and message, NO sensitive data)
 - Server start/stop events
+- A **truncated opaque hash** of your Countly server URL (64-bit SHA-256 prefix), attached as the `server` segment on every event — used for distinct-server aggregation. The raw URL is never sent.
 
 **What is NOT tracked:**
 - Authentication tokens or credentials
-- Server URLs or domains
+- Raw Countly server URLs or domains (only the opaque `server` hash above)
 - User data or analytics content
 - Personal information
 - IP addresses or client identifiers
+- Tool arguments or request/response bodies
 
 **Privacy & Device ID:**
-All analytics are aggregated under a single device ID "mcp" to ensure complete anonymity. No server-specific or user-specific information is collected.
+All analytics are aggregated under a single device ID `"mcp"` — Countly cannot distinguish individual operators from the device ID alone. The only per-deployment signal is the `server` hash on events, which is a truncated SHA-256 of the normalized server URL. The hash is intentionally coarse (64 bits) and the server URL is low-entropy, so do not assume the hash is unguessable for cloud patterns; it is meant for aggregation, not secrecy.
 
 **To opt in:**
 ```bash
