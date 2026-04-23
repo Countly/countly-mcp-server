@@ -13,23 +13,83 @@ import { redactSensitiveInMessage } from './error-handler.js';
 
 const ANALYTICS_URL = 'https://stats.count.ly';
 const ANALYTICS_APP_KEY = '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7';
+/**
+ * Length of the server-URL hash that accompanies every analytics event.
+ * 16 hex chars = 64 bits of entropy — enough to distinguish several billion
+ * distinct Countly servers with negligible collision risk, while keeping
+ * event payloads small. A collision between two real deployments is not a
+ * correctness issue for distinct-count aggregation.
+ */
+const SERVER_HASH_LENGTH = 16;
 
 // Load the package version once. Uses createRequire because the rest of the
 // file is ESM and require() isn't available natively.
 const require = createRequire(import.meta.url);
 
+/**
+ * Normalize a Countly server URL into a canonical form before hashing, so
+ * variations (trailing slash, scheme, uppercase host, default port) collapse
+ * to the same hash.
+ */
+export function normalizeServerUrlForHash(url: string): string {
+  if (!url) {
+    return '';
+  }
+  // Strip scheme (http:/https:), lowercase the whole thing (URLs are case-
+  // insensitive on host), and strip any trailing slashes.
+  return url
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '');
+}
+
+/**
+ * Compute the short opaque server-URL hash that rides along as the `server`
+ * segment on every event.
+ *
+ * Privacy note: the raw URL is never sent. For cloud patterns the hash is
+ * brute-forceable by anyone with a dictionary of common URLs (including
+ * Countly themselves, who already know their own cloud customer URLs via
+ * billing). For custom on-prem URLs the hash is opaque in practice.
+ */
+export function computeServerHash(url: string | undefined): string | undefined {
+  if (!url) {
+    return undefined;
+  }
+  const normalized = normalizeServerUrlForHash(url);
+  if (!normalized) {
+    return undefined;
+  }
+  return createHash('sha256').update(normalized).digest('hex').substring(0, SERVER_HASH_LENGTH);
+}
+
+/**
+ * Optional callback supplied by the server to resolve the Countly server URL
+ * at event time. In stdio mode this just returns the env-supplied config
+ * value; in HTTP mode it reads from AsyncLocalStorage so the per-request
+ * server URL ends up in the per-request events.
+ */
+type ServerUrlResolver = () => string | undefined;
+
 class Analytics {
   private enabled: boolean = false;
   private initialized: boolean = false;
   private deviceId: string = 'mcp';
+  private getServerUrl?: ServerUrlResolver;
 
   /**
    * Initialize analytics tracking.
    * Opt-in: enabled only when the caller passes true (which index.ts does
    * only when ENABLE_ANALYTICS=true is set in the environment).
+   *
+   * `getServerUrl` is called at each event-track time to resolve the
+   * current request's server URL. The returned URL is normalized and
+   * hashed into a short opaque `server` segment on the outgoing event —
+   * no raw URLs ever leave the process.
    */
-  init(enabled: boolean = false): void {
+  init(enabled: boolean = false, getServerUrl?: ServerUrlResolver): void {
     this.enabled = enabled;
+    this.getServerUrl = getServerUrl;
 
     if (!this.enabled) {
       console.error('📊 Analytics: Disabled (set ENABLE_ANALYTICS=true to opt in)');
@@ -52,7 +112,7 @@ class Analytics {
 
       this.initialized = true;
       console.error('📊 Analytics: Enabled and initialized');
-      
+
       // Track session start
       this.trackServerStart();
     } catch (error) {
@@ -62,13 +122,21 @@ class Analytics {
   }
 
   /**
-   * Hash server URL to create anonymous device ID
-   * Does NOT include auth tokens
+   * Build the segmentation object for an event, adding the `server` hash
+   * if we can resolve the current server URL. Callers hand in the
+   * event-specific fields; we merge the server hash on top.
    */
-  private hashServerUrl(url: string): string {
-    // Remove protocol and trailing slashes for consistency
-    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    return createHash('sha256').update(cleanUrl).digest('hex').substring(0, 32);
+  private withServerSegment(
+    segmentation?: Record<string, string | number>
+  ): Record<string, string | number> | undefined {
+    const hash = computeServerHash(this.getServerUrl?.());
+    if (!hash) {
+      return segmentation;
+    }
+    return {
+      ...(segmentation ?? {}),
+      server: hash,
+    };
   }
 
   /**
@@ -230,7 +298,9 @@ class Analytics {
   }
 
   /**
-   * Track custom event
+   * Track custom event. Automatically injects the `server` hash segment
+   * (when a serverUrl resolver was supplied to init) so Countly can
+   * aggregate per-server without ever seeing the raw URL.
    */
   trackEvent(eventName: string, segmentation?: Record<string, string | number>): void {
     if (!this.isEnabled()) {
@@ -241,7 +311,7 @@ class Analytics {
       Countly.add_event({
         key: eventName,
         count: 1,
-        segmentation,
+        segmentation: this.withServerSegment(segmentation),
       });
     } catch (error) {
       console.error('📊 Analytics: Failed to track event:', error);
@@ -249,7 +319,8 @@ class Analytics {
   }
 
   /**
-   * Track timed event
+   * Track timed event. Injects the `server` hash segment the same way
+   * trackEvent does.
    */
   trackTimedEvent(eventName: string, segmentation: Record<string, string | number>, duration: number): void {
     if (!this.isEnabled()) {
@@ -261,7 +332,7 @@ class Analytics {
         key: eventName,
         count: 1,
         dur: duration,
-        segmentation,
+        segmentation: this.withServerSegment(segmentation),
       });
     } catch (error) {
       console.error('📊 Analytics: Failed to track timed event:', error);

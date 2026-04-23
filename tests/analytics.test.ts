@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { analytics } from '../src/lib/analytics.js';
+import {
+  analytics,
+  computeServerHash,
+  normalizeServerUrlForHash,
+} from '../src/lib/analytics.js';
 
 /**
  * Analytics Tests
@@ -31,17 +35,19 @@ describe('Analytics', () => {
   beforeEach(() => {
     // Reset all mocks before each test
     vi.clearAllMocks();
-    
+
     // Reset analytics state by creating a new instance
     // Since analytics is a singleton, we need to reset its internal state
     (analytics as any).enabled = false;
     (analytics as any).initialized = false;
+    (analytics as any).getServerUrl = undefined;
   });
 
   afterEach(() => {
     // Clean up
     (analytics as any).enabled = false;
     (analytics as any).initialized = false;
+    (analytics as any).getServerUrl = undefined;
   });
 
   describe('init', () => {
@@ -657,30 +663,132 @@ describe('Analytics', () => {
     });
   });
 
-  describe('private methods', () => {
-    it('should hash server URL correctly', () => {
-      // Access private method for testing
-      const hashMethod = (analytics as any).hashServerUrl.bind(analytics);
-      
-      const hash1 = hashMethod('https://example.com/api');
-      const hash2 = hashMethod('https://example.com/api/');
-      const hash3 = hashMethod('http://example.com/api');
-      
-      // Should produce consistent hashes
-      expect(hash1).toBe(hash2);
-      expect(hash1).toBe(hash3);
-      expect(hash1).toHaveLength(32);
+  describe('server-url hashing', () => {
+    it('normalizes consistently: scheme stripped, lowercased, trailing slash removed', () => {
+      expect(normalizeServerUrlForHash('https://example.com/api'))
+        .toBe(normalizeServerUrlForHash('https://example.com/api/'));
+      expect(normalizeServerUrlForHash('https://EXAMPLE.com/api'))
+        .toBe(normalizeServerUrlForHash('http://example.com/api'));
+      expect(normalizeServerUrlForHash('HTTPS://Example.COM///'))
+        .toBe('example.com');
     });
 
-    it('should hash different URLs differently', () => {
-      const hashMethod = (analytics as any).hashServerUrl.bind(analytics);
-      
-      const hash1 = hashMethod('https://example.com/api');
-      const hash2 = hashMethod('https://different.com/api');
-      
-      expect(hash1).not.toBe(hash2);
+    it('hashes consistently across scheme / case / trailing-slash variations', () => {
+      const a = computeServerHash('https://example.com/api');
+      const b = computeServerHash('https://example.com/api/');
+      const c = computeServerHash('http://example.com/api');
+      const d = computeServerHash('HTTPS://Example.COM/api');
+      expect(a).toBe(b);
+      expect(a).toBe(c);
+      expect(a).toBe(d);
     });
 
+    it('returns a 16-hex-char string', () => {
+      const h = computeServerHash('https://api.count.ly');
+      expect(h).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('returns undefined for empty / undefined input', () => {
+      expect(computeServerHash(undefined)).toBeUndefined();
+      expect(computeServerHash('')).toBeUndefined();
+    });
+
+    it('hashes different URLs to different values', () => {
+      expect(computeServerHash('https://example.com'))
+        .not.toBe(computeServerHash('https://different.com'));
+    });
+  });
+
+  describe('server-hash segment injection on events', () => {
+    it('adds `server` segment to trackEvent when a resolver is set', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, () => 'https://api.count.ly');
+      vi.clearAllMocks();
+
+      analytics.trackEvent('anything', { foo: 'bar' });
+
+      const seg = (Countly.add_event as any).mock.calls[0][0].segmentation;
+      expect(seg.server).toMatch(/^[0-9a-f]{16}$/);
+      expect(seg.foo).toBe('bar');
+    });
+
+    it('adds `server` segment to trackTimedEvent', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, () => 'https://acme.count.ly');
+      vi.clearAllMocks();
+
+      analytics.trackTimedEvent('op', { type: 'query' }, 100);
+
+      const seg = (Countly.add_event as any).mock.calls[0][0].segmentation;
+      expect(seg.server).toMatch(/^[0-9a-f]{16}$/);
+      expect(seg.type).toBe('query');
+    });
+
+    it('propagates `server` through the specialized track* helpers', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, () => 'https://api.count.ly');
+      vi.clearAllMocks();
+
+      analytics.trackToolExecution('apps_list', true, 10);
+      analytics.trackToolCategory('apps');
+      analytics.trackAuthMethod('headers');
+      analytics.trackApiEndpoint('/o', 'GET', 200);
+      analytics.trackHttpRequest('/mcp', 'POST');
+      analytics.trackError('Error', 'boom', 'apps_list');
+
+      for (const call of (Countly.add_event as any).mock.calls) {
+        expect(call[0].segmentation.server).toMatch(/^[0-9a-f]{16}$/);
+      }
+    });
+
+    it('omits `server` segment when no resolver is configured', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true);
+      vi.clearAllMocks();
+
+      analytics.trackEvent('no_server', { x: 1 });
+
+      const seg = (Countly.add_event as any).mock.calls[0][0].segmentation;
+      expect(seg).toEqual({ x: 1 });
+      expect(seg.server).toBeUndefined();
+    });
+
+    it('omits `server` segment when the resolver returns undefined / empty', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, () => undefined);
+      vi.clearAllMocks();
+
+      analytics.trackEvent('still_no_server');
+
+      const seg = (Countly.add_event as any).mock.calls[0][0].segmentation;
+      expect(seg).toBeUndefined();
+    });
+
+    it('re-evaluates the resolver on every event (per-request URL variation)', async () => {
+      const Countly = await getCountlyMock();
+      let currentUrl = 'https://tenant-a.count.ly';
+      analytics.init(true, () => currentUrl);
+      vi.clearAllMocks();
+
+      analytics.trackEvent('e1');
+      currentUrl = 'https://tenant-b.count.ly';
+      analytics.trackEvent('e2');
+
+      const segA = (Countly.add_event as any).mock.calls[0][0].segmentation;
+      const segB = (Countly.add_event as any).mock.calls[1][0].segmentation;
+      expect(segA.server).not.toBe(segB.server);
+    });
+
+    it('keeps device_id at "mcp" (hash is on events, not device id)', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, () => 'https://api.count.ly');
+      expect(Countly.init).toHaveBeenCalledWith(
+        expect.objectContaining({ device_id: 'mcp' })
+      );
+    });
+  });
+
+  describe('getAppVersion', () => {
     it('should get app version from package.json', () => {
       const getVersionMethod = (analytics as any).getAppVersion.bind(analytics);
       

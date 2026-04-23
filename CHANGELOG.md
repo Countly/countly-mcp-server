@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.0] - 2026-04-23
 
+### Changed
+- **Anonymous server identification in telemetry** — every analytics event now carries a short opaque `server` segment: a 16-hex-char SHA-256 prefix of the normalized Countly server URL. This lets `stats.count.ly` aggregate per-distinct-server counts (for any event type) without ever seeing the raw URL. The device ID stays at `"mcp"` — only events carry the hash. In HTTP transport the hash is recomputed per request from the request-scoped server URL (via `AsyncLocalStorage`), so multi-tenant deployments naturally emit per-tenant counts. The README analytics section was updated to reflect what is (and isn't) tracked. Opt-in still required (`ENABLE_ANALYTICS=true`).
+
 ### Security
 - **Cross-tenant auth token mixing (HTTP transport)** (#110) — the HTTP transport previously mutated a shared axios client and shared config on every incoming request. Concurrent requests could interleave at `await` boundaries, causing tenant A's in-flight API calls to go out with tenant B's token. Fixed by constructing a per-request axios instance (with the `countly-token` header baked in) and passing state from the HTTP middleware to the MCP handler through `AsyncLocalStorage`. The shared client is now used only as a stdio-mode fallback and is never mutated per-request.
 - **Cross-tenant data leak via shared AppCache** (#110) — the apps cache was a single instance per process, so the first tenant's apps were visible to every other tenant's `resolveAppId` lookups for up to five minutes. Replaced with `AppCacheRegistry`, which keeps one `AppCache` per tenant keyed by SHA-256(token) so the raw token is never held as a Map key.
