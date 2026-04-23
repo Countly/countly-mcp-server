@@ -16,18 +16,19 @@ export const createNoteToolDefinition = {
       note: { type: 'string', description: 'Note body text shown in the dashboard.' },
       ts: { type: 'number', description: 'Note anchor timestamp. Unix seconds (< 10^10) are auto-converted to milliseconds; milliseconds are passed through.' },
       noteType: { type: 'string', description: 'Visibility tier, typically "public" or "private".' },
-      color: { type: 'string', description: 'Badge color. One of "turquoise", "yellow", "orange", "pink", "blue".', enum: ['turquoise', 'yellow', 'orange', 'pink', 'blue'] },
+      color: { type: 'string', description: 'Badge color. Defaults to "turquoise" when omitted.', enum: ['turquoise', 'yellow', 'orange', 'pink', 'blue'] },
       category: { type: 'string', description: 'Optional placement category, e.g. "sessionHomeWidget" to pin the note on the session dashboard graph.' },
       emails: { type: 'array', items: { type: 'string' }, description: 'Optional email addresses to notify.' },
     },
+    required: ['note', 'ts'],
   },
 };
 
 export async function handleCreateNote(context: ToolContext, args: any): Promise<ToolResult> {
   const app_id = await context.resolveAppId(args);
   const { note, ts, noteType, color, category, emails } = args;
-  
-  // Convert color name to numeric code
+
+  // Convert color name to numeric code. Defaults to turquoise (1) when omitted.
   const colorMap: { [key: string]: number } = {
     'turquoise': 1,
     'yellow': 2,
@@ -35,9 +36,9 @@ export async function handleCreateNote(context: ToolContext, args: any): Promise
     'pink': 4,
     'blue': 5,
   };
-  
-  const colorCode = colorMap[color.toLowerCase()] || 1;
-  
+
+  const colorCode = color ? (colorMap[color.toLowerCase()] || 1) : 1;
+
   // Convert timestamp to milliseconds if it appears to be in seconds
   const timestamp = ts < 10000000000 ? ts * 1000 : ts;
   

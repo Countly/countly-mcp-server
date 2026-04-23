@@ -48,6 +48,7 @@ describe('Tools Configuration', () => {
       'dashboards',
       'times_of_day',
       'hooks',
+      'metadata',
     ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
       expect(actualCategories.sort()).toEqual(expectedCategories.sort());
     });
@@ -65,7 +66,7 @@ describe('Tools Configuration', () => {
       database: 6,
       dashboard_users: 1,
       app_users: 3,
-      drill: 5,
+      drill: 4,
       user_profiles: 3,
       cohorts: 5,
       funnels: 7,
@@ -84,6 +85,7 @@ describe('Tools Configuration', () => {
       dashboards: 8,
       times_of_day: 1,
       hooks: 5,
+      metadata: 1,
     };    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
       expect(toolCount).toBe(expectedCounts[category as keyof typeof expectedCounts]);
