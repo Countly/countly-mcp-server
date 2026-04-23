@@ -275,7 +275,7 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
 **Available Categories:**
-- `CORE` - Core tools (ping, get_version, get_plugins, jobs_list, job_runs) (5 tools)
+- `CORE` - Core tools (ping, get_version, get_plugins) (3 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
 - `CRASHES` - Crash analytics and management (10 tools)
@@ -456,8 +456,6 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`ping`** - Check if Countly server is healthy and reachable
 - **`get_version`** - Check what version of Countly is running on the server
 - **`get_plugins`** - Get list of installed plugins on the server
-- **`jobs_list`** - List all background jobs running on the Countly server with pagination and sorting
-- **`job_runs`** - Get run history and details for a specific background job by name
 
 ### App Management
 - **`apps_list`** - List all applications

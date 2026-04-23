@@ -69,62 +69,6 @@ export async function handleGetViewsTable(context: ToolContext, args: any): Prom
 }
 
 // ============================================================================
-// GET_VIEW_SEGMENTS TOOL
-// ============================================================================
-
-export const getViewSegmentsToolDefinition = {
-  name: 'views_segments',
-  description: 'List segment keys available for slicing view data (e.g. country, app version) via /o?method=get_view_segments. Requires the views plugin. Use the returned keys with views_data.segment.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
-      period: {
-        type: 'string',
-        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".',
-        default: '30days'
-      },
-    },
-  },
-};
-
-export async function handleGetViewSegments(context: ToolContext, args: any): Promise<ToolResult> {
-  const app_id = await context.resolveAppId(args);
-  const { period = '30days' } = args;
-  
-  const params = {
-    ...context.getAuthParams(),
-    app_id,
-    method: 'get_view_segments',
-    period,
-  };
-
-  const response = await safeApiCall(
-
-
-    () => context.httpClient.get('/o', { params }),
-
-
-    'Failed to execute request to /o'
-
-
-  );
-  
-  const segments = response.data?.segments || response.data || [];
-  const segmentCount = Array.isArray(segments) ? segments.length : Object.keys(segments).length;
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Found ${segmentCount} segment(s) for views in app ${app_id}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
-
-// ============================================================================
 // GET_VIEWS_DATA TOOL
 // ============================================================================
 
@@ -193,13 +137,11 @@ export async function handleGetViewsData(context: ToolContext, args: any): Promi
 
 export const viewsToolDefinitions = [
   getViewsTableToolDefinition,
-  getViewSegmentsToolDefinition,
   getViewsDataToolDefinition,
 ];
 
 export const viewsToolHandlers = {
   'views_table': 'getViewsTable',
-  'views_segments': 'getViewSegments',
   'views_data': 'getViewsData',
 } as const;
 
@@ -208,10 +150,6 @@ export class ViewsTools {
 
   async getViewsTable(args: any): Promise<ToolResult> {
     return handleGetViewsTable(this.context, args);
-  }
-
-  async getViewSegments(args: any): Promise<ToolResult> {
-    return handleGetViewSegments(this.context, args);
   }
 
   async getViewsData(args: any): Promise<ToolResult> {

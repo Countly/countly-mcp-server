@@ -28,8 +28,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'ping': 'R',
       'get_version': 'R',
       'get_plugins': 'R',
-      'jobs_list': 'R',
-      'job_runs': 'R',
     },
     availableByDefault: true,
   },
@@ -99,7 +97,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   views: {
     operations: {
       'views_table': 'R',
-      'views_segments': 'R',
       'views_data': 'R',
     },
     requiresPlugin: 'views',

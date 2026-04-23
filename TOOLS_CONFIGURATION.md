@@ -49,7 +49,7 @@ These categories are always available without plugin checks:
 ## Tool Categories
 
 ### core
-**Tools**: `ping`, `get_version`, `get_plugins`, `jobs_list`, `job_runs`
+**Tools**: `ping`, `get_version`, `get_plugins`
 
 **Operations**:
 - R: All core tools (read-only)
@@ -58,7 +58,6 @@ These categories are always available without plugin checks:
 - `ping`: Check if Countly server is healthy and reachable
 - `get_version`: Check what version of Countly is running on the server
 - `get_plugins`: Check what plugins are enabled on the Countly server
-- `jobs_list` / `job_runs`: Background job visibility for MCP
 
 ### apps
 **Tools**: `apps_list`, `apps_get_by_name`, `apps_create`, `apps_update`, `apps_delete`, `apps_reset`
@@ -114,7 +113,7 @@ These categories are always available without plugin checks:
 **⚠️ Requires Plugin**: `alerts` plugin must be installed on Countly server
 
 ### views
-**Tools**: `views_table`, `views_segments`, `views_data`
+**Tools**: `views_table`, `views_data`
 
 **Operations**:
 - R: All views tools (read-only)
