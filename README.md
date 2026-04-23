@@ -222,6 +222,9 @@ The server supports multiple authentication methods (in priority order):
 | `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). |
 | `COUNTLY_RATE_LIMIT_RPM` | No | `120` | Per-IP requests per minute on the `/mcp` endpoint (HTTP transport). Set to `0` to disable. |
 | `COUNTLY_TRUST_PROXY` | No | `false` | When `true`, use `X-Forwarded-For` for the rate-limit client IP. Only enable when the server is behind a trusted reverse proxy that sets this header. |
+| `COUNTLY_MAX_BODY_BYTES` | No | `1048576` | Maximum request-body size accepted on `/mcp` (HTTP transport). Requests over the limit get `413 Payload Too Large`. Set to `0` to disable. |
+| `COUNTLY_MAX_CONCURRENT_PER_IP` | No | `50` | Maximum simultaneous TCP connections per client IP (HTTP transport). Over-limit connections are dropped. Set to `0` to disable. |
+| `COUNTLY_REQUEST_LOG` | No | `false` | When `true`, emit one NDJSON line per request to stderr (`{ts, ip, method, path, status, durationMs, rateLimitHit}`). Useful for piping into a log aggregator to spot abuse patterns. |
 
 *At least one authentication method must be configured
 
@@ -335,6 +338,26 @@ to 120 requests per minute. Tune via `COUNTLY_RATE_LIMIT_RPM=<n>`
 (set to `0` to disable). Behind a trusted reverse proxy, set
 `COUNTLY_TRUST_PROXY=true` so the first `X-Forwarded-For` hop is used as
 the client IP.
+
+### Resource-exhaustion defenses
+
+Additional protections layered on top of the application-level rate limit:
+
+- **Request body cap** (`COUNTLY_MAX_BODY_BYTES`, default 1 MiB) — `413
+  Payload Too Large` + socket destroyed for oversize bodies. Checked both
+  upfront via `Content-Length` and streamingly (for chunked / lying
+  clients).
+- **Per-IP concurrent connection cap** (`COUNTLY_MAX_CONCURRENT_PER_IP`,
+  default 50) — over-limit TCP connections are dropped before the TLS
+  handshake, closing the slow-loris amplification.
+- **Server timeouts** — `requestTimeout=30s`, `headersTimeout=10s`,
+  `keepAliveTimeout=5s`, `timeout=60s`. Slow clients can't keep sockets
+  open indefinitely.
+
+For operators that want per-request audit logs for abuse detection, set
+`COUNTLY_REQUEST_LOG=true`. The server will emit one NDJSON line per
+request to stderr, containing only the fields listed in the env-var
+table — no auth tokens, no bodies, no headers.
 
 ### CORS
 

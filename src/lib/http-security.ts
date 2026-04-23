@@ -149,3 +149,160 @@ export function extractClientIp(
   }
   return socketRemoteAddress ?? 'unknown';
 }
+
+/**
+ * Per-IP concurrent-connection limiter.
+ *
+ * Node's raw http.createServer has no per-IP cap. A single client can open
+ * thousands of TCP connections — slow-loris and connection-exhaustion
+ * territory. Track in-flight sockets per IP and reject new ones above the
+ * threshold by destroying the socket before it handshakes anything
+ * application-level.
+ *
+ * Used as a `server.on('connection', ...)` listener.
+ */
+export class ConcurrencyLimiter {
+  private readonly counts = new Map<string, number>();
+  private readonly max: number;
+
+  constructor(maxPerIp: number) {
+    this.max = maxPerIp;
+  }
+
+  /**
+   * Register a new connection. Returns true if the connection is accepted,
+   * false if it should be rejected (socket destroyed by caller).
+   */
+  accept(ip: string): boolean {
+    const current = this.counts.get(ip) ?? 0;
+    if (current >= this.max) {
+      return false;
+    }
+    this.counts.set(ip, current + 1);
+    return true;
+  }
+
+  release(ip: string): void {
+    const current = this.counts.get(ip) ?? 0;
+    if (current <= 1) {
+      this.counts.delete(ip);
+    } else {
+      this.counts.set(ip, current - 1);
+    }
+  }
+
+  /** Current live connection count for an IP (for testing). */
+  count(ip: string): number {
+    return this.counts.get(ip) ?? 0;
+  }
+
+  /** Total number of tracked IPs (for testing). */
+  size(): number {
+    return this.counts.size;
+  }
+}
+
+/**
+ * Parse a Content-Length header safely. Returns null when missing or
+ * unparseable (which means the caller will have to rely on a streaming
+ * check or a request timeout). A Content-Length of 0 is returned as 0,
+ * not null.
+ */
+export function parseContentLength(raw: string | string[] | undefined): number | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n < 0 || String(n) !== value.trim()) {
+    return null;
+  }
+  return n;
+}
+
+/**
+ * Enforce a maximum request body size.
+ *
+ * 1. Reject upfront if the caller's Content-Length header already exceeds
+ *    the limit (or if the header is missing and we're strict about it).
+ * 2. Attach a streaming data listener that destroys the request if bytes
+ *    received exceed the limit. This catches chunked transfers and clients
+ *    that lie about Content-Length.
+ *
+ * Returns true if the request is under the limit (keep processing) or false
+ * if it was already rejected (caller should stop).
+ */
+export function enforceBodySizeLimit(
+  req: {
+    headers: Record<string, string | string[] | undefined>;
+    on: (event: 'data' | 'aborted' | 'end', handler: (arg?: unknown) => void) => unknown;
+    destroy: (err?: Error) => void;
+  },
+  res: { writeHead: (code: number, headers?: Record<string, string>) => unknown; end: (body?: string) => unknown; headersSent?: boolean },
+  maxBytes: number
+): boolean {
+  const declared = parseContentLength(req.headers['content-length']);
+  if (declared !== null && declared > maxBytes) {
+    res.writeHead(413, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      error: 'Payload too large',
+      max_bytes: maxBytes,
+      declared_content_length: declared,
+    }));
+    // Also close the socket so a malicious client can't keep sending bytes.
+    req.destroy();
+    return false;
+  }
+
+  let received = 0;
+  let killed = false;
+  req.on('data', (chunk: unknown) => {
+    if (killed) {
+      return;
+    }
+    // Chunks are Buffers or strings in practice.
+    const len = chunk && typeof chunk === 'object' && 'length' in chunk
+      ? (chunk as { length: number }).length
+      : typeof chunk === 'string'
+        ? (chunk as string).length
+        : 0;
+    received += len;
+    if (received > maxBytes) {
+      killed = true;
+      if (!res.headersSent) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          error: 'Payload too large',
+          max_bytes: maxBytes,
+        }));
+      }
+      req.destroy();
+    }
+  });
+  return true;
+}
+
+/**
+ * Fields logged per request when structured request logging is enabled.
+ */
+export interface RequestLogEntry {
+  ts: string;
+  ip: string;
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+  rateLimitHit?: boolean;
+  bodyBytes?: number;
+}
+
+/**
+ * Format a request log entry as a single NDJSON line.
+ *
+ * Operators can tail stderr and pipe into their log aggregator. We emit
+ * only the fields listed in RequestLogEntry — no headers, no bodies, no
+ * token material.
+ */
+export function formatRequestLog(entry: RequestLogEntry): string {
+  return JSON.stringify(entry);
+}

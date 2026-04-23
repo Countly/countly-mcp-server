@@ -4,7 +4,11 @@ import { AppCache, AppCacheRegistry } from '../src/lib/app-cache.js';
 import { assertSafeServerHost, assertSafeServerUrl } from '../src/lib/config.js';
 import { redactSensitiveInMessage } from '../src/lib/error-handler.js';
 import {
+  ConcurrencyLimiter,
+  enforceBodySizeLimit,
   extractClientIp,
+  formatRequestLog,
+  parseContentLength,
   parseCorsAllowed,
   RateLimiter,
   resolveCorsOrigin,
@@ -323,6 +327,208 @@ describe('redactSensitiveInMessage', () => {
   it('preserves benign messages', () => {
     expect(redactSensitiveInMessage('App not found: MyApp')).toBe('App not found: MyApp');
     expect(redactSensitiveInMessage('')).toBe('');
+  });
+});
+
+describe('ConcurrencyLimiter', () => {
+  it('accepts connections up to the limit', () => {
+    const cl = new ConcurrencyLimiter(3);
+    expect(cl.accept('1.1.1.1')).toBe(true);
+    expect(cl.accept('1.1.1.1')).toBe(true);
+    expect(cl.accept('1.1.1.1')).toBe(true);
+  });
+
+  it('rejects over-limit connections', () => {
+    const cl = new ConcurrencyLimiter(2);
+    cl.accept('1.1.1.1');
+    cl.accept('1.1.1.1');
+    expect(cl.accept('1.1.1.1')).toBe(false);
+  });
+
+  it('release() frees a slot', () => {
+    const cl = new ConcurrencyLimiter(1);
+    expect(cl.accept('a')).toBe(true);
+    expect(cl.accept('a')).toBe(false);
+    cl.release('a');
+    expect(cl.accept('a')).toBe(true);
+  });
+
+  it('release() of a non-tracked IP is a no-op', () => {
+    const cl = new ConcurrencyLimiter(1);
+    cl.release('never-accepted');
+    expect(cl.size()).toBe(0);
+  });
+
+  it('isolates limits per IP', () => {
+    const cl = new ConcurrencyLimiter(1);
+    expect(cl.accept('a')).toBe(true);
+    expect(cl.accept('b')).toBe(true);
+    expect(cl.accept('a')).toBe(false);
+  });
+
+  it('stops tracking an IP when its count drops to zero', () => {
+    const cl = new ConcurrencyLimiter(2);
+    cl.accept('a');
+    cl.accept('a');
+    expect(cl.count('a')).toBe(2);
+    cl.release('a');
+    cl.release('a');
+    expect(cl.count('a')).toBe(0);
+    expect(cl.size()).toBe(0);
+  });
+});
+
+describe('parseContentLength', () => {
+  it('parses a valid numeric string', () => {
+    expect(parseContentLength('1024')).toBe(1024);
+  });
+  it('returns 0 for "0"', () => {
+    expect(parseContentLength('0')).toBe(0);
+  });
+  it('returns null for undefined / empty', () => {
+    expect(parseContentLength(undefined)).toBeNull();
+    expect(parseContentLength('')).toBeNull();
+  });
+  it('returns null for non-numeric', () => {
+    expect(parseContentLength('abc')).toBeNull();
+    expect(parseContentLength('100x')).toBeNull();
+  });
+  it('returns null for negative', () => {
+    expect(parseContentLength('-1')).toBeNull();
+  });
+  it('takes the first value when the header is an array', () => {
+    expect(parseContentLength(['42', '99'])).toBe(42);
+  });
+});
+
+/** Minimal mock http.IncomingMessage for enforceBodySizeLimit. */
+function mockReq(headers: Record<string, string> = {}) {
+  const listeners: Record<string, Array<(arg?: unknown) => void>> = {};
+  let destroyed = false;
+  return {
+    headers,
+    on(event: string, handler: (arg?: unknown) => void) {
+      (listeners[event] ??= []).push(handler);
+      return this as unknown;
+    },
+    emit(event: string, arg?: unknown) {
+      for (const h of listeners[event] ?? []) {
+        h(arg);
+      }
+    },
+    destroy() {
+      destroyed = true;
+    },
+    isDestroyed() {
+      return destroyed;
+    },
+  };
+}
+
+/** Minimal mock http.ServerResponse. */
+function mockRes() {
+  let status = 0;
+  let body = '';
+  let headersSent = false;
+  let ended = false;
+  return {
+    headersSent,
+    writeHead(code: number) {
+      status = code;
+      headersSent = true;
+      return this as unknown;
+    },
+    end(chunk?: string) {
+      body = chunk ?? '';
+      ended = true;
+      return this as unknown;
+    },
+    getStatus() {
+      return status;
+    },
+    getBody() {
+      return body;
+    },
+    didEnd() {
+      return ended;
+    },
+  };
+}
+
+describe('enforceBodySizeLimit', () => {
+  it('rejects upfront when Content-Length exceeds the limit', () => {
+    const req = mockReq({ 'content-length': String(2_000) });
+    const res = mockRes();
+    const ok = enforceBodySizeLimit(req as any, res as any, 1_000);
+    expect(ok).toBe(false);
+    expect(res.getStatus()).toBe(413);
+    expect(req.isDestroyed()).toBe(true);
+    expect(res.getBody()).toContain('Payload too large');
+  });
+
+  it('accepts when Content-Length is within the limit', () => {
+    const req = mockReq({ 'content-length': '500' });
+    const res = mockRes();
+    const ok = enforceBodySizeLimit(req as any, res as any, 1_000);
+    expect(ok).toBe(true);
+    expect(res.didEnd()).toBe(false);
+    expect(req.isDestroyed()).toBe(false);
+  });
+
+  it('streams-rejects when cumulative chunk bytes exceed the limit', () => {
+    const req = mockReq();
+    const res = mockRes();
+    const ok = enforceBodySizeLimit(req as any, res as any, 100);
+    expect(ok).toBe(true);
+    // Simulate 60+60 bytes arriving — should trip after the second chunk.
+    req.emit('data', Buffer.alloc(60));
+    req.emit('data', Buffer.alloc(60));
+    expect(res.getStatus()).toBe(413);
+    expect(req.isDestroyed()).toBe(true);
+  });
+
+  it('streams under the limit without interfering', () => {
+    const req = mockReq();
+    const res = mockRes();
+    enforceBodySizeLimit(req as any, res as any, 100);
+    req.emit('data', Buffer.alloc(30));
+    req.emit('data', Buffer.alloc(30));
+    expect(res.didEnd()).toBe(false);
+    expect(req.isDestroyed()).toBe(false);
+  });
+});
+
+describe('formatRequestLog', () => {
+  it('emits a single-line NDJSON entry with the declared fields', () => {
+    const line = formatRequestLog({
+      ts: '2026-04-23T12:34:56.000Z',
+      ip: '1.2.3.4',
+      method: 'POST',
+      path: '/mcp',
+      status: 200,
+      durationMs: 42,
+      rateLimitHit: false,
+    });
+    const parsed = JSON.parse(line);
+    expect(parsed.ts).toBe('2026-04-23T12:34:56.000Z');
+    expect(parsed.ip).toBe('1.2.3.4');
+    expect(parsed.method).toBe('POST');
+    expect(parsed.status).toBe(200);
+    expect(parsed.durationMs).toBe(42);
+    expect(line).not.toContain('\n');
+  });
+
+  it('omits undefined optional fields', () => {
+    const line = formatRequestLog({
+      ts: 't',
+      ip: 'i',
+      method: 'GET',
+      path: '/',
+      status: 200,
+      durationMs: 1,
+    });
+    expect(line).not.toContain('rateLimitHit');
+    expect(line).not.toContain('bodyBytes');
   });
 });
 

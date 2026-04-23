@@ -40,7 +40,10 @@ import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig } from './lib/config.js';
 import {
+  ConcurrencyLimiter,
+  enforceBodySizeLimit,
   extractClientIp,
+  formatRequestLog,
   parseCorsAllowed,
   RateLimiter,
   resolveCorsOrigin,
@@ -680,6 +683,27 @@ class CountlyMCPServer {
         : null;
       const trustProxy = (process.env.COUNTLY_TRUST_PROXY || '').toLowerCase() === 'true';
 
+      // Max request body bytes. Defaults to 1 MiB (MCP JSON-RPC bodies are
+      // typically a few KB). Configurable via COUNTLY_MAX_BODY_BYTES.
+      const maxBodyBytes = process.env.COUNTLY_MAX_BODY_BYTES !== undefined
+        ? Math.max(0, parseInt(process.env.COUNTLY_MAX_BODY_BYTES, 10) || 0)
+        : 1024 * 1024;
+
+      // Concurrent-connection ceiling per IP. Defaults to 50. 0 disables.
+      // Tunable via COUNTLY_MAX_CONCURRENT_PER_IP.
+      const maxConcurrentPerIp = process.env.COUNTLY_MAX_CONCURRENT_PER_IP !== undefined
+        ? Math.max(0, parseInt(process.env.COUNTLY_MAX_CONCURRENT_PER_IP, 10) || 0)
+        : 50;
+      const concurrencyLimiter = maxConcurrentPerIp > 0
+        ? new ConcurrencyLimiter(maxConcurrentPerIp)
+        : null;
+
+      // Opt-in structured NDJSON request log. Set COUNTLY_REQUEST_LOG=true
+      // (or "ndjson") to enable. Output goes to stderr.
+      const requestLogEnabled = ['true', 'ndjson', '1'].includes(
+        (process.env.COUNTLY_REQUEST_LOG || '').toLowerCase()
+      );
+
       // MCP server only responds to /mcp endpoint - other endpoints are available for other applications
       const mcpEndpoint = '/mcp';
       
@@ -697,6 +721,34 @@ class CountlyMCPServer {
       await this.server.connect(transport);
       
       const httpServer = http.createServer((req, res) => {
+        // Per-request wall-clock for the request log emitted at the bottom
+        // of this handler (when COUNTLY_REQUEST_LOG is on).
+        const reqStart = Date.now();
+        let rateLimitHit = false;
+
+        const writeRequestLog = (): void => {
+          if (!requestLogEnabled) {
+            return;
+          }
+          const clientIp = extractClientIp(req.headers, req.socket.remoteAddress, trustProxy);
+          const parsed = url.parse(req.url || '', true);
+          console.error(formatRequestLog({
+            ts: new Date().toISOString(),
+            ip: clientIp,
+            method: req.method || 'UNKNOWN',
+            path: parsed.pathname || '',
+            status: res.statusCode,
+            durationMs: Date.now() - reqStart,
+            rateLimitHit,
+          }));
+        };
+        res.on('finish', writeRequestLog);
+        res.on('close', () => {
+          if (!res.writableFinished) {
+            writeRequestLog();
+          }
+        });
+
         void (async () => {
         // Handle CORS for MCP and health endpoints only. Allowlist is
         // configured via COUNTLY_CORS_ALLOWED_ORIGINS; see parseCorsAllowed.
@@ -842,6 +894,7 @@ class CountlyMCPServer {
             const clientIp = extractClientIp(req.headers, req.socket.remoteAddress, trustProxy);
             const result = rateLimiter.check(clientIp);
             if (!result.ok) {
+              rateLimitHit = true;
               res.writeHead(429, {
                 'Content-Type': 'application/json',
                 'Retry-After': String(result.retryAfterSeconds),
@@ -850,6 +903,17 @@ class CountlyMCPServer {
                 error: 'Rate limit exceeded',
                 retry_after_seconds: result.retryAfterSeconds,
               }));
+              return;
+            }
+          }
+
+          // Enforce the body-size limit. Checks Content-Length upfront and
+          // streams-counts any subsequent chunks. If the limit is exceeded
+          // we respond 413 Payload Too Large and destroy the socket so a
+          // malicious client can't keep dumping bytes. 0 disables the check.
+          if (maxBodyBytes > 0) {
+            const ok = enforceBodySizeLimit(req, res, maxBodyBytes);
+            if (!ok) {
               return;
             }
           }
@@ -1554,6 +1618,33 @@ class CountlyMCPServer {
         });
       });
       
+      // Slow-loris / resource-exhaustion defenses. Node's defaults leave the
+      // server wide open: sockets can sit idle forever, and a single client
+      // can open thousands of connections. We set conservative timeouts and
+      // a per-IP concurrent-connection ceiling.
+      //
+      //   requestTimeout   max time from first byte to full request  (30s)
+      //   headersTimeout   max time to receive headers                (10s)
+      //   keepAliveTimeout close idle kept-alive connections          (5s)
+      //   timeout          socket inactivity                          (60s)
+      httpServer.requestTimeout = 30_000;
+      httpServer.headersTimeout = 10_000;
+      httpServer.keepAliveTimeout = 5_000;
+      httpServer.timeout = 60_000;
+
+      if (concurrencyLimiter) {
+        httpServer.on('connection', (socket) => {
+          const ip = socket.remoteAddress ?? 'unknown';
+          if (!concurrencyLimiter.accept(ip)) {
+            // Too many open connections for this IP. Kill immediately —
+            // don't let them consume a file descriptor or TLS handshake.
+            socket.destroy();
+            return;
+          }
+          socket.once('close', () => concurrencyLimiter.release(ip));
+        });
+      }
+
       httpServer.listen(port, hostname, () => {
         console.error(`✅ Countly MCP server running on HTTP at http://${hostname}:${port}${mcpEndpoint}`);
         console.error(`✅ Health check available at: http://${hostname}:${port}/health`);
