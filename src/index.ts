@@ -29,7 +29,7 @@ import axios, { AxiosInstance } from 'axios';
 import { AppCache, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
-import { buildConfig } from './lib/config.js';
+import { assertSafeServerUrl, buildConfig } from './lib/config.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
@@ -120,14 +120,17 @@ class CountlyMCPServer {
   private appCache: AppCache;
   private toolsConfig: ToolsConfig;
   private loopDetector: LoopDetector;
+  private lastTokenInUrlWarnAt: number = 0;
 
   constructor(testMode: boolean = false) {
     this.appCache = new AppCache();
     this.toolsConfig = loadToolsConfig(process.env);
     this.loopDetector = new LoopDetector();
     
-    // Initialize analytics (enabled by default; set ENABLE_ANALYTICS=false to disable)
-    const analyticsEnabled = (process.env.ENABLE_ANALYTICS || '').toLowerCase() !== 'false';
+    // Initialize analytics. Opt-in: enabled only when ENABLE_ANALYTICS=true.
+    // README has always documented this as "disabled by default"; the previous
+    // `!== 'false'` check silently opted users in. Flip to explicit opt-in.
+    const analyticsEnabled = (process.env.ENABLE_ANALYTICS || '').toLowerCase() === 'true';
     analytics.init(analyticsEnabled);
     
     // Log configuration on startup (only in non-test mode)
@@ -485,6 +488,28 @@ class CountlyMCPServer {
     }
   }
 
+  /**
+   * Warn when a caller passes the auth token via ?auth_token= URL query
+   * parameter instead of via the X-Countly-Auth-Token header. Tokens in URLs
+   * leak into access logs, reverse-proxy logs, browser history, and Referer
+   * headers. Support is kept for now for backward compatibility but will be
+   * removed in a future release. Rate-limited to once per minute so busy HTTP
+   * traffic does not flood stderr.
+   */
+  private warnTokenInUrl(): void {
+    const now = Date.now();
+    if (now - this.lastTokenInUrlWarnAt < 60_000) {
+      return;
+    }
+    this.lastTokenInUrlWarnAt = now;
+    console.error(
+      '⚠️  SECURITY: auth token was passed via ?auth_token= URL query parameter. ' +
+      'This leaks into access logs, browser history, and Referer headers. ' +
+      'Migrate callers to the X-Countly-Auth-Token header. ' +
+      'URL-parameter support is deprecated and will be removed in a future release.'
+    );
+  }
+
   private async getApps(): Promise<CountlyApp[]> {
     // Check if cache is still valid
     if (!this.appCache.isExpired()) {
@@ -687,6 +712,20 @@ class CountlyMCPServer {
             while (cleanUrl.endsWith('/')) {
               cleanUrl = cleanUrl.slice(0, -1);
             }
+            // SSRF guard: the serverUrl is caller-controlled over HTTP, so
+            // reject private/loopback/link-local targets (including cloud
+            // metadata endpoints like 169.254.169.254) before wiring it into
+            // the axios client. Without this check, any HTTP caller could
+            // redirect the MCP server's outbound requests at internal hosts.
+            try {
+              assertSafeServerUrl(cleanUrl);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.error(`Rejected serverUrl override: ${msg}`);
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Invalid server_url', message: msg }));
+              return;
+            }
             this.config.serverUrl = cleanUrl;
             this.httpClient.defaults.baseURL = this.config.serverUrl;
             const source = headerServerUrl ? 'headers' : 'URL parameters';
@@ -698,6 +737,13 @@ class CountlyMCPServer {
             this.setAuthHeader(authToken);
             const source = headerAuthToken ? 'headers' : 'URL parameters';
             console.error(`Auth token configured from ${source}`);
+            // Deprecation: tokens in URL query params end up in access logs,
+            // reverse-proxy logs, browser history, and Referer headers.
+            // Rate-limit the warning so we log it at most once per minute
+            // even under heavy HTTP traffic.
+            if (!headerAuthToken && paramAuthToken) {
+              this.warnTokenInUrl();
+            }
           }
           
           // Handle with StreamableHTTPServerTransport (modern protocol)

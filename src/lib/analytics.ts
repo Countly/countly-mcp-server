@@ -1,7 +1,7 @@
 /**
  * Analytics tracking module using Countly SDK
- * Provides comprehensive product and usage analytics
- * Enabled by default, can be disabled via ENABLE_ANALYTICS=false environment variable
+ * Provides comprehensive product and usage analytics.
+ * Disabled by default — opt in with ENABLE_ANALYTICS=true.
  */
 
 // @ts-ignore - countly-sdk-nodejs doesn't have TypeScript definitions
@@ -17,14 +17,15 @@ class Analytics {
   private deviceId: string = 'mcp';
 
   /**
-   * Initialize analytics tracking
-   * @param enabled - Whether analytics is enabled (defaults to true unless ENABLE_ANALYTICS=false)
+   * Initialize analytics tracking.
+   * Opt-in: enabled only when the caller passes true (which index.ts does
+   * only when ENABLE_ANALYTICS=true is set in the environment).
    */
-  init(enabled: boolean = true): void {
+  init(enabled: boolean = false): void {
     this.enabled = enabled;
 
     if (!this.enabled) {
-      console.error('📊 Analytics: Disabled (set ENABLE_ANALYTICS=true or remove override to enable)');
+      console.error('📊 Analytics: Disabled (set ENABLE_ANALYTICS=true to opt in)');
       return;
     }
 
