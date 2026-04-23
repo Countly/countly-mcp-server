@@ -47,6 +47,7 @@ import {
   parseCorsAllowed,
   RateLimiter,
   resolveCorsOrigin,
+  sanitizeForLog,
 } from './lib/http-security.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
@@ -949,19 +950,31 @@ class CountlyMCPServer {
             try {
               assertSafeServerUrl(cleanUrl);
             } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              console.error(`Rejected serverUrl override: ${msg}`);
+              // Sanitize before logging — the URL came from an HTTP
+              // header, so it's under attacker control and could carry
+              // newlines / ANSI escapes used for log injection (CWE-117).
+              const rawMsg = err instanceof Error ? err.message : String(err);
+              console.error(`Rejected serverUrl override: ${sanitizeForLog(rawMsg)}`);
+              // Respond with a constant generic message instead of echoing
+              // the error detail (which embeds the caller's URL). Keeps
+              // the server-side log useful for debugging while denying
+              // log-injection / information-leak downstream.
               res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'Invalid server_url', message: msg }));
+              res.end(JSON.stringify({
+                error: 'Invalid server_url',
+                message: 'The provided Countly server URL was rejected. It must be an http(s) URL that does not target loopback, private, link-local, or cloud-metadata addresses.',
+              }));
               return;
             }
             effectiveServerUrl = cleanUrl;
             const source = headerServerUrl ? 'headers' : 'URL parameters';
-            console.error(`Using Countly server from ${source}:`, effectiveServerUrl);
+            console.error(`Using Countly server from ${source}:`, sanitizeForLog(effectiveServerUrl));
           }
 
           if (authToken) {
             const source = headerAuthToken ? 'headers' : 'URL parameters';
+            // `source` is one of two hard-coded strings — no log-injection
+            // risk here. Leave as-is.
             console.error(`Auth token configured from ${source}`);
             if (!headerAuthToken && paramAuthToken) {
               this.warnTokenInUrl();

@@ -283,6 +283,31 @@ export function enforceBodySizeLimit(
 }
 
 /**
+ * Make a potentially-attacker-controlled string safe to concatenate into a
+ * stderr log line. Strips control characters (LF, CR, ESC, etc.) that would
+ * otherwise let a caller inject fake log entries or smuggle ANSI escapes,
+ * and truncates to a fixed length so logs stay bounded.
+ *
+ * Covers the CWE-117 "log injection" pattern flagged by CodeQL when
+ * user-supplied values (e.g. the `server_url` header) end up in
+ * `console.error(...)` templates.
+ */
+export function sanitizeForLog(value: unknown, maxLen = 256): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const s = typeof value === 'string' ? value : String(value);
+  // Drop ASCII control characters (0x00-0x1F) and DEL (0x7F), but keep
+  // visible / printable bytes (including non-ASCII UTF-8, which stays
+  // valid in a UTF-8 log file).
+  const clean = s.replace(/[\u0000-\u001F\u007F]/g, '?');
+  if (clean.length <= maxLen) {
+    return clean;
+  }
+  return clean.slice(0, maxLen) + '…';
+}
+
+/**
  * Fields logged per request when structured request logging is enabled.
  */
 export interface RequestLogEntry {

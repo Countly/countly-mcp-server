@@ -12,6 +12,7 @@ import {
   parseCorsAllowed,
   RateLimiter,
   resolveCorsOrigin,
+  sanitizeForLog,
 } from '../src/lib/http-security.js';
 
 /**
@@ -495,6 +496,53 @@ describe('enforceBodySizeLimit', () => {
     req.emit('data', Buffer.alloc(30));
     expect(res.didEnd()).toBe(false);
     expect(req.isDestroyed()).toBe(false);
+  });
+});
+
+describe('sanitizeForLog', () => {
+  it('strips LF / CR / other control chars to "?"', () => {
+    expect(sanitizeForLog('good\nevil')).toBe('good?evil');
+    expect(sanitizeForLog('a\r\nb')).toBe('a??b');
+    expect(sanitizeForLog('tab\there')).toBe('tab?here');
+    expect(sanitizeForLog('bell\x07!')).toBe('bell?!');
+  });
+
+  it('strips ANSI escape sequences (the ESC char)', () => {
+    // CSI red: "\x1b[31m"
+    expect(sanitizeForLog('attack\x1b[31mRED')).toBe('attack?[31mRED');
+  });
+
+  it('strips DEL (0x7F)', () => {
+    expect(sanitizeForLog('x\x7fy')).toBe('x?y');
+  });
+
+  it('keeps printable ASCII and multi-byte UTF-8 intact', () => {
+    expect(sanitizeForLog('Hello, World!')).toBe('Hello, World!');
+    expect(sanitizeForLog('über — naïve 日本語')).toBe('über — naïve 日本語');
+  });
+
+  it('truncates overlong strings with an ellipsis', () => {
+    const longStr = 'x'.repeat(300);
+    const out = sanitizeForLog(longStr);
+    expect(out.length).toBeLessThanOrEqual(257); // 256 + "…"
+    expect(out.endsWith('…')).toBe(true);
+  });
+
+  it('handles null / undefined cleanly', () => {
+    expect(sanitizeForLog(null)).toBe('');
+    expect(sanitizeForLog(undefined)).toBe('');
+  });
+
+  it('stringifies non-string values', () => {
+    expect(sanitizeForLog(42)).toBe('42');
+    expect(sanitizeForLog({ a: 1 })).toBe('[object Object]');
+  });
+
+  it('defeats log-injection payloads from attacker-controlled URLs', () => {
+    const payload = 'http://attacker.example\n[INFO] forged log entry: all is well';
+    const safe = sanitizeForLog(payload);
+    expect(safe).not.toContain('\n');
+    expect(safe.startsWith('http://attacker.example?')).toBe(true);
   });
 });
 
