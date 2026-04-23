@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- **Jobs module** — dropped the `jobs_list` and `job_runs` tools from the `core` category. Both called `/o?method=jobs`, which is not documented in the Countly API reference and has no first-party spec; operators looking for background-task visibility should use the documented `/o/tasks/*` endpoints directly.
+- **`views_segments` tool** — removed the `views_segments` tool (was calling `/o?method=get_view_segments`, which is not documented in the Countly API reference). For view segmentation discovery use `metadata_get` or `queriable_fields_list` with the `[CLY]_view` event.
+
 ## [1.2.1] - 2026-04-22
 
 ### Fixed
