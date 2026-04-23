@@ -664,13 +664,42 @@ describe('Analytics', () => {
   });
 
   describe('server-url hashing', () => {
-    it('normalizes consistently: scheme stripped, lowercased, trailing slash removed', () => {
+    it('normalizes consistently: scheme stripped, hostname lowercased, trailing slash removed', () => {
       expect(normalizeServerUrlForHash('https://example.com/api'))
         .toBe(normalizeServerUrlForHash('https://example.com/api/'));
       expect(normalizeServerUrlForHash('https://EXAMPLE.com/api'))
         .toBe(normalizeServerUrlForHash('http://example.com/api'));
       expect(normalizeServerUrlForHash('HTTPS://Example.COM///'))
         .toBe('example.com');
+    });
+
+    it('strips default ports (:80 on http, :443 on https)', () => {
+      // These are semantically equivalent URLs and must collapse to the
+      // same hash — otherwise distinct-server aggregation splits.
+      expect(normalizeServerUrlForHash('https://example.com'))
+        .toBe(normalizeServerUrlForHash('https://example.com:443'));
+      expect(normalizeServerUrlForHash('http://example.com'))
+        .toBe(normalizeServerUrlForHash('http://example.com:80'));
+      expect(computeServerHash('https://example.com'))
+        .toBe(computeServerHash('https://example.com:443'));
+    });
+
+    it('preserves non-default ports', () => {
+      // A custom port IS meaningful — different deployment.
+      expect(normalizeServerUrlForHash('https://example.com:8443'))
+        .not.toBe(normalizeServerUrlForHash('https://example.com'));
+    });
+
+    it('preserves path case (RFC 3986: paths are case-sensitive)', () => {
+      // /API and /api are potentially different endpoints; do not merge.
+      expect(normalizeServerUrlForHash('https://example.com/API'))
+        .not.toBe(normalizeServerUrlForHash('https://example.com/api'));
+    });
+
+    it('accepts bare hostnames without a scheme', () => {
+      // Common config style: `COUNTLY_SERVER_URL=my-countly.com`
+      expect(normalizeServerUrlForHash('example.com'))
+        .toBe(normalizeServerUrlForHash('https://example.com'));
     });
 
     it('hashes consistently across scheme / case / trailing-slash variations', () => {
@@ -691,6 +720,7 @@ describe('Analytics', () => {
     it('returns undefined for empty / undefined input', () => {
       expect(computeServerHash(undefined)).toBeUndefined();
       expect(computeServerHash('')).toBeUndefined();
+      expect(computeServerHash('   ')).toBeUndefined();
     });
 
     it('hashes different URLs to different values', () => {
@@ -785,6 +815,22 @@ describe('Analytics', () => {
       expect(Countly.init).toHaveBeenCalledWith(
         expect.objectContaining({ device_id: 'mcp' })
       );
+    });
+
+    it('includes the hash on the server_started event (fired from within init)', async () => {
+      const Countly = await getCountlyMock();
+      // Resolver returns a URL immediately so the very first event — which
+      // trackServerStart() emits from inside init() — is already tagged.
+      // This guards against the regression where server_started events
+      // shipped without the `server` segment because the config wasn't
+      // wired up yet at init time.
+      analytics.init(true, () => 'https://api.count.ly');
+
+      const serverStartedCall = (Countly.add_event as any).mock.calls.find(
+        (c: any[]) => c[0].key === 'server_started'
+      );
+      expect(serverStartedCall).toBeDefined();
+      expect(serverStartedCall[0].segmentation.server).toMatch(/^[0-9a-f]{16}$/);
     });
   });
 

@@ -28,19 +28,46 @@ const require = createRequire(import.meta.url);
 
 /**
  * Normalize a Countly server URL into a canonical form before hashing, so
- * variations (trailing slash, scheme, uppercase host, default port) collapse
- * to the same hash.
+ * variations that are semantically equivalent collapse to the same hash:
+ *
+ *   - scheme dropped (`http://` == `https://` for identity purposes)
+ *   - hostname lowercased (URLs are case-insensitive on host)
+ *   - default port stripped (`:80` for http, `:443` for https)
+ *   - trailing slashes on the pathname stripped
+ *   - path / query / fragment case preserved (RFC 3986: only the host is
+ *     case-insensitive)
+ *
+ * Uses `new URL()` for structural correctness; falls back to a minimal
+ * regex-based strip when the input doesn't parse as a URL (so a bare
+ * hostname or misformatted value still produces a stable hash).
  */
 export function normalizeServerUrlForHash(url: string): string {
-  if (!url) {
+  const trimmed = (url ?? '').trim();
+  if (!trimmed) {
     return '';
   }
-  // Strip scheme (http:/https:), lowercase the whole thing (URLs are case-
-  // insensitive on host), and strip any trailing slashes.
-  return url
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/+$/, '');
+
+  // If there's no scheme, prepend one so `new URL()` succeeds without
+  // changing the semantic identity — we drop the scheme again below.
+  const hasScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed);
+  try {
+    const parsed = new URL(hasScheme ? trimmed : `https://${trimmed}`);
+    const hostname = parsed.hostname.toLowerCase();
+    const isDefaultPort =
+      (parsed.protocol === 'http:' && parsed.port === '80') ||
+      (parsed.protocol === 'https:' && parsed.port === '443');
+    const port = parsed.port && !isDefaultPort ? `:${parsed.port}` : '';
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    // Preserve search + hash (rare on Countly URLs but keep case).
+    return `${hostname}${port}${pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    // Non-URL input (malformed, unexpected scheme, etc.): minimal best-
+    // effort normalization — strip scheme prefix and trailing slashes,
+    // preserve path case.
+    return trimmed
+      .replace(/^[a-z][a-z\d+.-]*:\/\//i, '')
+      .replace(/\/+$/, '');
+  }
 }
 
 /**

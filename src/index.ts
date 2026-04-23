@@ -210,15 +210,23 @@ class CountlyMCPServer {
     // The getServerUrl callback lets analytics attach a short opaque SHA-256
     // hash of the current Countly server URL (as the `server` segment) to
     // every event, so stats.count.ly can aggregate distinct-server counts
-    // without ever seeing raw URLs. In HTTP transport the URL varies per
-    // request (via X-Countly-Server-Url), so we prefer the AsyncLocalStorage-
-    // carried value; in stdio mode we fall back to the env-derived config.
-    // `this.config` is populated below — the callback is invoked lazily at
-    // event-track time, by which point it exists.
+    // without ever seeing raw URLs.
+    //
+    // Priority:
+    //   1. HTTP per-request URL from AsyncLocalStorage (multi-tenant)
+    //   2. static server config (stdio after constructor finishes)
+    //   3. process.env.COUNTLY_SERVER_URL (pre-config fallback — the
+    //      `server_started` event fires from inside analytics.init() which
+    //      runs before this.config is assigned, so without this fallback
+    //      the very first event would ship without the `server` segment)
     const analyticsEnabled = (process.env.ENABLE_ANALYTICS || '').toLowerCase() === 'true';
     analytics.init(analyticsEnabled, () => {
       const reqState = this.requestContext.getStore();
-      return reqState?.serverUrl || this.config?.serverUrl;
+      return (
+        reqState?.serverUrl
+        || this.config?.serverUrl
+        || process.env.COUNTLY_SERVER_URL
+      );
     });
     
     // Log configuration on startup (only in non-test mode)
