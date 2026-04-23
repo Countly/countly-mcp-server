@@ -2,6 +2,12 @@ import { describe, it, expect } from 'vitest';
 
 import { AppCache, AppCacheRegistry } from '../src/lib/app-cache.js';
 import { assertSafeServerHost, assertSafeServerUrl } from '../src/lib/config.js';
+import {
+  extractClientIp,
+  parseCorsAllowed,
+  RateLimiter,
+  resolveCorsOrigin,
+} from '../src/lib/http-security.js';
 
 /**
  * Regression tests for the security hardening done on this branch.
@@ -188,5 +194,118 @@ describe('AppCacheRegistry: per-tenant isolation', () => {
     // on the private field being a Map and inspect via JSON for sanity.
     const serialized = JSON.stringify(reg, (_k, v) => (v instanceof Map ? [...v.keys()] : v));
     expect(serialized).not.toContain(token);
+  });
+});
+
+describe('parseCorsAllowed', () => {
+  it('returns "*" for undefined', () => {
+    expect(parseCorsAllowed(undefined)).toBe('*');
+  });
+  it('returns "*" for empty string', () => {
+    expect(parseCorsAllowed('')).toBe('*');
+  });
+  it('returns "*" for explicit "*"', () => {
+    expect(parseCorsAllowed('*')).toBe('*');
+  });
+  it('parses a single origin', () => {
+    expect(parseCorsAllowed('https://a.com')).toEqual(['https://a.com']);
+  });
+  it('parses a comma-separated list', () => {
+    expect(parseCorsAllowed('https://a.com, https://b.com')).toEqual([
+      'https://a.com',
+      'https://b.com',
+    ]);
+  });
+  it('falls back to "*" if all entries are empty', () => {
+    expect(parseCorsAllowed(', ,')).toBe('*');
+  });
+});
+
+describe('resolveCorsOrigin', () => {
+  it('returns "*" when allowlist is "*"', () => {
+    expect(resolveCorsOrigin('*', 'https://evil.com')).toBe('*');
+    expect(resolveCorsOrigin('*', undefined)).toBe('*');
+  });
+  it('echoes the origin when it is on the allowlist', () => {
+    expect(
+      resolveCorsOrigin(['https://a.com', 'https://b.com'], 'https://a.com')
+    ).toBe('https://a.com');
+  });
+  it('returns null when the origin is not on the allowlist', () => {
+    expect(
+      resolveCorsOrigin(['https://a.com'], 'https://evil.com')
+    ).toBeNull();
+  });
+  it('returns null when allowlist is specific and no Origin header is sent', () => {
+    expect(resolveCorsOrigin(['https://a.com'], undefined)).toBeNull();
+  });
+});
+
+describe('RateLimiter', () => {
+  it('allows requests under the limit', () => {
+    const rl = new RateLimiter({ windowMs: 60_000, maxRequests: 3 });
+    expect(rl.check('1.1.1.1').ok).toBe(true);
+    expect(rl.check('1.1.1.1').ok).toBe(true);
+    expect(rl.check('1.1.1.1').ok).toBe(true);
+  });
+
+  it('rejects requests over the limit with a Retry-After', () => {
+    const rl = new RateLimiter({ windowMs: 60_000, maxRequests: 2 });
+    const now = 1_000_000;
+    expect(rl.check('1.1.1.1', now).ok).toBe(true);
+    expect(rl.check('1.1.1.1', now + 100).ok).toBe(true);
+    const third = rl.check('1.1.1.1', now + 200);
+    expect(third.ok).toBe(false);
+    if (!third.ok) {
+      expect(third.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+      expect(third.retryAfterSeconds).toBeLessThanOrEqual(60);
+    }
+  });
+
+  it('isolates limits per key', () => {
+    const rl = new RateLimiter({ windowMs: 60_000, maxRequests: 1 });
+    expect(rl.check('a').ok).toBe(true);
+    expect(rl.check('b').ok).toBe(true);
+    expect(rl.check('a').ok).toBe(false);
+    expect(rl.check('b').ok).toBe(false);
+  });
+
+  it('expires entries outside the window', () => {
+    const rl = new RateLimiter({ windowMs: 1000, maxRequests: 1 });
+    expect(rl.check('k', 0).ok).toBe(true);
+    expect(rl.check('k', 500).ok).toBe(false);
+    // 1001ms later, the first hit should have aged out
+    expect(rl.check('k', 1001).ok).toBe(true);
+  });
+
+  it('caps the total number of tracked keys', () => {
+    const rl = new RateLimiter({ windowMs: 60_000, maxRequests: 10, maxTrackedKeys: 3 });
+    rl.check('a');
+    rl.check('b');
+    rl.check('c');
+    rl.check('d'); // evicts oldest
+    expect(rl.size()).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('extractClientIp', () => {
+  it('returns the socket address when trustProxy=false', () => {
+    expect(
+      extractClientIp({ 'x-forwarded-for': '1.2.3.4' }, '5.6.7.8', false)
+    ).toBe('5.6.7.8');
+  });
+
+  it('honors X-Forwarded-For when trustProxy=true', () => {
+    expect(
+      extractClientIp({ 'x-forwarded-for': '1.2.3.4, 9.9.9.9' }, '5.6.7.8', true)
+    ).toBe('1.2.3.4');
+  });
+
+  it('falls back to socket address when XFF is missing even with trustProxy', () => {
+    expect(extractClientIp({}, '5.6.7.8', true)).toBe('5.6.7.8');
+  });
+
+  it('returns "unknown" when nothing is available', () => {
+    expect(extractClientIp({}, undefined, true)).toBe('unknown');
   });
 });

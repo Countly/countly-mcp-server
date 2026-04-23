@@ -9,7 +9,15 @@ dotenv.config({ quiet: true });
 import { AsyncLocalStorage } from 'async_hooks';
 import { realpathSync } from 'fs';
 import http from 'http';
+import { createRequire } from 'module';
 import url from 'url';
+
+// Load the package version at runtime so the MCP handshake, the well-known
+// manifest, and any future self-identification share a single source of
+// truth. Previously these drifted (handshake reported "1.0.0" while the
+// manifest reported "1.0.1" and package.json said something else entirely).
+const require = createRequire(import.meta.url);
+const { version: PACKAGE_VERSION } = require('../package.json') as { version: string };
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -31,6 +39,12 @@ import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } fro
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig } from './lib/config.js';
+import {
+  extractClientIp,
+  parseCorsAllowed,
+  RateLimiter,
+  resolveCorsOrigin,
+} from './lib/http-security.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
@@ -175,7 +189,7 @@ class CountlyMCPServer {
     this.server = new Server(
       {
         name: 'countly-mcp-server',
-        version: '1.0.0',
+        version: PACKAGE_VERSION,
       },
       {
         capabilities: {
@@ -621,8 +635,27 @@ class CountlyMCPServer {
     if (transportType === 'http') {
       const port = httpConfig?.port || 3101;
       const hostname = httpConfig?.hostname || 'localhost';
-      const corsEnabled = httpConfig?.cors || true;
-      
+      // Note: was `httpConfig?.cors || true` which always evaluates to true
+      // (|| treats `false` as falsy). Switch to nullish-coalescing so
+      // `--no-cors` actually disables CORS.
+      const corsEnabled = httpConfig?.cors ?? true;
+
+      // CORS allowlist: defaults to "*" for backward compatibility, but
+      // operators running the MCP server behind a browser-facing origin
+      // should set COUNTLY_CORS_ALLOWED_ORIGINS to a specific comma-
+      // separated list (e.g. "https://my-app.example.com").
+      const corsAllowed = parseCorsAllowed(process.env.COUNTLY_CORS_ALLOWED_ORIGINS);
+
+      // Rate limiter for /mcp endpoint. Defaults to 120 req/min per IP.
+      // Tunable via COUNTLY_RATE_LIMIT_RPM=<number> or 0 to disable.
+      const rateLimitRpm = process.env.COUNTLY_RATE_LIMIT_RPM !== undefined
+        ? Math.max(0, parseInt(process.env.COUNTLY_RATE_LIMIT_RPM, 10) || 0)
+        : 120;
+      const rateLimiter = rateLimitRpm > 0
+        ? new RateLimiter({ windowMs: 60_000, maxRequests: rateLimitRpm })
+        : null;
+      const trustProxy = (process.env.COUNTLY_TRUST_PROXY || '').toLowerCase() === 'true';
+
       // MCP server only responds to /mcp endpoint - other endpoints are available for other applications
       const mcpEndpoint = '/mcp';
       
@@ -641,19 +674,34 @@ class CountlyMCPServer {
       
       const httpServer = http.createServer((req, res) => {
         void (async () => {
-        // Handle CORS for MCP and health endpoints only
+        // Handle CORS for MCP and health endpoints only. Allowlist is
+        // configured via COUNTLY_CORS_ALLOWED_ORIGINS; see parseCorsAllowed.
         if (corsEnabled) {
           const parsedUrl = url.parse(req.url || '', true);
           const pathname = parsedUrl.pathname;
-          
-          // Only set CORS headers for our endpoints
+
           if (pathname === mcpEndpoint || pathname === '/health' || pathname === '/.well-known/mcp-manifest.json') {
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-            
-            if (req.method === 'OPTIONS') {
-              res.writeHead(200);
+            const requestOrigin = (req.headers.origin as string | undefined);
+            const allowOrigin = resolveCorsOrigin(corsAllowed, requestOrigin);
+            if (allowOrigin !== null) {
+              res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+              // When we echo a specific origin (not "*"), browsers require
+              // Vary: Origin so caches don't serve the response to another
+              // origin. See MDN on CORS + caching.
+              if (allowOrigin !== '*') {
+                res.setHeader('Vary', 'Origin');
+              }
+              res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+              res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Countly-Auth-Token, X-Countly-Server-Url');
+
+              if (req.method === 'OPTIONS') {
+                res.writeHead(200);
+                res.end();
+                return;
+              }
+            } else if (req.method === 'OPTIONS') {
+              // Pre-flight from a disallowed origin — refuse cleanly.
+              res.writeHead(403);
               res.end();
               return;
             }
@@ -685,7 +733,7 @@ class CountlyMCPServer {
           
           const manifest = {
             name: 'countly-mcp-server',
-            version: '1.0.1',
+            version: PACKAGE_VERSION,
             description: 'Model Context Protocol server for Countly Analytics Platform',
             protocol: {
               version: '2025-06-18',
@@ -761,7 +809,27 @@ class CountlyMCPServer {
         // MCP endpoint - ONLY endpoint that handles MCP protocol requests
         if (pathname === mcpEndpoint) {
           analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
-          
+
+          // Per-IP rate limiting. Configurable via COUNTLY_RATE_LIMIT_RPM
+          // (default 120 requests per minute). Set to 0 to disable. IP is
+          // taken from the socket unless COUNTLY_TRUST_PROXY=true, in which
+          // case we honor X-Forwarded-For.
+          if (rateLimiter) {
+            const clientIp = extractClientIp(req.headers, req.socket.remoteAddress, trustProxy);
+            const result = rateLimiter.check(clientIp);
+            if (!result.ok) {
+              res.writeHead(429, {
+                'Content-Type': 'application/json',
+                'Retry-After': String(result.retryAfterSeconds),
+              });
+              res.end(JSON.stringify({
+                error: 'Rate limit exceeded',
+                retry_after_seconds: result.retryAfterSeconds,
+              }));
+              return;
+            }
+          }
+
           // Check for configuration in custom headers (secure way, recommended)
           const headerServerUrl = req.headers['x-countly-server-url'] as string;
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;

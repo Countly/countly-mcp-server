@@ -7,9 +7,14 @@
 // @ts-ignore - countly-sdk-nodejs doesn't have TypeScript definitions
 import Countly from 'countly-sdk-nodejs';
 import { createHash } from 'crypto';
+import { createRequire } from 'module';
 
 const ANALYTICS_URL = 'https://stats.count.ly';
 const ANALYTICS_APP_KEY = '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7';
+
+// Load the package version once. Uses createRequire because the rest of the
+// file is ESM and require() isn't available natively.
+const require = createRequire(import.meta.url);
 
 class Analytics {
   private enabled: boolean = false;
@@ -65,14 +70,16 @@ class Analytics {
   }
 
   /**
-   * Get app version from package.json
+   * Get app version from package.json. Shared with the MCP handshake /
+   * manifest version in index.ts — there is no compile-time wiring, just
+   * the single JSON source of truth.
    */
   private getAppVersion(): string {
     try {
-      const pkg = require('../../package.json');
-      return pkg.version || '1.0.0';
+      const pkg = require('../../package.json') as { version?: string };
+      return pkg.version || '0.0.0';
     } catch {
-      return '1.0.0';
+      return '0.0.0';
     }
   }
 

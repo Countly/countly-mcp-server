@@ -219,6 +219,9 @@ The server supports multiple authentication methods (in priority order):
 | `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics (set to `true` to opt in) |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
+| `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). |
+| `COUNTLY_RATE_LIMIT_RPM` | No | `120` | Per-IP requests per minute on the `/mcp` endpoint (HTTP transport). Set to `0` to disable. |
+| `COUNTLY_TRUST_PROXY` | No | `false` | When `true`, use `X-Forwarded-For` for the rate-limit client IP. Only enable when the server is behind a trusted reverse proxy that sets this header. |
 
 *At least one authentication method must be configured
 
