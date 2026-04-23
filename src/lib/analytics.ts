@@ -1,15 +1,22 @@
 /**
  * Analytics tracking module using Countly SDK
- * Provides comprehensive product and usage analytics
- * Enabled by default, can be disabled via ENABLE_ANALYTICS=false environment variable
+ * Provides comprehensive product and usage analytics.
+ * Disabled by default — opt in with ENABLE_ANALYTICS=true.
  */
 
 // @ts-ignore - countly-sdk-nodejs doesn't have TypeScript definitions
 import Countly from 'countly-sdk-nodejs';
 import { createHash } from 'crypto';
+import { createRequire } from 'module';
+
+import { redactSensitiveInMessage } from './error-handler.js';
 
 const ANALYTICS_URL = 'https://stats.count.ly';
 const ANALYTICS_APP_KEY = '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7';
+
+// Load the package version once. Uses createRequire because the rest of the
+// file is ESM and require() isn't available natively.
+const require = createRequire(import.meta.url);
 
 class Analytics {
   private enabled: boolean = false;
@@ -17,14 +24,15 @@ class Analytics {
   private deviceId: string = 'mcp';
 
   /**
-   * Initialize analytics tracking
-   * @param enabled - Whether analytics is enabled (defaults to true unless ENABLE_ANALYTICS=false)
+   * Initialize analytics tracking.
+   * Opt-in: enabled only when the caller passes true (which index.ts does
+   * only when ENABLE_ANALYTICS=true is set in the environment).
    */
-  init(enabled: boolean = true): void {
+  init(enabled: boolean = false): void {
     this.enabled = enabled;
 
     if (!this.enabled) {
-      console.error('📊 Analytics: Disabled (set ENABLE_ANALYTICS=true or remove override to enable)');
+      console.error('📊 Analytics: Disabled (set ENABLE_ANALYTICS=true to opt in)');
       return;
     }
 
@@ -64,14 +72,16 @@ class Analytics {
   }
 
   /**
-   * Get app version from package.json
+   * Get app version from package.json. Shared with the MCP handshake /
+   * manifest version in index.ts — there is no compile-time wiring, just
+   * the single JSON source of truth.
    */
   private getAppVersion(): string {
     try {
-      const pkg = require('../../package.json');
-      return pkg.version || '1.0.0';
+      const pkg = require('../../package.json') as { version?: string };
+      return pkg.version || '0.0.0';
     } catch {
-      return '1.0.0';
+      return '0.0.0';
     }
   }
 
@@ -189,14 +199,19 @@ class Analytics {
       return;
     }
 
+    // Defence-in-depth: redact anything that looks like a bearer token /
+    // API key before it leaves the process for stats.count.ly or the
+    // Countly crash-log endpoint.
+    const redacted = redactSensitiveInMessage(errorMessage);
+
     this.trackEvent('error_occurred', {
       error_type: errorType,
-      error_message: errorMessage.substring(0, 100), // Limit length
+      error_message: redacted.substring(0, 100), // Limit length
       tool: toolName || 'unknown',
     });
 
     // Also record as crash for visibility
-    Countly.log_error(new Error(`${errorType}: ${errorMessage}`));
+    Countly.log_error(new Error(`${errorType}: ${redacted}`));
   }
 
   /**

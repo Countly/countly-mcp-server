@@ -7,12 +7,12 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getEventsAndSegmentsToolDefinition = {
   name: 'events_list',
-  description: 'List all events and their segments for an application. This shows exactly how events appear in the database, including both custom events and internal Countly events.',
+  description: 'List event definitions for an app: custom events (key, display name, category, segments) via /o?method=get_events, plus the built-in [CLY]_* events with their known segments. For event totals and breakdown data use query_data with query_type="events"; for richer metadata use metadata_get.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -190,16 +190,16 @@ function getSegmentTypeDescription(type: string): string {
 
 export const createEventToolDefinition = {
   name: 'events_create',
-  description: 'Create or update an event definition with display name and description. Note: segments are created automatically when events are sent from SDK.',
+  description: 'Create or update metadata (display name, description, category) for an event key via /i/events/edit_map. Segments are populated automatically by SDK-reported events, not by this tool. To list existing events use events_list.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      key: { type: 'string', description: 'Event key (required)' },
-      name: { type: 'string', description: 'Display name for the event (defaults to key if not provided)' },
-      description: { type: 'string', description: 'Description for the event' },
-      category: { type: 'string', description: 'Category ID to assign the event to' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      key: { type: 'string', description: 'Event key (the identifier SDKs send, e.g. "purchase_completed").' },
+      name: { type: 'string', description: 'Display name shown in the dashboard. Defaults to the key when omitted.' },
+      description: { type: 'string', description: 'Free-form description of what the event tracks.' },
+      category: { type: 'string', description: 'Optional category ID to group the event under.' },
     },
     required: ['key'],
   },
@@ -253,16 +253,16 @@ export async function handleCreateEvent(context: ToolContext, args: any): Promis
 
 export const deleteEventsToolDefinition = {
   name: 'events_delete',
-  description: 'Delete events and all their data from the application. WARNING: This action is irreversible!',
+  description: 'Delete one or more event definitions and all their historical data via /i/events/delete_events. WARNING: irreversible. For creating/updating definitions use events_create.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       events: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Array of event keys to delete (e.g., ["wallet_connection_failed"])'
+        description: 'Event keys to delete (e.g. ["wallet_connection_failed"]). Must be a non-empty array.'
       },
     },
     required: ['events'],

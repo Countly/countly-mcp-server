@@ -16,12 +16,12 @@ import type { ToolContext } from './types.js';
  */
 export const listDashboardsTool = {
   name: 'dashboards_list',
-  description: 'List all available dashboards for the current user',
+  description: 'List custom dashboards accessible to the current user via /o/dashboards/all. Requires the dashboards plugin. For widgets and live data of one dashboard use dashboards_data.',
   inputSchema: z.object({
     just_schema: z.boolean()
       .optional()
       .default(true)
-      .describe('Whether to return just the schema without data'),
+      .describe('When true, return dashboard metadata and widget layout without running widget queries (faster). Defaults to true.'),
   }),
 };
 
@@ -52,18 +52,18 @@ async function handleListDashboards(args: z.infer<typeof listDashboardsTool.inpu
  */
 export const getDashboardDataTool = {
   name: 'dashboards_data',
-  description: 'Get widgets and data for a specific dashboard with optional period filtering',
+  description: 'Get a dashboard including its widgets and computed data for the given period via /o/dashboards. Requires the dashboards plugin. To list dashboards use dashboards_list.',
   inputSchema: z.object({
     dashboard_id: z.string()
-      .describe('Dashboard ID to retrieve'),
+      .describe('Dashboard identifier to retrieve. Obtain it from dashboards_list.'),
     period: z.string()
       .optional()
       .default('30days')
-      .describe('Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds]'),
+      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".'),
     action: z.string()
       .optional()
       .default('')
-      .describe('Optional action parameter'),
+      .describe('Optional action passthrough (e.g. "refresh"). Defaults to empty string.'),
   }),
 };
 
@@ -96,30 +96,30 @@ async function handleGetDashboardData(args: z.infer<typeof getDashboardDataTool.
  */
 export const createDashboardTool = {
   name: 'dashboards_create',
-  description: 'Create a new dashboard with specified settings',
+  description: 'Create an empty custom dashboard via /i/dashboards/create. Requires the dashboards plugin. Add widgets afterwards with dashboards_widget_add.',
   inputSchema: z.object({
     name: z.string()
-      .describe('Dashboard name'),
+      .describe('Display name for the dashboard.'),
     share_with: z.string()
       .optional()
       .default('all-users')
-      .describe('Sharing settings: "all-users", "selected-users", or "none"'),
+      .describe('Sharing mode: "all-users" (everyone), "selected-users" (specific accounts), or "none" (creator only). Defaults to "all-users".'),
     send_email_invitation: z.boolean()
       .optional()
       .default(false)
-      .describe('Whether to send email invitations to shared users'),
+      .describe('When true, email shared users about the new dashboard. Defaults to false.'),
     use_refresh_rate: z.boolean()
       .optional()
       .default(true)
-      .describe('Whether to enable auto-refresh'),
+      .describe('When true, auto-refresh widgets on the interval in refreshRate. Defaults to true.'),
     refreshRate: z.number()
       .optional()
       .default(30)
-      .describe('Auto-refresh rate in seconds'),
+      .describe('Auto-refresh interval in seconds (used when use_refresh_rate=true). Defaults to 30.'),
     theme: z.number()
       .optional()
       .default(0)
-      .describe('Dashboard theme (0 for default)'),
+      .describe('Theme index (0 = default). Defaults to 0.'),
   }),
 };
 
@@ -158,25 +158,25 @@ async function handleCreateDashboard(args: z.infer<typeof createDashboardTool.in
  */
 export const updateDashboardTool = {
   name: 'dashboards_update',
-  description: 'Update an existing dashboard configuration',
+  description: 'Update settings on an existing dashboard (name, sharing, theme, refresh) via /i/dashboards/update. Only supplied fields change. Requires the dashboards plugin. For widget changes use dashboards_widget_update.',
   inputSchema: z.object({
     dashboard_id: z.string()
-      .describe('Dashboard ID to update'),
+      .describe('Dashboard identifier to update. Obtain it from dashboards_list.'),
     name: z.string()
       .optional()
-      .describe('Dashboard name'),
+      .describe('New display name. Omit to keep current.'),
     share_with: z.string()
       .optional()
-      .describe('Sharing settings: "all-users", "selected-users", or "none"'),
+      .describe('New sharing mode: "all-users", "selected-users", or "none". Omit to keep current.'),
     theme: z.number()
       .optional()
-      .describe('Dashboard theme'),
+      .describe('New theme index. Omit to keep current.'),
     use_refresh_rate: z.boolean()
       .optional()
-      .describe('Whether to enable auto-refresh'),
+      .describe('Enable or disable auto-refresh. Omit to keep current.'),
     refreshRate: z.number()
       .optional()
-      .describe('Auto-refresh rate in seconds'),
+      .describe('New auto-refresh interval in seconds. Omit to keep current.'),
   }),
 };
 
@@ -223,10 +223,10 @@ async function handleUpdateDashboard(args: z.infer<typeof updateDashboardTool.in
  */
 export const deleteDashboardTool = {
   name: 'dashboards_delete',
-  description: 'Delete a dashboard',
+  description: 'Delete a custom dashboard and all its widgets via /i/dashboards/delete. Requires the dashboards plugin. WARNING: irreversible.',
   inputSchema: z.object({
     dashboard_id: z.string()
-      .describe('Dashboard ID to delete'),
+      .describe('Dashboard identifier to delete. Obtain it from dashboards_list.'),
   }),
 };
 
@@ -257,10 +257,10 @@ async function handleDeleteDashboard(args: z.infer<typeof deleteDashboardTool.in
  */
 export const addDashboardWidgetTool = {
   name: 'dashboards_widget_add',
-  description: 'Add a widget to a dashboard. Widgets display analytics, events, or custom data. IMPORTANT: Widget must be provided as a complete JSON object with all required fields for the widget type.',
+  description: 'Add a widget (analytics, events, crashes, drill, SDK, cohorts, formulas, push, funnels, revenue, times-of-day, retention, users, or note) to a dashboard via /i/dashboards/add-widget. Requires the dashboards plugin. The widget object must be complete for its widget_type; see the widget.description examples.',
   inputSchema: z.object({
     dashboard_id: z.string()
-      .describe('Dashboard ID to add widget to'),
+      .describe('Dashboard identifier to add the widget to. Obtain it from dashboards_list.'),
     widget: z.object({
       title: z.string()
         .describe('Widget title (can be empty string)'),
@@ -461,16 +461,16 @@ async function handleAddDashboardWidget(args: z.infer<typeof addDashboardWidgetT
  */
 export const updateDashboardWidgetTool = {
   name: 'dashboards_widget_update',
-  description: 'Update a widget in a dashboard (e.g., change position, size, or configuration)',
+  description: 'Update fields on an existing dashboard widget (commonly position, size, or config) via /i/dashboards/update-widget. Requires the dashboards plugin. To remove a widget use dashboards_widget_remove.',
   inputSchema: z.object({
     dashboard_id: z.string()
-      .describe('Dashboard ID containing the widget'),
+      .describe('Dashboard identifier that owns the widget. Obtain it from dashboards_list.'),
     widget_id: z.string()
-      .describe('Widget ID to update'),
+      .describe('Widget identifier to update. Obtain it from dashboards_data.'),
     widget: z.object({
-      position: z.array(z.number()).optional().describe('Widget position [x, y] in grid'),
-      size: z.array(z.number()).optional().describe('Widget size [width, height] in grid units'),
-    }).passthrough().describe('Widget update data (position, size, or other properties)'),
+      position: z.array(z.number()).optional().describe('New [x, y] position in the dashboard grid.'),
+      size: z.array(z.number()).optional().describe('New [width, height] in grid units.'),
+    }).passthrough().describe('Partial widget object with the fields to change (e.g. position, size, visualization, metrics). Other widget-config fields are accepted passthrough.'),
   }),
 };
 
@@ -503,12 +503,12 @@ async function handleUpdateDashboardWidget(args: z.infer<typeof updateDashboardW
  */
 export const removeDashboardWidgetTool = {
   name: 'dashboards_widget_remove',
-  description: 'Remove a widget from a dashboard',
+  description: 'Remove a single widget from a dashboard via /i/dashboards/remove-widget. Requires the dashboards plugin. WARNING: irreversible. To delete the whole dashboard use dashboards_delete.',
   inputSchema: z.object({
     dashboard_id: z.string()
-      .describe('Dashboard ID containing the widget'),
+      .describe('Dashboard identifier that owns the widget. Obtain it from dashboards_list.'),
     widget_id: z.string()
-      .describe('Widget ID to remove'),
+      .describe('Widget identifier to remove. Obtain it from dashboards_data.'),
   }),
 };
 

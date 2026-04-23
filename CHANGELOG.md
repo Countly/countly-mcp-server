@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-23
+
+### Security
+- **Cross-tenant auth token mixing (HTTP transport)** (#110) — the HTTP transport previously mutated a shared axios client and shared config on every incoming request. Concurrent requests could interleave at `await` boundaries, causing tenant A's in-flight API calls to go out with tenant B's token. Fixed by constructing a per-request axios instance (with the `countly-token` header baked in) and passing state from the HTTP middleware to the MCP handler through `AsyncLocalStorage`. The shared client is now used only as a stdio-mode fallback and is never mutated per-request.
+- **Cross-tenant data leak via shared AppCache** (#110) — the apps cache was a single instance per process, so the first tenant's apps were visible to every other tenant's `resolveAppId` lookups for up to five minutes. Replaced with `AppCacheRegistry`, which keeps one `AppCache` per tenant keyed by SHA-256(token) so the raw token is never held as a Map key.
+- **SSRF via `X-Countly-Server-Url` / `?server_url=`** (#110) — the HTTP transport accepted a caller-supplied Countly server URL and wired it into the outbound axios client with no validation, allowing any caller to redirect outbound requests at cloud metadata (169.254.169.254), Docker internal services, loopback, and private RFC 1918 ranges (with the response body returned in tool output). New `assertSafeServerUrl` rejects loopback, link-local, RFC 1918, carrier-grade NAT, `0.0.0.0/8`, IPv6 private ranges, `.local`/`.localhost` hostnames, and non-`http(s)` schemes. Not a full DNS-rebinding defense — that still requires egress firewalling — but closes the trivial syntactic bypass.
+- **Telemetry default flipped to opt-in** (#110) — the README has always said "analytics disabled by default" but the code evaluated `process.env.ENABLE_ANALYTICS !== 'false'`, which was `true` for any empty/unset value. Analytics now fire only when `ENABLE_ANALYTICS=true` is explicitly set. README table (`Default: false`) and prose updated to match.
+- **Auth token in URL query params deprecated** (#110) — tokens passed via `?auth_token=` leak into access logs, reverse-proxy logs, browser history, and Referer headers. The transport still accepts them for backward compatibility but now emits a rate-limited security warning to stderr and the behavior is scheduled for removal in a future release. Use `X-Countly-Auth-Token` header instead.
+- **CORS allowlist is now configurable** (#110) — defaults remain `Access-Control-Allow-Origin: *` (backward compatible) but operators can lock it down via `COUNTLY_CORS_ALLOWED_ORIGINS="https://a.example.com,https://b.example.com"`. When a specific allowlist is set, the server echoes only allowed origins and adds `Vary: Origin`; pre-flight requests from disallowed origins get a `403`.
+- **Per-IP rate limiting on `/mcp`** (#110) — sliding-window, in-memory. Defaults to 120 requests per minute per IP; tunable via `COUNTLY_RATE_LIMIT_RPM=<n>` (set to `0` to disable). Uses the socket address by default; honors `X-Forwarded-For` only when `COUNTLY_TRUST_PROXY=true` is set. Returns `429 Too Many Requests` with `Retry-After`.
+- **CORS flag logic bug** (#110) — `httpConfig?.cors || true` always evaluated to `true` (it treats `false` as falsy), so `--no-cors` didn't actually disable CORS. Fixed to use nullish coalescing (`?? true`).
+- **Auth-token residue in `LoopDetector` history** (#110) — when a caller passed `countly_auth_token` as a tool argument the loop detector retained the raw args for up to 30s, risking exposure in heap snapshots / crash dumps. The detector now scrubs sensitive arg keys (`countly_auth_token`) to `[REDACTED]` before storing.
+- **Token redaction in error messages** (#110) — `extractErrorDetails` and `Analytics.trackError` now run error strings through `redactSensitiveInMessage`, which redacts `auth_token=`/`api_key=`/`token=` query-param values, `"auth_token":"..."` JSON fields, and `countly-token:`/`Authorization:` header lines. Defence-in-depth against an upstream Countly server accidentally echoing a token in an error body, and against the token reaching the telemetry endpoint when analytics is opted in.
+- **Dev-dependency CVE** (#110) — `npm audit fix` applied; `brace-expansion` moderate DoS cleared.
+- **Request-body size cap** (#110) — new `COUNTLY_MAX_BODY_BYTES` (default 1 MiB). Requests that declare (or stream) more bytes get `413 Payload Too Large` and the socket is destroyed so a malicious client can't keep shipping data.
+- **Per-IP concurrent-connection cap** (#110) — new `COUNTLY_MAX_CONCURRENT_PER_IP` (default 50). Closes the connection-exhaustion and slow-loris amplification primitive that Node's raw `http.createServer` leaves wide open.
+- **Server timeouts tightened** (#110) — `requestTimeout=30s`, `headersTimeout=10s`, `keepAliveTimeout=5s`, `timeout=60s`. Complements the concurrent-connection cap against slow clients.
+- **Opt-in structured request log** (#110) — new `COUNTLY_REQUEST_LOG=true` emits one NDJSON line per request to stderr (`{ts, ip, method, path, status, durationMs, rateLimitHit}`). No tokens, bodies, or headers logged. Useful for piping into aggregators to spot abuse patterns.
+
+### Removed
+- **Jobs module** (#112) — dropped the `jobs_list` and `job_runs` tools from the `core` category. Both called `/o?method=jobs`, which is not documented in the Countly API reference; operators looking for background-task visibility should use the documented `/o/tasks/*` endpoints directly.
+- **`views_segments` tool** (#112) — removed the `views_segments` tool (was calling `/o?method=get_view_segments`, which is not documented in the Countly API reference). For view segmentation discovery use `metadata_get` or `queriable_fields_list` with the `[CLY]_view` event.
+
+### Changed
+- **Tool descriptions rewritten for model-pickability** (#110) — rewrote the `description` string and every input-schema field description across all ~128 tool definitions in `src/tools/*.ts`. Descriptions now name the concrete endpoint, include a disambiguation sentence pointing to siblings, standardize `app_id`/`app_name`/`period` wording everywhere, add `WARNING: irreversible` to destructive tools, and add `Requires the <name> plugin` to plugin-gated tools. The original `app_analytics_summary` "will show available apps" false promise and similar lies across other tools are gone. No handler logic, schema types, or runtime behavior changed — description strings only.
+- **`metadata_get` is now always available** (#110) — moved out of the `drill` category into a new `metadata` category with `availableByDefault: true`. The handler already degraded gracefully without the drill plugin (returning custom events, built-in `[CLY]_*` event segments, and system fields); it was just hidden on drill-less servers by its category classification.
+
+### Fixed
+- **`notes_create` TypeError when `color` omitted** (#110) — `handleCreateNote` called `color.toLowerCase()` unconditionally while `color` was optional. Guarded the call and marked `note` and `ts` as `required` in the schema (they were already dereferenced unguarded).
+- **`hooks_update` silent asymmetry on trigger fields** (#110) — the handler silently ignored partial trigger updates when only one of `trigger_type` or `trigger_config` was supplied while still reporting success. Now throws `McpError(InvalidParams)` with a clear message; both fields must be supplied together, or neither.
+- **Version string drift** (#110) — the MCP handshake (`Server({version})`), the well-known manifest, and `package.json` reported three different versions. All three now read from `package.json` at runtime via `createRequire(import.meta.url)`.
+
 ## [1.2.1] - 2026-04-22
 
 ### Fixed
@@ -278,6 +310,7 @@ Initial release of Countly MCP Server.
 - Comprehensive test suite
 - GitHub Actions CI/CD integration
 
+[1.3.0]: https://github.com/Countly/countly-mcp-server/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Countly/countly-mcp-server/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Countly/countly-mcp-server/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Countly/countly-mcp-server/compare/v1.0.1...v1.1.0

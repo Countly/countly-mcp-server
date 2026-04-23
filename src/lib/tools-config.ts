@@ -28,8 +28,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'ping': 'R',
       'get_version': 'R',
       'get_plugins': 'R',
-      'jobs_list': 'R',
-      'job_runs': 'R',
     },
     availableByDefault: true,
   },
@@ -99,7 +97,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   views: {
     operations: {
       'views_table': 'R',
-      'views_segments': 'R',
       'views_data': 'R',
     },
     requiresPlugin: 'views',
@@ -136,11 +133,21 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'drill_bookmarks_list': 'R',
       'drill_bookmarks_create': 'C',
       'drill_bookmarks_delete': 'D',
-      'metadata_get': 'R',
       'queriable_fields_list': 'R',
     },
     requiresPlugin: 'drill',
     availableByDefault: false,
+  },
+  metadata: {
+    operations: {
+      // metadata_get returns event definitions, built-in event segments,
+      // and system fields even without the drill plugin (drill just adds
+      // user/custom/campaign-property breakdowns on top). Keeping it in
+      // the drill category hid it from servers without drill installed
+      // even though the handler degrades gracefully.
+      'metadata_get': 'R',
+    },
+    availableByDefault: true,
   },
   user_profiles: {
     operations: {

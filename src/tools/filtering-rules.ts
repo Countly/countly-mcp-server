@@ -7,12 +7,12 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const listFilteringRulesToolDefinition = {
   name: 'filtering_rules_list',
-  description: 'List all filtering rules that block specific requests or data from entering the Countly server. Shows rules for blocking sessions, events, or all requests based on conditions.',
+  description: 'List ingestion filtering (block) rules for an app via /o/blocks. Rules drop incoming requests, sessions, or events matching a MongoDB condition before they hit analytics. Requires the blocks plugin.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -46,39 +46,39 @@ export async function handleListFilteringRules(context: ToolContext, args: any):
 
 export const createFilteringRuleToolDefinition = {
   name: 'filtering_rules_create',
-  description: 'Create a new filtering rule to block requests. Can block all requests, sessions, or specific events based on MongoDB query conditions (e.g., IP address, app version, device properties). IMPORTANT: To block specific conditions (like an IP address), you MUST include a "rule" parameter with MongoDB query conditions. An empty rule {} will block ALL matching requests.',
+  description: 'Create an ingestion filter that drops incoming requests, sessions, or specific events matching a MongoDB condition, via /i/blocks/create. Requires the blocks plugin. WARNING: an empty rule {} drops ALL requests of the given type. To modify an existing rule use filtering_rules_update.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      type: { 
-        type: 'string', 
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      type: {
+        type: 'string',
         enum: ['all', 'session', 'event'],
-        description: 'Type of rule: "all" blocks all requests, "session" blocks sessions only, "event" blocks specific events'
+        description: 'Scope of the rule: "all" (every request type), "session" (session begin requests), or "event" (specific custom event, selected via key).'
       },
-      name: { 
-        type: 'string', 
-        description: 'Human-readable name describing the rule (e.g., "Block IP 127.0.0.1", "Block App Version 5:10:1")'
+      name: {
+        type: 'string',
+        description: 'Human-readable rule name shown in the dashboard (e.g. "Block IP 127.0.0.1", "Block App Version 5:10:1").'
       },
-      rule: { 
-        type: 'object', 
-        description: 'MongoDB query object for matching conditions. REQUIRED for specific filtering. Use "up." prefix for user properties. Common examples: Block specific IP: {"up.ip": {"$in": ["127.0.0.1"]}}, Block IP range with regex: {"up.ip": {"$regex": "^192\\.168\\."}}, Block app version: {"up.av": {"$in": ["5:10:1"]}}, Block device: {"up.d": {"$in": ["iPhone"]}}. Leave empty {} ONLY to block all requests matching the type.',
+      rule: {
+        type: 'object',
+        description: 'MongoDB-style match condition. Use "up." prefix for user properties. Examples: block an IP \'{"up.ip":{"$in":["127.0.0.1"]}}\', block a subnet \'{"up.ip":{"$regex":"^192\\\\.168\\\\."}}\', block an app version \'{"up.av":{"$in":["5:10:1"]}}\', block a device \'{"up.d":{"$in":["iPhone"]}}\'. Use {} only when you want to drop all requests of the chosen type. Defaults to {}.',
         default: {}
       },
-      key: { 
-        type: 'string', 
-        description: 'Event key when type is "event" (specific event to block), or "*" for all',
+      key: {
+        type: 'string',
+        description: 'Event key when type="event" (the event to target), or "*" for all event keys. Defaults to "*".',
         default: '*'
       },
-      is_arbitrary_input: { 
-        type: 'boolean', 
-        description: 'Whether the key is user-provided input. Set to true for specific event keys, false for "*"',
+      is_arbitrary_input: {
+        type: 'boolean',
+        description: 'Set true when key is a specific user-provided event key; false when key is "*". Defaults to false.',
         default: false
       },
-      status: { 
-        type: 'boolean', 
-        description: 'Whether the rule is active (true) or disabled (false)',
+      status: {
+        type: 'boolean',
+        description: 'Whether the rule is enabled immediately (true) or saved disabled (false). Defaults to true.',
         default: true
       },
     },
@@ -125,43 +125,43 @@ export async function handleCreateFilteringRule(context: ToolContext, args: any)
 
 export const updateFilteringRuleToolDefinition = {
   name: 'filtering_rules_update',
-  description: 'Update an existing filtering rule. Can modify conditions, enable/disable rules, or change the rule type. IMPORTANT: To block specific conditions (like an IP address), you MUST include a "rule" parameter with MongoDB query conditions.',
+  description: 'Replace the configuration of an existing filtering rule (full payload: type, name, rule, key, status) via /i/blocks/update. Requires the blocks plugin. To only enable/disable, use filtering_rules_toggle_status.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      block_id: { 
-        type: 'string', 
-        description: 'ID of the filtering rule to update (_id from filtering_rules_list)'
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      block_id: {
+        type: 'string',
+        description: 'Rule identifier (_id) to update. Obtain it from filtering_rules_list.'
       },
-      type: { 
-        type: 'string', 
+      type: {
+        type: 'string',
         enum: ['all', 'session', 'event'],
-        description: 'Type of rule: "all" blocks all requests, "session" blocks sessions only, "event" blocks specific events'
+        description: 'New rule scope: "all", "session", or "event".'
       },
-      name: { 
-        type: 'string', 
-        description: 'Human-readable name describing the rule'
+      name: {
+        type: 'string',
+        description: 'New human-readable rule name.'
       },
-      rule: { 
-        type: 'object', 
-        description: 'MongoDB query object for matching conditions. REQUIRED for specific filtering. Use "up." prefix for user properties. Common examples: Block specific IP: {"up.ip": {"$in": ["127.0.0.1"]}}, Block IP range with regex: {"up.ip": {"$regex": "^192\\.168\\."}}, Block app version: {"up.av": {"$in": ["5:10:1"]}}, Block device: {"up.d": {"$in": ["iPhone"]}}. Leave empty {} ONLY to block all requests matching the type.',
+      rule: {
+        type: 'object',
+        description: 'New MongoDB-style match condition. WARNING: {} drops all requests of the type. See filtering_rules_create for examples. Defaults to {}.',
         default: {}
       },
-      key: { 
-        type: 'string', 
-        description: 'Event key when type is "event", or "*" for all',
+      key: {
+        type: 'string',
+        description: 'Event key when type="event" (the event to target), or "*" for all. Defaults to "*".',
         default: '*'
       },
-      is_arbitrary_input: { 
-        type: 'boolean', 
-        description: 'Whether the key is user-provided input',
+      is_arbitrary_input: {
+        type: 'boolean',
+        description: 'Set true when key is a specific event key; false when key is "*". Defaults to false.',
         default: false
       },
-      status: { 
-        type: 'boolean', 
-        description: 'Whether the rule is active (true) or disabled (false)',
+      status: {
+        type: 'boolean',
+        description: 'Whether the rule is enabled (true) or disabled (false). Defaults to true.',
         default: true
       },
     },
@@ -209,15 +209,15 @@ export async function handleUpdateFilteringRule(context: ToolContext, args: any)
 
 export const deleteFilteringRuleToolDefinition = {
   name: 'filtering_rules_delete',
-  description: 'Delete a filtering rule. Once deleted, requests matching the rule conditions will no longer be blocked.',
+  description: 'Permanently delete a filtering rule via /i/blocks/delete; matching requests will no longer be dropped. Requires the blocks plugin. WARNING: irreversible. To disable without deleting use filtering_rules_toggle_status.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      block_id: { 
-        type: 'string', 
-        description: 'ID of the filtering rule to delete (_id from filtering_rules_list)'
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      block_id: {
+        type: 'string',
+        description: 'Rule identifier (_id) to delete. Obtain it from filtering_rules_list.'
       },
     },
     required: ['block_id'],
@@ -254,15 +254,15 @@ export async function handleDeleteFilteringRule(context: ToolContext, args: any)
 
 export const toggleFilteringRuleStatusToolDefinition = {
   name: 'filtering_rules_toggle_status',
-  description: 'Toggle the status (enabled/disabled) of one or more filtering rules. Allows you to quickly enable or disable rules without modifying other settings.',
+  description: 'Enable or disable one or more existing filtering rules without changing their condition, via /i/blocks/toggle_status. Requires the blocks plugin. For full edits use filtering_rules_update.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       blocks: {
         type: 'object',
-        description: 'Object mapping rule IDs to their new status. Keys are rule IDs, values are boolean (true=enabled, false=disabled). Example: {"rule_id_1": false, "rule_id_2": true}',
+        description: 'Map of rule_id -> desired status (true=enabled, false=disabled). Example: {"rule_id_1": false, "rule_id_2": true}.',
       },
     },
     required: ['blocks'],

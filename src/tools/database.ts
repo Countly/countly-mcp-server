@@ -7,7 +7,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const listDatabasesToolDefinition = {
   name: 'databases_list',
-  description: 'List all available databases and their collections',
+  description: 'List MongoDB databases and collections exposed by the Countly dbviewer (typically countly, countly_drill, countly_out, countly_fs) via /o/db. Requires the dbviewer plugin. Takes no arguments.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -47,25 +47,25 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
 
 export const queryDatabaseToolDefinition = {
   name: 'databases_query',
-  description: 'Query documents from a database collection with filtering, sorting, and pagination',
+  description: 'Run a raw MongoDB find() query on a Countly collection with filter, projection, sort, and pagination via /o/db. Requires the dbviewer plugin. For a single document by _id use databases_document; for aggregation pipelines use collections_aggregate.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID to filter results (optional)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      database: { 
-        type: 'string', 
+      app_id: { type: 'string', description: 'Optional application ID passed to the query. When provided (or resolvable from app_name) it is forwarded as an app_id filter to the dbviewer endpoint.' },
+      app_name: { type: 'string', description: 'Optional application name (resolved to app_id before querying). Must match an existing app exactly; see apps_list.' },
+      database: {
+        type: 'string',
         enum: ['countly', 'countly_drill', 'countly_out', 'countly_fs'],
-        description: 'Database name',
+        description: 'Database to query. Defaults to "countly".',
         default: 'countly'
       },
-      collection: { type: 'string', description: 'Collection name to query' },
-      filter: { type: 'string', description: 'MongoDB query filter as JSON string (optional)' },
-      projection: { type: 'string', description: 'MongoDB projection as JSON string (optional)' },
-      sort: { type: 'string', description: 'MongoDB sort criteria as JSON string (optional)' },
-      limit: { type: 'number', description: 'Maximum number of documents to return (1-1000)', minimum: 1, maximum: 1000, default: 20 },
-      skip: { type: 'number', description: 'Number of documents to skip for pagination', minimum: 0, default: 0 },
-      search: { type: 'string', description: 'Search term for document IDs (optional)' },
+      collection: { type: 'string', description: 'Collection name within the chosen database. To discover collection names use databases_list.' },
+      filter: { type: 'string', description: 'MongoDB query filter as a JSON string (e.g. \'{"_id":"abc"}\'). Optional.' },
+      projection: { type: 'string', description: 'MongoDB projection as a JSON string (e.g. \'{"_id":1,"name":1}\'). Optional.' },
+      sort: { type: 'string', description: 'MongoDB sort as a JSON string (e.g. \'{"_id":-1}\'). Optional.' },
+      limit: { type: 'number', description: 'Maximum number of documents to return (1-1000). Defaults to 20.', minimum: 1, maximum: 1000, default: 20 },
+      skip: { type: 'number', description: 'Number of documents to skip for pagination. Defaults to 0.', minimum: 0, default: 0 },
+      search: { type: 'string', description: 'Optional substring match on document _id values.' },
     },
     required: ['collection'],
   },
@@ -131,20 +131,20 @@ params.sSearch = search;
 
 export const getDocumentToolDefinition = {
   name: 'databases_document',
-  description: 'Get a specific document by ID from a collection',
+  description: 'Fetch a single MongoDB document by _id from a given collection via /o/db. Requires the dbviewer plugin. For multi-document queries use databases_query.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID to filter results (optional)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      database: { 
-        type: 'string', 
+      app_id: { type: 'string', description: 'Optional application ID scope for the lookup. When provided (or resolvable from app_name) it is forwarded to the dbviewer endpoint.' },
+      app_name: { type: 'string', description: 'Optional application name (resolved to app_id). Must match an existing app exactly; see apps_list.' },
+      database: {
+        type: 'string',
         enum: ['countly', 'countly_drill', 'countly_out', 'countly_fs'],
-        description: 'Database name',
+        description: 'Database name. Defaults to "countly".',
         default: 'countly'
       },
-      collection: { type: 'string', description: 'Collection name' },
-      document_id: { type: 'string', description: 'Document ID to retrieve' },
+      collection: { type: 'string', description: 'Collection holding the document. To discover collections use databases_list.' },
+      document_id: { type: 'string', description: 'Document _id to retrieve.' },
     },
     required: ['collection', 'document_id'],
   },
@@ -196,20 +196,20 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 
 export const aggregateCollectionToolDefinition = {
   name: 'collections_aggregate',
-  description: 'Run MongoDB aggregation pipeline on a collection',
+  description: 'Run a MongoDB aggregation pipeline on a collection via /o/db. Requires the dbviewer plugin. For simple find queries use databases_query.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID to filter results (optional)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      database: { 
-        type: 'string', 
+      app_id: { type: 'string', description: 'Optional application ID scope forwarded to the dbviewer endpoint.' },
+      app_name: { type: 'string', description: 'Optional application name (resolved to app_id). Must match an existing app exactly; see apps_list.' },
+      database: {
+        type: 'string',
         enum: ['countly', 'countly_drill', 'countly_out', 'countly_fs'],
-        description: 'Database name',
+        description: 'Database name. Defaults to "countly".',
         default: 'countly'
       },
-      collection: { type: 'string', description: 'Collection name' },
-      aggregation: { type: 'string', description: 'MongoDB aggregation pipeline as JSON string' },
+      collection: { type: 'string', description: 'Collection to run the aggregation against. To discover collections use databases_list.' },
+      aggregation: { type: 'string', description: 'Aggregation pipeline as a JSON-encoded array (e.g. \'[{"$match":{"_id":"x"}},{"$group":{"_id":"$field","n":{"$sum":1}}}]\').' },
     },
     required: ['collection', 'aggregation'],
   },
@@ -261,17 +261,17 @@ export async function handleAggregateCollection(context: ToolContext, args: any)
 
 export const getCollectionIndexesToolDefinition = {
   name: 'collections_indexes',
-  description: 'Get indexes for a specific collection',
+  description: 'List indexes defined on a MongoDB collection (keys, options, sizes) via /o/db?action=get_indexes. Requires the dbviewer plugin.',
   inputSchema: {
     type: 'object',
     properties: {
-      database: { 
-        type: 'string', 
+      database: {
+        type: 'string',
         enum: ['countly', 'countly_drill', 'countly_out', 'countly_fs'],
-        description: 'Database name',
+        description: 'Database name. Defaults to "countly".',
         default: 'countly'
       },
-      collection: { type: 'string', description: 'Collection name' },
+      collection: { type: 'string', description: 'Collection whose indexes to list. To discover collections use databases_list.' },
     },
     required: ['collection'],
   },
@@ -314,14 +314,14 @@ export async function handleGetCollectionIndexes(context: ToolContext, args: any
 
 export const getDbStatisticsToolDefinition = {
   name: 'databases_stats',
-  description: 'Get MongoDB statistics (mongotop and mongostat)',
+  description: 'Get live MongoDB process statistics ("mongotop" per-collection timings or "mongostat" server-wide counters) via /o/db/mongotop or /o/db/mongostat. Requires the dbviewer plugin.',
   inputSchema: {
     type: 'object',
     properties: {
       stat_type: {
         type: 'string',
         enum: ['mongotop', 'mongostat'],
-        description: 'Type of statistics to retrieve'
+        description: 'Which statistic set to fetch: "mongotop" (per-collection read/write time) or "mongostat" (server-wide ops/second, connections, memory).'
       },
     },
     required: ['stat_type'],

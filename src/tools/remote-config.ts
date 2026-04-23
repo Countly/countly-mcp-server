@@ -7,12 +7,12 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const listRemoteConfigsToolDefinition = {
   name: 'remote_configs_list',
-  description: 'List all remote config parameters and conditions for an application. Remote configs allow controlling app behavior by changing parameter values on the server.',
+  description: 'List all remote-config parameters and segment conditions defined for an app via /o?method=remote-config. Requires the remote-config plugin. Use before creating or updating parameters/conditions to see existing IDs.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -50,15 +50,15 @@ export async function handleListRemoteConfigs(context: ToolContext, args: any): 
 
 export const addRemoteConfigConditionToolDefinition = {
   name: 'remote_config_conditions_add',
-  description: 'Add a condition to segment user groups for which to use specific parameter values. Conditions use MongoDB queries to match users based on properties like age, country, etc.',
+  description: 'Create a user-segmentation condition that remote-config parameters can reference to serve variant values, via /i/remote-config/add-condition. Requires the remote-config plugin. To modify an existing condition use remote_config_conditions_update.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       condition: {
         type: 'string',
-        description: 'Condition configuration as JSON string. Must include: condition_name (string), condition_color (number 1-10), condition (MongoDB query object with "up." prefix for user properties), condition_definition (human-readable description), seed_value (optional string), condition_description (optional string). Example: {"condition_name":"Test users","condition_color":1,"condition":{"up.age":{"$gt":30}},"condition_definition":"Age greater than 30","seed_value":"","condition_description":"Test user group"}'
+        description: 'Condition as a JSON string with fields: condition_name (string), condition_color (number 1-10), condition (MongoDB query; use "up." prefix for user properties), condition_definition (human-readable), seed_value (optional string), condition_description (optional string). Example: \'{"condition_name":"Test users","condition_color":1,"condition":{"up.age":{"$gt":30}},"condition_definition":"Age greater than 30","seed_value":"","condition_description":"Test user group"}\'.'
       },
     },
     required: ['condition'],
@@ -95,19 +95,19 @@ export async function handleAddRemoteConfigCondition(context: ToolContext, args:
 
 export const updateRemoteConfigConditionToolDefinition = {
   name: 'remote_config_conditions_update',
-  description: 'Update an existing remote config condition to modify user segmentation criteria.',
+  description: 'Replace the configuration of an existing remote-config condition via /i/remote-config/update-condition. Requires the remote-config plugin.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       condition_id: {
         type: 'string',
-        description: 'The ID of the condition to update',
+        description: 'Condition identifier (_id) to update. Obtain it from remote_configs_list.',
       },
       condition: {
         type: 'string',
-        description: 'Updated condition configuration as JSON string. Should include all fields: condition_name, condition_color, condition, condition_definition, seed_value, condition_description, and used_in_parameters (number of parameters using this condition). Example: {"condition_name":"Test users","condition_color":2,"condition":{"up.age":{"$gt":30}},"condition_definition":"Age greater than 30","seed_value":"","condition_description":"Updated description","used_in_parameters":0}'
+        description: 'Full replacement condition as a JSON string with condition_name, condition_color, condition, condition_definition, seed_value, condition_description, and used_in_parameters (current count of parameters using it). Example: \'{"condition_name":"Test users","condition_color":2,"condition":{"up.age":{"$gt":30}},"condition_definition":"Age greater than 30","seed_value":"","condition_description":"Updated description","used_in_parameters":0}\'.'
       },
     },
     required: ['condition_id', 'condition'],
@@ -145,15 +145,15 @@ export async function handleUpdateRemoteConfigCondition(context: ToolContext, ar
 
 export const deleteRemoteConfigConditionToolDefinition = {
   name: 'remote_config_conditions_delete',
-  description: 'Delete a remote config condition. Note: Cannot delete conditions that are currently being used by parameters.',
+  description: 'Delete a remote-config segmentation condition via /i/remote-config/remove-condition. Fails if any parameter still references the condition. Requires the remote-config plugin. WARNING: irreversible.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       condition_id: {
         type: 'string',
-        description: 'The ID of the condition to delete',
+        description: 'Condition identifier (_id) to delete. Obtain it from remote_configs_list.',
       },
     },
     required: ['condition_id'],
@@ -190,15 +190,15 @@ export async function handleDeleteRemoteConfigCondition(context: ToolContext, ar
 
 export const addRemoteConfigParameterToolDefinition = {
   name: 'remote_config_parameters_add',
-  description: 'Add a remote config parameter that apps can fetch and use to control behavior. Parameters can have different values for different user segments based on conditions.',
+  description: 'Create a remote-config parameter (key + default value + per-condition overrides) that SDKs fetch to control app behavior, via /i/remote-config/add-parameter. Requires the remote-config plugin. To modify an existing parameter use remote_config_parameters_update.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       parameter: {
         type: 'string',
-        description: 'Parameter configuration as JSON string. Must include: parameter_key (string - unique key), default_value (any - value for users not matching conditions), description (string), conditions (array of {condition_id, value} objects), status ("Running" or "Stopped"), expiry_dttm (optional - timestamp in milliseconds when parameter expires). Example: {"parameter_key":"feature_flag","default_value":"0","description":"Feature toggle","conditions":[{"condition_id":"123","value":"1"}],"status":"Running","expiry_dttm":1763035291208}'
+        description: 'Parameter as a JSON string with: parameter_key (unique key), default_value (value served when no condition matches), description, conditions (array of {condition_id, value}), status ("Running" or "Stopped"), optional expiry_dttm (ms epoch). Example: \'{"parameter_key":"feature_flag","default_value":"0","description":"Feature toggle","conditions":[{"condition_id":"123","value":"1"}],"status":"Running","expiry_dttm":1763035291208}\'.'
       },
     },
     required: ['parameter'],
@@ -235,19 +235,19 @@ export async function handleAddRemoteConfigParameter(context: ToolContext, args:
 
 export const updateRemoteConfigParameterToolDefinition = {
   name: 'remote_config_parameters_update',
-  description: 'Update an existing remote config parameter to change its values, conditions, or status.',
+  description: 'Replace an existing remote-config parameter (values, conditions, status) via /i/remote-config/update-parameter. Requires the remote-config plugin.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       parameter_id: {
         type: 'string',
-        description: 'The ID of the parameter to update',
+        description: 'Parameter identifier (_id) to update. Obtain it from remote_configs_list.',
       },
       parameter: {
         type: 'string',
-        description: 'Updated parameter configuration as JSON string. Should include all fields: parameter_key, default_value, description, conditions, status, expiry_dttm (optional), valuesList (array of all possible values), ts (creation timestamp). Example: {"parameter_key":"feature_flag","default_value":0,"description":"Updated description","conditions":[{"condition_id":"123","value":1}],"status":"Stopped","expiry_dttm":1763035291208,"valuesList":[0,1],"ts":1762952513609}'
+        description: 'Full replacement parameter as a JSON string with parameter_key, default_value, description, conditions, status, optional expiry_dttm, valuesList (all historical values), and ts (creation timestamp ms). Example: \'{"parameter_key":"feature_flag","default_value":0,"description":"Updated description","conditions":[{"condition_id":"123","value":1}],"status":"Stopped","expiry_dttm":1763035291208,"valuesList":[0,1],"ts":1762952513609}\'.'
       },
     },
     required: ['parameter_id', 'parameter'],
@@ -285,15 +285,15 @@ export async function handleUpdateRemoteConfigParameter(context: ToolContext, ar
 
 export const deleteRemoteConfigParameterToolDefinition = {
   name: 'remote_config_parameters_delete',
-  description: 'Delete a remote config parameter. This will remove the parameter from the server and apps will no longer receive it.',
+  description: 'Delete a remote-config parameter via /i/remote-config/remove-parameter. After deletion, SDKs will stop receiving it. Requires the remote-config plugin. WARNING: irreversible.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       parameter_id: {
         type: 'string',
-        description: 'The ID of the parameter to delete',
+        description: 'Parameter identifier (_id) to delete. Obtain it from remote_configs_list.',
       },
     },
     required: ['parameter_id'],

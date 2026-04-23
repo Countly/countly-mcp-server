@@ -6,9 +6,18 @@ import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 
 
+import { AsyncLocalStorage } from 'async_hooks';
 import { realpathSync } from 'fs';
 import http from 'http';
+import { createRequire } from 'module';
 import url from 'url';
+
+// Load the package version at runtime so the MCP handshake, the well-known
+// manifest, and any future self-identification share a single source of
+// truth. Previously these drifted (handshake reported "1.0.0" while the
+// manifest reported "1.0.1" and package.json said something else entirely).
+const require = createRequire(import.meta.url);
+const { version: PACKAGE_VERSION } = require('../package.json') as { version: string };
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -26,10 +35,20 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
-import { buildConfig } from './lib/config.js';
+import { assertSafeServerUrl, buildConfig } from './lib/config.js';
+import {
+  ConcurrencyLimiter,
+  enforceBodySizeLimit,
+  extractClientIp,
+  formatRequestLog,
+  parseCorsAllowed,
+  RateLimiter,
+  resolveCorsOrigin,
+  sanitizeForLog,
+} from './lib/http-security.js';
 import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
@@ -51,11 +70,45 @@ interface HttpConfig {
   cors?: boolean;
 }
 
+/**
+ * Per-request authentication + endpoint context.
+ *
+ * In HTTP transport the MCP server is multi-tenant: each incoming request
+ * may carry its own Countly auth token and server URL (via headers or URL
+ * params). Previously those were mutated onto the shared `this.config` and
+ * `this.httpClient.defaults`, which led to cross-tenant token mixing under
+ * concurrency. We now stash per-request state in an AsyncLocalStorage so the
+ * MCP tool handler can pick it up across await boundaries without sharing.
+ */
+interface RequestState {
+  authToken?: string;
+  serverUrl: string;
+}
+
 interface ToolCallHistory {
   toolName: string;
   args: any;
   timestamp: number;
   result?: any;
+}
+
+/**
+ * Keys that are never worth keeping in the loop-detector history, and which
+ * are sensitive enough that a crash/heap-dump shouldn't preserve them. Scrub
+ * on ingress rather than on comparison so the stored history is clean from
+ * the start.
+ */
+const SENSITIVE_ARG_KEYS = new Set<string>(['countly_auth_token']);
+
+function scrubSensitiveArgs(args: any): any {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    return args;
+  }
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(args)) {
+    out[k] = SENSITIVE_ARG_KEYS.has(k) ? '[REDACTED]' : v;
+  }
+  return out;
 }
 
 class LoopDetector {
@@ -66,21 +119,26 @@ class LoopDetector {
 
   addCall(toolName: string, args: any): { isLoop: boolean; warning?: string } {
     const now = Date.now();
-    
+
     // Clean old entries
     this.history = this.history.filter(call => now - call.timestamp < this.timeWindow);
-    
+
+    // Strip secrets before we retain the args anywhere. The loop detector
+    // keeps args in memory for up to 30s; any auth token passed as a tool
+    // argument would otherwise survive in heap snapshots or crash reports.
+    const safeArgs = scrubSensitiveArgs(args);
+
     // Create a normalized args signature for comparison
-    const argsSignature = this.normalizeArgs(args);
-    
+    const argsSignature = this.normalizeArgs(safeArgs);
+
     // Count similar calls in recent history
     const similarCalls = this.history.filter(call => {
       const callArgsSignature = this.normalizeArgs(call.args);
       return call.toolName === toolName && callArgsSignature === argsSignature;
     });
-    
-    // Add current call to history
-    this.history.push({ toolName, args, timestamp: now });
+
+    // Add current call to history (scrubbed args — never raw)
+    this.history.push({ toolName, args: safeArgs, timestamp: now });
     
     // Keep history size manageable
     if (this.history.length > this.maxHistorySize) {
@@ -116,18 +174,39 @@ class LoopDetector {
 class CountlyMCPServer {
   private server: Server;
   private config: CountlyConfig;
+  /**
+   * Shared fallback axios client. Used only for stdio-mode operation where
+   * a single long-lived process serves a single tenant via env/file
+   * credentials. HTTP-transport callers each get a fresh per-request client
+   * via `createRequestHttpClient()` so concurrent tenants can't mix tokens.
+   */
   private httpClient: AxiosInstance;
-  private appCache: AppCache;
+  /**
+   * Per-tenant app caches keyed by SHA-256(authToken). See the class comment
+   * on AppCacheRegistry — sharing one AppCache across tenants is a
+   * cross-tenant data-leak bug.
+   */
+  private appCacheRegistry: AppCacheRegistry;
   private toolsConfig: ToolsConfig;
   private loopDetector: LoopDetector;
+  private lastTokenInUrlWarnAt: number = 0;
+  /**
+   * AsyncLocalStorage carrying the per-request auth token + serverUrl from
+   * the HTTP middleware to the MCP tool handler across await boundaries.
+   * Falls back to null (no store) in stdio mode where no middleware runs.
+   */
+  private requestContext: AsyncLocalStorage<RequestState>;
 
   constructor(testMode: boolean = false) {
-    this.appCache = new AppCache();
+    this.appCacheRegistry = new AppCacheRegistry();
     this.toolsConfig = loadToolsConfig(process.env);
     this.loopDetector = new LoopDetector();
+    this.requestContext = new AsyncLocalStorage<RequestState>();
     
-    // Initialize analytics (enabled by default; set ENABLE_ANALYTICS=false to disable)
-    const analyticsEnabled = (process.env.ENABLE_ANALYTICS || '').toLowerCase() !== 'false';
+    // Initialize analytics. Opt-in: enabled only when ENABLE_ANALYTICS=true.
+    // README has always documented this as "disabled by default"; the previous
+    // `!== 'false'` check silently opted users in. Flip to explicit opt-in.
+    const analyticsEnabled = (process.env.ENABLE_ANALYTICS || '').toLowerCase() === 'true';
     analytics.init(analyticsEnabled);
     
     // Log configuration on startup (only in non-test mode)
@@ -138,7 +217,7 @@ class CountlyMCPServer {
     this.server = new Server(
       {
         name: 'countly-mcp-server',
-        version: '1.0.0',
+        version: PACKAGE_VERSION,
       },
       {
         capabilities: {
@@ -182,19 +261,27 @@ class CountlyMCPServer {
    */
   private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
     const metadata = (request as any)?._meta || (request as any)?.meta;
-    
+
     // Try to get from metadata or args first
     let authToken = resolveAuthToken({ metadata, args });
-    
-    // If not found in metadata/args, use the one already configured (from headers or environment)
+
+    // Per-request HTTP state from AsyncLocalStorage (HTTP middleware sets it)
+    if (!authToken) {
+      const reqState = this.requestContext.getStore();
+      if (reqState?.authToken) {
+        authToken = reqState.authToken;
+      }
+    }
+
+    // Server-level config fallback (env / file in stdio mode)
     if (!authToken && this.config.authToken) {
       authToken = this.config.authToken;
     }
-    
+
     if (!authToken) {
       throw createMissingAuthError();
     }
-    
+
     return { authToken };
   }
 
@@ -208,41 +295,49 @@ class CountlyMCPServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      let originalAuthToken: string | undefined;
       const startTime = Date.now();
 
       try {
         // Extract credentials from request (client-side)
         const credentials = this.getCredentials(request, args);
-        
+
         // Track authentication method used
         const metadata = (request as any)?._meta || (request as any)?.meta;
         if (metadata?.countlyAuthToken) {
           analytics.trackAuthMethod('metadata');
         } else if (args?.countly_auth_token) {
           analytics.trackAuthMethod('args');
-        } else if (credentials.authToken) {
+        } else if (this.requestContext.getStore()?.authToken) {
           analytics.trackAuthMethod('headers');
         } else if (process.env.COUNTLY_AUTH_TOKEN) {
           analytics.trackAuthMethod('env');
         }
-        
-        // Store the original auth token temporarily for this request
-        originalAuthToken = this.config.authToken;
-        
-        // Set the auth token in config and as header
-        if (credentials.authToken) {
-          this.config.authToken = credentials.authToken;
-          this.setAuthHeader(credentials.authToken);
-        }
+
+        // Resolve the per-request endpoint (header/URL-param override via
+        // AsyncLocalStorage falls through to the server-level config).
+        const reqState = this.requestContext.getStore();
+        const serverUrl = reqState?.serverUrl || this.config.serverUrl;
+        const authToken = credentials.authToken;
+
+        // Build a fresh axios client for this request so concurrent tenants
+        // cannot share headers / baseURL on the same object. The shared
+        // `this.httpClient` is intentionally untouched.
+        const perReqHttpClient = this.createRequestHttpClient(authToken, serverUrl);
+
+        // Per-tenant app cache. Keyed by SHA-256(authToken) inside the
+        // registry so one tenant's apps cannot leak into another's
+        // resolveAppId lookup.
+        const perTenantAppCache = this.appCacheRegistry.for(authToken);
 
         // Create tool context
         const context: ToolContext = {
-          resolveAppId: async (args: any) => await this.resolveAppIdentifier(args),
-          getAuthParams: () => this.getAuthParams(),
-          httpClient: this.httpClient,
-          appCache: this.appCache,
-          getApps: async () => await this.getApps(),
+          resolveAppId: async (a: any) =>
+            await this.resolveAppIdentifierWithContext(a, perReqHttpClient, perTenantAppCache, authToken),
+          getAuthParams: () => (authToken ? { auth_token: authToken } : {}),
+          httpClient: perReqHttpClient,
+          appCache: perTenantAppCache,
+          getApps: async () =>
+            await this.getAppsWithContext(perReqHttpClient, perTenantAppCache, authToken),
         };
         
         // Get all tool metadata and filter based on tools configuration
@@ -319,11 +414,9 @@ class CountlyMCPServer {
           ErrorCode.InternalError,
           `Error executing tool ${name}: ${error instanceof Error ? error.message : String(error)}`
         );
-      } finally {
-        // Restore original auth token and header
-        this.config.authToken = originalAuthToken;
-        this.setAuthHeader(originalAuthToken);
       }
+      // No finally {} needed — per-request httpClient and cache are local to
+      // this handler. Nothing shared was mutated.
     });
   }
 
@@ -331,25 +424,9 @@ class CountlyMCPServer {
     // Handle resources/list requests
     this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
       try {
-        // Unify auth token resolution for resources
-        const metadata = (request as any)?._meta || (request as any)?.meta;
-        const args = (request as any)?.params || {};
-        let authToken = resolveAuthToken({ metadata, args });
-        if (!authToken && this.config.authToken) {
-          authToken = this.config.authToken;
-        }
-        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-          authToken = process.env.COUNTLY_AUTH_TOKEN;
-        }
-        if (authToken) {
-          this.setAuthHeader(authToken);
-        }
+        const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
-        const resources = await listResources(
-          this.httpClient,
-          this.appCache,
-          getAuthParams
-        );
+        const resources = await listResources(client, cache, getAuthParams);
         analytics.trackHttpRequest('/resources/list', 'MCP');
         return { resources };
       } catch (error) {
@@ -368,27 +445,10 @@ class CountlyMCPServer {
     // Handle resources/read requests
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       try {
-        // Unify auth token resolution for resources
-        const metadata = (request as any)?._meta || (request as any)?.meta;
-        const args = (request as any)?.params || {};
-        let authToken = resolveAuthToken({ metadata, args });
-        if (!authToken && this.config.authToken) {
-          authToken = this.config.authToken;
-        }
-        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-          authToken = process.env.COUNTLY_AUTH_TOKEN;
-        }
-        if (authToken) {
-          this.setAuthHeader(authToken);
-        }
+        const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
         const { uri } = request.params;
-        const content = await readResource(
-          uri,
-          this.httpClient,
-          this.appCache,
-          getAuthParams
-        );
+        const content = await readResource(uri, client, cache, getAuthParams);
         analytics.trackHttpRequest('/resources/read', 'MCP');
         return { contents: [content] };
       } catch (error) {
@@ -485,15 +545,91 @@ class CountlyMCPServer {
     }
   }
 
-  private async getApps(): Promise<CountlyApp[]> {
-    // Check if cache is still valid
-    if (!this.appCache.isExpired()) {
-      return this.appCache.getAll();
+  /**
+   * Warn when a caller passes the auth token via ?auth_token= URL query
+   * parameter instead of via the X-Countly-Auth-Token header. Tokens in URLs
+   * leak into access logs, reverse-proxy logs, browser history, and Referer
+   * headers. Support is kept for now for backward compatibility but will be
+   * removed in a future release. Rate-limited to once per minute so busy HTTP
+   * traffic does not flood stderr.
+   */
+  private warnTokenInUrl(): void {
+    const now = Date.now();
+    if (now - this.lastTokenInUrlWarnAt < 60_000) {
+      return;
     }
+    this.lastTokenInUrlWarnAt = now;
+    console.error(
+      '⚠️  SECURITY: auth token was passed via ?auth_token= URL query parameter. ' +
+      'This leaks into access logs, browser history, and Referer headers. ' +
+      'Migrate callers to the X-Countly-Auth-Token header. ' +
+      'URL-parameter support is deprecated and will be removed in a future release.'
+    );
+  }
 
-    const params = this.getAuthParams();
-    const response = await this.httpClient.get('/o/apps/mine', { params });
-    
+  /**
+   * Build a fresh axios instance for a single MCP request. Baking the
+   * auth token into the per-request instance's default headers (instead of
+   * the shared `this.httpClient`) means concurrent tenants never see each
+   * other's credentials — even if their handlers interleave across await
+   * points.
+   */
+  private createRequestHttpClient(
+    authToken: string | undefined,
+    serverUrl: string
+  ): AxiosInstance {
+    const headers: Record<string, string> = {};
+    if (authToken) {
+      headers['countly-token'] = authToken;
+    }
+    return axios.create({
+      baseURL: serverUrl,
+      timeout: this.config.timeout,
+      headers,
+    });
+  }
+
+  /**
+   * Resolve the effective auth token + build a per-request axios client and
+   * a per-tenant AppCache for non-tool MCP requests (resources, prompts).
+   * Priority order: tool args > MCP metadata > AsyncLocalStorage (HTTP
+   * middleware) > server-level config (env/file).
+   */
+  private buildPerRequestClient(request: any): {
+    client: AxiosInstance;
+    cache: AppCache;
+    authToken: string | undefined;
+  } {
+    const metadata = request?._meta || request?.meta;
+    const args = request?.params || {};
+    let authToken = resolveAuthToken({ metadata, args });
+    const reqState = this.requestContext.getStore();
+    if (!authToken && reqState?.authToken) {
+      authToken = reqState.authToken;
+    }
+    if (!authToken && this.config.authToken) {
+      authToken = this.config.authToken;
+    }
+    if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
+      authToken = process.env.COUNTLY_AUTH_TOKEN;
+    }
+    const serverUrl = reqState?.serverUrl || this.config.serverUrl;
+    const client = this.createRequestHttpClient(authToken, serverUrl);
+    const cache = this.appCacheRegistry.for(authToken);
+    return { client, cache, authToken };
+  }
+
+  private async getAppsWithContext(
+    client: AxiosInstance,
+    cache: AppCache,
+    authToken: string | undefined
+  ): Promise<CountlyApp[]> {
+    if (!cache.isExpired()) {
+      return cache.getAll();
+    }
+    const params = authToken ? { auth_token: authToken } : {};
+    const response = await client.get('/o/apps/mine', { params });
+
     let apps: CountlyApp[];
     if (response.data && Array.isArray(response.data)) {
       apps = response.data;
@@ -504,18 +640,18 @@ class CountlyMCPServer {
     } else {
       apps = [];
     }
-    
-    this.appCache.update(apps);
+
+    cache.update(apps);
     return apps;
   }
 
-  private async resolveAppId(args: any): Promise<string> {
-    const apps = await this.getApps();
-    return resolveAppIdentifier(args, apps);
-  }
-
-  private async resolveAppIdentifier(args: any): Promise<string> {
-    const apps = await this.getApps();
+  private async resolveAppIdentifierWithContext(
+    args: any,
+    client: AxiosInstance,
+    cache: AppCache,
+    authToken: string | undefined
+  ): Promise<string> {
+    const apps = await this.getAppsWithContext(client, cache, authToken);
     return resolveAppIdentifier(args, apps);
   }
 
@@ -527,8 +663,48 @@ class CountlyMCPServer {
     if (transportType === 'http') {
       const port = httpConfig?.port || 3101;
       const hostname = httpConfig?.hostname || 'localhost';
-      const corsEnabled = httpConfig?.cors || true;
-      
+      // Note: was `httpConfig?.cors || true` which always evaluates to true
+      // (|| treats `false` as falsy). Switch to nullish-coalescing so
+      // `--no-cors` actually disables CORS.
+      const corsEnabled = httpConfig?.cors ?? true;
+
+      // CORS allowlist: defaults to "*" for backward compatibility, but
+      // operators running the MCP server behind a browser-facing origin
+      // should set COUNTLY_CORS_ALLOWED_ORIGINS to a specific comma-
+      // separated list (e.g. "https://my-app.example.com").
+      const corsAllowed = parseCorsAllowed(process.env.COUNTLY_CORS_ALLOWED_ORIGINS);
+
+      // Rate limiter for /mcp endpoint. Defaults to 120 req/min per IP.
+      // Tunable via COUNTLY_RATE_LIMIT_RPM=<number> or 0 to disable.
+      const rateLimitRpm = process.env.COUNTLY_RATE_LIMIT_RPM !== undefined
+        ? Math.max(0, parseInt(process.env.COUNTLY_RATE_LIMIT_RPM, 10) || 0)
+        : 120;
+      const rateLimiter = rateLimitRpm > 0
+        ? new RateLimiter({ windowMs: 60_000, maxRequests: rateLimitRpm })
+        : null;
+      const trustProxy = (process.env.COUNTLY_TRUST_PROXY || '').toLowerCase() === 'true';
+
+      // Max request body bytes. Defaults to 1 MiB (MCP JSON-RPC bodies are
+      // typically a few KB). Configurable via COUNTLY_MAX_BODY_BYTES.
+      const maxBodyBytes = process.env.COUNTLY_MAX_BODY_BYTES !== undefined
+        ? Math.max(0, parseInt(process.env.COUNTLY_MAX_BODY_BYTES, 10) || 0)
+        : 1024 * 1024;
+
+      // Concurrent-connection ceiling per IP. Defaults to 50. 0 disables.
+      // Tunable via COUNTLY_MAX_CONCURRENT_PER_IP.
+      const maxConcurrentPerIp = process.env.COUNTLY_MAX_CONCURRENT_PER_IP !== undefined
+        ? Math.max(0, parseInt(process.env.COUNTLY_MAX_CONCURRENT_PER_IP, 10) || 0)
+        : 50;
+      const concurrencyLimiter = maxConcurrentPerIp > 0
+        ? new ConcurrencyLimiter(maxConcurrentPerIp)
+        : null;
+
+      // Opt-in structured NDJSON request log. Set COUNTLY_REQUEST_LOG=true
+      // (or "ndjson") to enable. Output goes to stderr.
+      const requestLogEnabled = ['true', 'ndjson', '1'].includes(
+        (process.env.COUNTLY_REQUEST_LOG || '').toLowerCase()
+      );
+
       // MCP server only responds to /mcp endpoint - other endpoints are available for other applications
       const mcpEndpoint = '/mcp';
       
@@ -546,20 +722,63 @@ class CountlyMCPServer {
       await this.server.connect(transport);
       
       const httpServer = http.createServer((req, res) => {
+        // Per-request wall-clock for the request log emitted at the bottom
+        // of this handler (when COUNTLY_REQUEST_LOG is on).
+        const reqStart = Date.now();
+        let rateLimitHit = false;
+
+        const writeRequestLog = (): void => {
+          if (!requestLogEnabled) {
+            return;
+          }
+          const clientIp = extractClientIp(req.headers, req.socket.remoteAddress, trustProxy);
+          const parsed = url.parse(req.url || '', true);
+          console.error(formatRequestLog({
+            ts: new Date().toISOString(),
+            ip: clientIp,
+            method: req.method || 'UNKNOWN',
+            path: parsed.pathname || '',
+            status: res.statusCode,
+            durationMs: Date.now() - reqStart,
+            rateLimitHit,
+          }));
+        };
+        res.on('finish', writeRequestLog);
+        res.on('close', () => {
+          if (!res.writableFinished) {
+            writeRequestLog();
+          }
+        });
+
         void (async () => {
-        // Handle CORS for MCP and health endpoints only
+        // Handle CORS for MCP and health endpoints only. Allowlist is
+        // configured via COUNTLY_CORS_ALLOWED_ORIGINS; see parseCorsAllowed.
         if (corsEnabled) {
           const parsedUrl = url.parse(req.url || '', true);
           const pathname = parsedUrl.pathname;
-          
-          // Only set CORS headers for our endpoints
+
           if (pathname === mcpEndpoint || pathname === '/health' || pathname === '/.well-known/mcp-manifest.json') {
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-            
-            if (req.method === 'OPTIONS') {
-              res.writeHead(200);
+            const requestOrigin = (req.headers.origin as string | undefined);
+            const allowOrigin = resolveCorsOrigin(corsAllowed, requestOrigin);
+            if (allowOrigin !== null) {
+              res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+              // When we echo a specific origin (not "*"), browsers require
+              // Vary: Origin so caches don't serve the response to another
+              // origin. See MDN on CORS + caching.
+              if (allowOrigin !== '*') {
+                res.setHeader('Vary', 'Origin');
+              }
+              res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+              res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Countly-Auth-Token, X-Countly-Server-Url');
+
+              if (req.method === 'OPTIONS') {
+                res.writeHead(200);
+                res.end();
+                return;
+              }
+            } else if (req.method === 'OPTIONS') {
+              // Pre-flight from a disallowed origin — refuse cleanly.
+              res.writeHead(403);
               res.end();
               return;
             }
@@ -591,7 +810,7 @@ class CountlyMCPServer {
           
           const manifest = {
             name: 'countly-mcp-server',
-            version: '1.0.1',
+            version: PACKAGE_VERSION,
             description: 'Model Context Protocol server for Countly Analytics Platform',
             protocol: {
               version: '2025-06-18',
@@ -667,7 +886,39 @@ class CountlyMCPServer {
         // MCP endpoint - ONLY endpoint that handles MCP protocol requests
         if (pathname === mcpEndpoint) {
           analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
-          
+
+          // Per-IP rate limiting. Configurable via COUNTLY_RATE_LIMIT_RPM
+          // (default 120 requests per minute). Set to 0 to disable. IP is
+          // taken from the socket unless COUNTLY_TRUST_PROXY=true, in which
+          // case we honor X-Forwarded-For.
+          if (rateLimiter) {
+            const clientIp = extractClientIp(req.headers, req.socket.remoteAddress, trustProxy);
+            const result = rateLimiter.check(clientIp);
+            if (!result.ok) {
+              rateLimitHit = true;
+              res.writeHead(429, {
+                'Content-Type': 'application/json',
+                'Retry-After': String(result.retryAfterSeconds),
+              });
+              res.end(JSON.stringify({
+                error: 'Rate limit exceeded',
+                retry_after_seconds: result.retryAfterSeconds,
+              }));
+              return;
+            }
+          }
+
+          // Enforce the body-size limit. Checks Content-Length upfront and
+          // streams-counts any subsequent chunks. If the limit is exceeded
+          // we respond 413 Payload Too Large and destroy the socket so a
+          // malicious client can't keep dumping bytes. 0 disables the check.
+          if (maxBodyBytes > 0) {
+            const ok = enforceBodySizeLimit(req, res, maxBodyBytes);
+            if (!ok) {
+              return;
+            }
+          }
+
           // Check for configuration in custom headers (secure way, recommended)
           const headerServerUrl = req.headers['x-countly-server-url'] as string;
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
@@ -681,27 +932,66 @@ class CountlyMCPServer {
           const serverUrl = headerServerUrl || paramServerUrl;
           const authToken = headerAuthToken || paramAuthToken;
           
+          // Build per-request state. Instead of mutating `this.config` and
+          // `this.httpClient.defaults` (which would be shared across
+          // concurrent tenants and race), stash state in AsyncLocalStorage
+          // and let the MCP handlers pull their per-request axios client out
+          // of the registry keyed by token.
+          let effectiveServerUrl = this.config.serverUrl;
           if (serverUrl) {
             // Remove trailing slashes safely without regex
             let cleanUrl = serverUrl;
             while (cleanUrl.endsWith('/')) {
               cleanUrl = cleanUrl.slice(0, -1);
             }
-            this.config.serverUrl = cleanUrl;
-            this.httpClient.defaults.baseURL = this.config.serverUrl;
+            // SSRF guard: the serverUrl is caller-controlled over HTTP, so
+            // reject private/loopback/link-local targets (including cloud
+            // metadata endpoints like 169.254.169.254) before using it.
+            try {
+              assertSafeServerUrl(cleanUrl);
+            } catch (err) {
+              // Sanitize before logging — the URL came from an HTTP
+              // header, so it's under attacker control and could carry
+              // newlines / ANSI escapes used for log injection (CWE-117).
+              const rawMsg = err instanceof Error ? err.message : String(err);
+              console.error(`Rejected serverUrl override: ${sanitizeForLog(rawMsg)}`);
+              // Respond with a constant generic message instead of echoing
+              // the error detail (which embeds the caller's URL). Keeps
+              // the server-side log useful for debugging while denying
+              // log-injection / information-leak downstream.
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                error: 'Invalid server_url',
+                message: 'The provided Countly server URL was rejected. It must be an http(s) URL that does not target loopback, private, link-local, or cloud-metadata addresses.',
+              }));
+              return;
+            }
+            effectiveServerUrl = cleanUrl;
             const source = headerServerUrl ? 'headers' : 'URL parameters';
-            console.error(`Using Countly server from ${source}:`, this.config.serverUrl);
+            console.error(`Using Countly server from ${source}:`, sanitizeForLog(effectiveServerUrl));
           }
-          
+
           if (authToken) {
-            this.config.authToken = authToken;
-            this.setAuthHeader(authToken);
             const source = headerAuthToken ? 'headers' : 'URL parameters';
+            // `source` is one of two hard-coded strings — no log-injection
+            // risk here. Leave as-is.
             console.error(`Auth token configured from ${source}`);
+            if (!headerAuthToken && paramAuthToken) {
+              this.warnTokenInUrl();
+            }
           }
-          
-          // Handle with StreamableHTTPServerTransport (modern protocol)
-          await transport.handleRequest(req, res);
+
+          // Run the MCP SDK handler inside an AsyncLocalStorage scope so the
+          // CallTool / resource handlers (which execute across await points)
+          // can read the per-request auth token + serverUrl without any
+          // shared-state mutation. This closes the cross-tenant token-mixing
+          // window previously present in the HTTP transport.
+          await this.requestContext.run(
+            { authToken: authToken || undefined, serverUrl: effectiveServerUrl },
+            async () => {
+              await transport.handleRequest(req, res);
+            }
+          );
           return;
         }
         
@@ -1341,6 +1631,33 @@ class CountlyMCPServer {
         });
       });
       
+      // Slow-loris / resource-exhaustion defenses. Node's defaults leave the
+      // server wide open: sockets can sit idle forever, and a single client
+      // can open thousands of connections. We set conservative timeouts and
+      // a per-IP concurrent-connection ceiling.
+      //
+      //   requestTimeout   max time from first byte to full request  (30s)
+      //   headersTimeout   max time to receive headers                (10s)
+      //   keepAliveTimeout close idle kept-alive connections          (5s)
+      //   timeout          socket inactivity                          (60s)
+      httpServer.requestTimeout = 30_000;
+      httpServer.headersTimeout = 10_000;
+      httpServer.keepAliveTimeout = 5_000;
+      httpServer.timeout = 60_000;
+
+      if (concurrencyLimiter) {
+        httpServer.on('connection', (socket) => {
+          const ip = socket.remoteAddress ?? 'unknown';
+          if (!concurrencyLimiter.accept(ip)) {
+            // Too many open connections for this IP. Kill immediately —
+            // don't let them consume a file descriptor or TLS handshake.
+            socket.destroy();
+            return;
+          }
+          socket.once('close', () => concurrencyLimiter.release(ip));
+        });
+      }
+
       httpServer.listen(port, hostname, () => {
         console.error(`✅ Countly MCP server running on HTTP at http://${hostname}:${port}${mcpEndpoint}`);
         console.error(`✅ Health check available at: http://${hostname}:${port}/health`);

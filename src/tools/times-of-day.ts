@@ -16,20 +16,20 @@ import type { ToolContext } from './types.js';
  */
 export const getTimesOfDayTool = {
   name: 'times_of_day',
-  description: 'Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.',
+  description: 'Get a weekday x hour heatmap of user activity in users\' local time for a given event via /o?method=times-of-day. Requires the times-of-day plugin. Distinct from datapoints_punch_card (which measures server data-point volume, not user activity).',
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
     event_key: z.string()
       .optional()
-      .describe('Event key to analyze. Use "[CLY]_session" for session data, or any custom event key.'),
+      .describe('Event key to analyze. Use "[CLY]_session" for sessions, or any custom event key. Omit for the server default.'),
     period: z.string()
       .optional()
-      .describe('Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'),
+      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Server default applies when omitted.'),
   }),
 };
 

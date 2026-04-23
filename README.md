@@ -216,15 +216,21 @@ The server supports multiple authentication methods (in priority order):
 | `COUNTLY_AUTH_TOKEN` | No* | - | Authentication token (direct) |
 | `COUNTLY_AUTH_TOKEN_FILE` | No* | - | Path to file containing auth token |
 | `COUNTLY_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
-| `ENABLE_ANALYTICS` | No | `true` | Enable anonymous usage analytics (set to `false` to opt out) |
+| `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics (set to `true` to opt in) |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
+| `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). |
+| `COUNTLY_RATE_LIMIT_RPM` | No | `120` | Per-IP requests per minute on the `/mcp` endpoint (HTTP transport). Set to `0` to disable. |
+| `COUNTLY_TRUST_PROXY` | No | `false` | When `true`, use `X-Forwarded-For` for the rate-limit client IP. Only enable when the server is behind a trusted reverse proxy that sets this header. |
+| `COUNTLY_MAX_BODY_BYTES` | No | `1048576` | Maximum request-body size accepted on `/mcp` (HTTP transport). Requests over the limit get `413 Payload Too Large`. Set to `0` to disable. |
+| `COUNTLY_MAX_CONCURRENT_PER_IP` | No | `50` | Maximum simultaneous TCP connections per client IP (HTTP transport). Over-limit connections are dropped. Set to `0` to disable. |
+| `COUNTLY_REQUEST_LOG` | No | `false` | When `true`, emit one NDJSON line per request to stderr (`{ts, ip, method, path, status, durationMs, rateLimitHit}`). Useful for piping into a log aggregator to spot abuse patterns. |
 
 *At least one authentication method must be configured
 
 ### Analytics Tracking (Optional)
 
-The MCP server includes optional anonymous usage analytics to help improve the product. Analytics are **enabled by default** and can be disabled via the `ENABLE_ANALYTICS=false` environment variable.
+The MCP server includes optional anonymous usage analytics to help improve the product. Analytics are **disabled by default** and can be opted into via the `ENABLE_ANALYTICS=true` environment variable.
 
 **What is tracked:**
 - Transport type used (stdio vs HTTP)
@@ -244,14 +250,14 @@ The MCP server includes optional anonymous usage analytics to help improve the p
 **Privacy & Device ID:**
 All analytics are aggregated under a single device ID "mcp" to ensure complete anonymity. No server-specific or user-specific information is collected.
 
-**To disable:**
+**To opt in:**
 ```bash
-export ENABLE_ANALYTICS=false
+export ENABLE_ANALYTICS=true
 ```
 
 Or in your `.env` file:
 ```
-ENABLE_ANALYTICS=false
+ENABLE_ANALYTICS=true
 ```
 
 ### Tools Configuration
@@ -275,7 +281,7 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
 **Available Categories:**
-- `CORE` - Core tools (ping, get_version, get_plugins, jobs_list, job_runs) (5 tools)
+- `CORE` - Core tools (ping, get_version, get_plugins) (3 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
 - `CRASHES` - Crash analytics and management (10 tools)
@@ -290,6 +296,105 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 **Total: 42 tools across 11 categories**
 
 For complete documentation, examples, and per-tool CRUD mappings, see **[TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md)**.
+
+## Security & Production Hardening
+
+The HTTP transport is designed to be usable both as a public-facing MCP
+endpoint (e.g. `mcp.count.ly`) and as a self-hosted single-tenant server.
+The defaults favor compatibility; operators should opt into the tighter
+settings below based on their deployment model.
+
+### Multi-tenant isolation
+
+The HTTP transport is safe to use with multiple concurrent clients using
+different Countly auth tokens. Each request gets its own outbound axios
+instance with the `countly-token` header baked in, and each tenant's apps
+cache is keyed by SHA-256(token) so one tenant's apps cannot leak into
+another tenant's `resolveAppId` lookup.
+
+No operator configuration is required for this.
+
+### SSRF
+
+Caller-supplied server URLs (via `X-Countly-Server-Url` header or
+`?server_url=` query param) are validated against an SSRF denylist —
+loopback, link-local, RFC 1918, carrier-grade NAT, cloud metadata
+endpoints (`169.254.169.254`), `.local`/`.localhost`, and non-HTTP(S)
+schemes are rejected with a 400. This is a syntactic check; defense
+against DNS-rebinding still requires egress firewalling the server.
+
+### Credentials in URLs are deprecated
+
+Passing the auth token via `?auth_token=` is supported for backward
+compatibility but emits a rate-limited security warning to stderr.
+Tokens in URLs leak into access logs, browser history, and Referer
+headers. Migrate callers to `X-Countly-Auth-Token` — URL-param support
+will be removed in a future release.
+
+### Rate limiting
+
+The `/mcp` endpoint has a per-IP sliding-window rate limiter, defaulting
+to 120 requests per minute. Tune via `COUNTLY_RATE_LIMIT_RPM=<n>`
+(set to `0` to disable). Behind a trusted reverse proxy, set
+`COUNTLY_TRUST_PROXY=true` so the first `X-Forwarded-For` hop is used as
+the client IP.
+
+### Resource-exhaustion defenses
+
+Additional protections layered on top of the application-level rate limit:
+
+- **Request body cap** (`COUNTLY_MAX_BODY_BYTES`, default 1 MiB) — `413
+  Payload Too Large` + socket destroyed for oversize bodies. Checked both
+  upfront via `Content-Length` and streamingly (for chunked / lying
+  clients).
+- **Per-IP concurrent connection cap** (`COUNTLY_MAX_CONCURRENT_PER_IP`,
+  default 50) — over-limit TCP connections are dropped before the TLS
+  handshake, closing the slow-loris amplification.
+- **Server timeouts** — `requestTimeout=30s`, `headersTimeout=10s`,
+  `keepAliveTimeout=5s`, `timeout=60s`. Slow clients can't keep sockets
+  open indefinitely.
+
+For operators that want per-request audit logs for abuse detection, set
+`COUNTLY_REQUEST_LOG=true`. The server will emit one NDJSON line per
+request to stderr, containing only the fields listed in the env-var
+table — no auth tokens, no bodies, no headers.
+
+### CORS
+
+The default is `Access-Control-Allow-Origin: *` so browser-based MCP
+clients from any origin can connect. If your deployment only needs to
+serve specific origins, lock it down:
+
+```bash
+COUNTLY_CORS_ALLOWED_ORIGINS="https://dash.example.com,https://ops.example.com"
+```
+
+The server will then echo only allowed origins and add `Vary: Origin`.
+Pre-flight requests from disallowed origins get a 403.
+
+### Self-hosted single-tenant deployments
+
+If you're running this as a single-tenant server (e.g. `docker run` on a
+VPS for your own AI assistant), prefer one of:
+
+- **Bind to localhost only** and tunnel through SSH:
+  `docker run -p 127.0.0.1:3000:3000 ...`
+- **Bind behind a reverse proxy** (Caddy, Nginx, Traefik) that terminates
+  TLS, adds authentication if needed, and sets a trusted `X-Forwarded-For`
+  (then set `COUNTLY_TRUST_PROXY=true`).
+
+The default Dockerfile binds to `0.0.0.0:3000` so it works inside a
+container without extra flags. This means `docker run -p 3000:3000 ...`
+exposes the MCP endpoint to the public internet — use an explicit local
+bind, a reverse proxy, or an external firewall if that's not what you
+want.
+
+### Telemetry
+
+Analytics are **disabled by default**. Opt in with `ENABLE_ANALYTICS=true`.
+No authentication tokens, server URLs, or tool arguments are ever sent
+to `stats.count.ly`; error messages shipped to the analytics SDK are
+redacted for token-shaped substrings.
 
 ## Docker Deployment
 
@@ -456,8 +561,6 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`ping`** - Check if Countly server is healthy and reachable
 - **`get_version`** - Check what version of Countly is running on the server
 - **`get_plugins`** - Get list of installed plugins on the server
-- **`jobs_list`** - List all background jobs running on the Countly server with pagination and sorting
-- **`job_runs`** - Get run history and details for a specific background job by name
 
 ### App Management
 - **`apps_list`** - List all applications

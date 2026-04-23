@@ -17,15 +17,15 @@ import type { ToolContext } from './types.js';
  */
 export const getDatapointStatisticsTool = {
   name: 'datapoints_stats',
-  description: 'Get data points collected per app per datapoint type. Data points are a measure of collected data, often tied to server specs and billing. Optionally filter by specific apps.',
+  description: 'Get data-point counts per app per datapoint type (the billing/usage metric) via /o/server-stats/data-points. Requires the server-stats plugin. For a ranked view use datapoints_top_apps; for hourly load pattern use datapoints_punch_card.',
   inputSchema: z.object({
     period: z.string()
       .optional()
       .default('30days')
-      .describe('Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'),
+      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Defaults to "30days".'),
     selected_app: z.string()
       .optional()
-      .describe('Optional comma-separated list of app IDs to filter results (e.g., "app_id1,app_id2")'),
+      .describe('Optional comma-separated app IDs to restrict results (e.g. "app_id1,app_id2"). Omit for all apps the caller can see.'),
   }),
 };
 
@@ -60,12 +60,12 @@ async function handleGetDatapointStatistics(args: z.infer<typeof getDatapointSta
  */
 export const getTopDatapointAppsTool = {
   name: 'datapoints_top_apps',
-  description: 'Get top apps ranked by data point collection. Shows which apps are generating the most data points, useful for understanding data usage and billing.',
+  description: 'Rank apps by data-point volume over a period via /o/server-stats/top. Requires the server-stats plugin. For the full per-type breakdown use datapoints_stats.',
   inputSchema: z.object({
     period: z.string()
       .optional()
       .default('30days')
-      .describe('Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'),
+      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".'),
   }),
 };
 
@@ -96,12 +96,12 @@ async function handleGetTopDatapointApps(args: z.infer<typeof getTopDatapointApp
  */
 export const getDatapointPunchCardTool = {
   name: 'datapoints_punch_card',
-  description: 'Get hourly data point breakdown punchcard showing server load patterns throughout the day and week. Useful for capacity planning and identifying peak usage times.',
+  description: 'Get a weekday x hour punch-card of data-point volume (load distribution across the week) via /o/server-stats/punch-card. Requires the server-stats plugin. Useful for spotting peak hours.',
   inputSchema: z.object({
     period: z.string()
       .optional()
       .default('30days')
-      .describe('Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'),
+      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".'),
   }),
 };
 

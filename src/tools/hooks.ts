@@ -8,7 +8,9 @@
  * Requires: hooks plugin
  */
 
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+
 import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
@@ -18,14 +20,14 @@ import type { ToolContext } from './types.js';
  */
 export const listHooksTool = {
   name: 'hooks_list',
-  description: 'List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.',
+  description: 'List hooks (triggers + effects: webhooks, emails, custom code, scheduled jobs) configured for an app via /o/hook/list. Requires the hooks plugin. To try a config before saving use hooks_test.',
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
   }),
 };
 
@@ -58,19 +60,19 @@ async function handleListHooks(args: z.infer<typeof listHooksTool.inputSchema>, 
  */
 export const testHookTool = {
   name: 'hooks_test',
-  description: 'Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.',
+  description: 'Dry-run a hook configuration with optional mock data via /i/hook/test (evaluates trigger match and runs effects in test mode). Requires the hooks plugin. To persist the hook use hooks_create.',
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
     hook_config: z.string()
-      .describe('Hook configuration as JSON string. Must include name, description, apps array, trigger object (type and configuration), and effects array.'),
+      .describe('Hook configuration as a JSON string with {name, description, apps:[...], trigger:{type, configuration}, effects:[...]}.'),
     mock_data: z.string()
       .optional()
-      .describe('Mock data as JSON string to test the hook with. For IncomingDataTrigger, include events array and user object.'),
+      .describe('Optional mock input as a JSON string. For IncomingDataTrigger pass {events:[...], user:{...}}.'),
   }),
 };
 
@@ -108,38 +110,33 @@ async function handleTestHook(args: z.infer<typeof testHookTool.inputSchema>, co
  */
 export const createHookTool = {
   name: 'hooks_create',
-  description: `Create a new webhook/hook. Hooks can be triggered by:
-- IncomingDataTrigger: Triggered by specific events with optional filters
-- APIEndPointTrigger: Creates a unique endpoint URL that can be called externally
-- InternalEventTrigger: Triggered by internal Countly events. Available events: /i/apps/create (new app created), /i/apps/update (app updated), /i/apps/delete (app deleted), /i/apps/reset (app reset), /i/users/create (dashboard user created), /i/users/update (dashboard user updated), /i/users/delete (dashboard user deleted), /systemlogs (system logs), /master (master events), /crashes/new (new crash received), /cohort/enter (user enters cohort), /cohort/exit (user exits cohort), /i/app_users/create (app user created), /i/app_users/update (app user updated), /i/app_users/delete (app user deleted), /hooks/trigger (another hook triggered), /alerts/trigger (alert triggered), /i/remote-config/add-parameter, /i/remote-config/update-parameter, /i/remote-config/remove-parameter, /i/remote-config/add-condition, /i/remote-config/update-condition, /i/remote-config/remove-condition
-- ScheduledTrigger: Triggered on a schedule (cron expression)
+  description: `Create a hook (persistent trigger + effects binding) via /i/hook/save. Requires the hooks plugin. To change an existing hook use hooks_update; to try before persisting use hooks_test.
 
-Effects can include:
-- HTTPEffect: Make HTTP requests to external URLs
-- EmailEffect: Send emails
-- CustomCodeEffect: Execute custom JavaScript code`,
+Supported trigger types: IncomingDataTrigger (match specific events with an optional filter), APIEndPointTrigger (exposes a unique URL to POST/GET into), InternalEventTrigger (fires on internal Countly events, e.g. /crashes/new, /cohort/enter, /i/apps/create, /alerts/trigger, remote-config mutations, etc.), ScheduledTrigger (cron schedule).
+
+Supported effects: HTTPEffect (outbound HTTP request), EmailEffect (send email), CustomCodeEffect (run JavaScript).`,
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
     name: z.string()
-      .describe('Hook name'),
+      .describe('Display name for the hook.'),
     description: z.string()
-      .describe('Hook description'),
+      .describe('Free-form description of what the hook does.'),
     apps: z.array(z.string())
-      .describe('Array of app IDs this hook applies to'),
+      .describe('App IDs this hook applies to (usually a single-element array).'),
     trigger_type: z.enum(['IncomingDataTrigger', 'APIEndPointTrigger', 'InternalEventTrigger', 'ScheduledTrigger'])
-      .describe('Type of trigger'),
+      .describe('Trigger class (see top-level description for behavior).'),
     trigger_config: z.string()
-      .describe('Trigger configuration as JSON string. For IncomingDataTrigger: {event: ["app_id***event_key"], filter: "..."}. For APIEndPointTrigger: {path: "uuid", method: "get|post"}. For InternalEventTrigger: {eventType: "/crashes/new" or "/cohort/enter" or any other internal event from the list above, cohortID: null, hookID: null, alertID: null}. For ScheduledTrigger: {period1: "day|week|month", cron: "0 6 * * *", period3: 6, timezone2: "timezone"}'),
+      .describe('Trigger configuration as a JSON string. IncomingDataTrigger: {event:["app_id***event_key"], filter:"..."}. APIEndPointTrigger: {path:"uuid", method:"get|post"}. InternalEventTrigger: {eventType:"/crashes/new"|"/cohort/enter"|... , cohortID:null, hookID:null, alertID:null}. ScheduledTrigger: {period1:"day|week|month", cron:"0 6 * * *", period3:6, timezone2:"<IANA tz>"}.'),
     effects: z.string()
-      .describe('Array of effects as JSON string. Each effect has type and configuration. HTTPEffect: {url, method, requestData, headers}. EmailEffect: {address: ["email"], emailTemplate: "text"}. CustomCodeEffect: {code: "javascript"}'),
+      .describe('Effects as a JSON-encoded array. Each entry has {type, configuration}. HTTPEffect: {url, method, requestData, headers}. EmailEffect: {address:["email"], emailTemplate:"text"}. CustomCodeEffect: {code:"javascript"}.'),
     enabled: z.boolean()
       .default(true)
-      .describe('Whether the hook is enabled'),
+      .describe('Whether the hook is active immediately. Defaults to true.'),
   }),
 };
 
@@ -192,37 +189,37 @@ async function handleCreateHook(args: z.infer<typeof createHookTool.inputSchema>
  */
 export const updateHookTool = {
   name: 'hooks_update',
-  description: 'Update an existing webhook/hook configuration. Provide the hook _id and new configuration.',
+  description: 'Update an existing hook via /i/hook/save (the tool fetches the current hook first, merges supplied fields, and saves). Requires the hooks plugin. Note: both trigger_type AND trigger_config must be supplied together to change the trigger.',
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
     hook_id: z.string()
-      .describe('Hook ID to update'),
+      .describe('Hook identifier (_id) to update. Obtain it from hooks_list.'),
     name: z.string()
       .optional()
-      .describe('Hook name'),
+      .describe('New display name. Omit to keep current.'),
     description: z.string()
       .optional()
-      .describe('Hook description'),
+      .describe('New description. Omit to keep current.'),
     apps: z.array(z.string())
       .optional()
-      .describe('Array of app IDs this hook applies to'),
+      .describe('Replacement list of app IDs. Omit to keep current.'),
     trigger_type: z.enum(['IncomingDataTrigger', 'APIEndPointTrigger', 'InternalEventTrigger', 'ScheduledTrigger'])
       .optional()
-      .describe('Type of trigger'),
+      .describe('New trigger class. Must be supplied together with trigger_config to actually change the trigger.'),
     trigger_config: z.string()
       .optional()
-      .describe('Trigger configuration as JSON string'),
+      .describe('New trigger configuration as a JSON string (see hooks_create.trigger_config for shape). Only applied when trigger_type is also set.'),
     effects: z.string()
       .optional()
-      .describe('Array of effects as JSON string'),
+      .describe('Replacement effects array as a JSON string (see hooks_create.effects). Omit to keep current.'),
     enabled: z.boolean()
       .optional()
-      .describe('Whether the hook is enabled'),
+      .describe('Enable or disable the hook. Omit to keep current.'),
   }),
 };
 
@@ -265,8 +262,18 @@ async function handleUpdateHook(args: z.infer<typeof updateHookTool.inputSchema>
     enabled: args.enabled !== undefined ? args.enabled : existingHook.enabled,
   };
 
-  // Update trigger if provided
-  if (args.trigger_type && args.trigger_config) {
+  // Update trigger if provided. Both fields must be supplied together so the
+  // trigger object stays internally consistent — partial updates can easily
+  // leave type and configuration out of sync (e.g. new type with stale cron
+  // config). Fail loudly instead of silently ignoring the request.
+  if (args.trigger_type || args.trigger_config) {
+    if (!args.trigger_type || !args.trigger_config) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'hooks_update: trigger_type and trigger_config must be provided together. ' +
+        'Supply both to change the trigger, or neither to keep it unchanged.'
+      );
+    }
     const triggerConfig = JSON.parse(args.trigger_config);
     hookConfig.trigger = {
       type: args.trigger_type,
@@ -306,16 +313,16 @@ async function handleUpdateHook(args: z.infer<typeof updateHookTool.inputSchema>
  */
 export const deleteHookTool = {
   name: 'hooks_delete',
-  description: 'Delete a webhook/hook by its ID',
+  description: 'Delete a hook by its _id via /i/hook/delete. Requires the hooks plugin. WARNING: irreversible. To disable without deleting set enabled=false via hooks_update.',
   inputSchema: z.object({
     app_id: z.string()
       .optional()
-      .describe('Application ID (optional if app_name is provided)'),
+      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
     app_name: z.string()
       .optional()
-      .describe('Application name (alternative to app_id)'),
+      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
     hook_id: z.string()
-      .describe('Hook ID to delete'),
+      .describe('Hook identifier (_id) to delete. Obtain it from hooks_list.'),
   }),
 };
 

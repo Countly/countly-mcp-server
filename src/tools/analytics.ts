@@ -13,15 +13,15 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getAnalyticsAppSummaryToolDefinition = {
   name: 'app_analytics_summary',
-  description: 'Get general summary information about an app, including analytics data. Can be used for general information requests about the app, like how is app doing, or show me info about this app, etc.',
+  description: 'Get a high-level analytics overview for a specific app (sessions, users, events, and retention for the chosen period). Use this when the user already has an app in mind and wants a quick health check (e.g. "how is MyApp doing?"). To discover which apps exist in the account, use apps_list — this tool requires an app identifier and does not list apps.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional - if not provided, will show available apps)' },
-      app_name: { type: 'string', description: 'Application name (optional - if not provided, will show available apps)' },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]")'
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      period: {
+        type: 'string',
+        description: 'Time period for data. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Defaults to "30days".'
       },
     },
     required: [],
@@ -68,20 +68,20 @@ params.period = period;
 
 export const getSlippingAwayUsersToolDefinition = {
   name: 'slipping_users',
-  description: 'Get users who are slipping away based on inactivity period',
+  description: 'List app users who have not returned within a given inactivity window (churn-risk cohort) via /o/slipping. Use this to identify re-engagement targets; for generic user listings use user_profiles_query instead.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      period: { 
-        type: 'number', 
-        enum: [7, 14, 30, 60, 90], 
-        description: 'Time period to check for (days)',
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      period: {
+        type: 'number',
+        enum: [7, 14, 30, 60, 90],
+        description: 'Inactivity threshold in days. Users whose last session is older than this are returned. Defaults to 7.',
         default: 7
       },
-      limit: { type: 'number', description: 'Maximum number of users to return', default: 50 },
-      skip: { type: 'number', description: 'Number of users to skip for pagination', default: 0 },
+      limit: { type: 'number', description: 'Maximum number of users to return. Defaults to 50.', default: 50 },
+      skip: { type: 'number', description: 'Number of users to skip for pagination. Defaults to 0.', default: 0 },
     },
   },
 };
@@ -125,21 +125,21 @@ export async function handleGetSlippingAwayUsers(context: ToolContext, args: any
 
 export const getSessionFrequencyToolDefinition = {
   name: 'session_frequency',
-  description: 'Get session frequency distribution showing how many sessions fall into different time buckets. Buckets: f=0 (first session), f=1 (1-24 hours), f=2 (1 day), f=3 (2 days), f=4 (3 days), f=5 (4 days), f=6 (5 days), f=7 (6 days), f=8 (7 days), f=9 (8-14 days), f=10 (15-30 days), f=11 (30+ days)',
+  description: 'Get the session-frequency distribution for an app via /o/analytics/frequency: how many sessions occurred at each return-interval bucket (f=0 first, f=1 1-24h, f=2 1d, f=3 2d, f=4 3d, f=5 4d, f=6 5d, f=7 6d, f=8 7d, f=9 8-14d, f=10 15-30d, f=11 30+d). For duration-based distributions use session_durations.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range',
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Defaults to "30days" when omitted.',
         default: '30days'
       },
     },
@@ -195,15 +195,15 @@ export async function handleGetSessionFrequency(context: ToolContext, args: any)
 
 export const getUserLoyaltyToolDefinition = {
   name: 'user_loyalty',
-  description: 'Get user loyalty data showing how many sessions users have had. Results are divided into loyalty buckets: 1 session, 2 sessions, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, and 500+ sessions.',
+  description: 'Get the user-loyalty distribution for an app via /o/app_users/loyalty: counts of users bucketed by lifetime session count (1, 2, 3-5, 6-9, 10-19, 20-49, 50-99, 100-499, 500+). For session-timing breakdowns use session_frequency.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      query: { 
-        type: 'string', 
-        description: 'Optional MongoDB query as JSON string to filter users (e.g., \'{"country":"US"}\' or \'{}\'). Defaults to \'{}\' (all users).' 
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      query: {
+        type: 'string',
+        description: 'MongoDB query as a JSON string to filter the user set (e.g. \'{"country":"US"}\'). Defaults to \'{}\' (all users).'
       },
     },
   },
@@ -255,15 +255,15 @@ export async function handleGetUserLoyalty(context: ToolContext, args: any): Pro
 
 export const getSessionDurationsToolDefinition = {
   name: 'session_durations',
-  description: 'Get session duration distribution showing how long user sessions lasted. Results are divided into duration buckets: 0-10 seconds, 11-30 seconds, 31-60 seconds, 1-3 minutes, 3-10 minutes, 10-30 minutes, 30-60 minutes, and over 1 hour.',
+  description: 'Get the session-duration distribution for an app via /o/analytics/durations: counts of sessions bucketed by length (0-10s, 11-30s, 31-60s, 1-3m, 3-10m, 10-30m, 30-60m, 1h+). For session-return cadence use session_frequency.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      period: { 
-        type: 'string', 
-        description: 'Time period for data. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds] (e.g., "[1417730400000,1420149600000]"). Defaults to "30days".'
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Defaults to "30days" when omitted.'
       },
     },
   },
@@ -316,16 +316,16 @@ export async function handleGetSessionDurations(context: ToolContext, args: any)
 
 export const queryDataToolDefinition = {
   name: 'query_data',
-  description: 'Unified tool for querying analytics data. Use query_type to specify: "analytics" for predefined breakdowns (locations, devices, etc.), "events" for event totals/breakdowns, "drill" for custom segment filtering (requires drill plugin).',
+  description: 'Query analytics data in one of three modes selected by query_type: "analytics" for built-in breakdowns (locations, devices, carriers, app versions, etc.), "events" for event totals via /o/analytics/events, or "drill" for custom segment filtering (drill plugin, with bucket + projection). For the single-call app overview use app_analytics_summary; for event key management use events_list.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       query_type: {
         type: 'string',
         enum: ['analytics', 'events', 'drill'],
-        description: 'Type of query to perform'
+        description: 'Which query mode to run: "analytics" (predefined breakdown, requires method), "events" (event totals, optional event key), or "drill" (segmentation via drill plugin; requires query_object).'
       },
       // Analytics-specific
       method: {
@@ -335,30 +335,30 @@ export const queryDataToolDefinition = {
           'devices', 'device_details', 'app_versions', 'cities',
           'browser', 'density', 'langs', 'sources'
         ],
-        description: 'Data retrieval method (for analytics query_type)'
+        description: 'Analytics breakdown method. Required when query_type is "analytics"; ignored otherwise.'
       },
-      segmentation: { type: 'string', description: 'Segmentation parameter for events (for analytics query_type)' },
+      segmentation: { type: 'string', description: 'Event segmentation key to break results by. Used when query_type is "analytics".' },
       // Events-specific
-      event: { type: 'string', description: 'Event key (for events/drill query_type)' },
+      event: { type: 'string', description: 'Event key to query. Used when query_type is "events" or "drill".' },
       // Drill-specific
       query_object: {
         type: 'string',
-        description: 'MongoDB query object as JSON string (for drill query_type). Use prefixes as shown in queriable_fields_list.'
+        description: 'MongoDB-style query as a JSON string for drill filtering. Required when query_type is "drill". Use field prefixes listed by queriable_fields_list.'
       },
       bucket: {
         type: 'string',
-        description: 'Time bucket granularity (for drill query_type)',
+        description: 'Time bucket granularity for drill results. Defaults to "daily" when query_type is "drill".',
         enum: ['hourly', 'daily', 'weekly', 'monthly'],
       },
       projection_key: {
         type: 'array',
-        description: 'Array of segments to break down by (for drill query_type)',
+        description: 'Segment keys to break the drill result down by. Used when query_type is "drill".',
         items: { type: 'string' }
       },
       // Common
-      period: { 
-        type: 'string', 
-        description: 'Time period. Possible values: "month", "60days", "30days", "7days", "yesterday", "hour", or custom range as [startMilliseconds,endMilliseconds]'
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Server default applies when omitted.'
       },
     },
     required: ['query_type'],

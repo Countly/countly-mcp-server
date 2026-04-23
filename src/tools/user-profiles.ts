@@ -8,21 +8,21 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const queryUserProfilesToolDefinition = {
   name: 'user_profiles_query',
-  description: 'Query user profiles using MongoDB query. Check drill queriable_fields_list for available user properties (without "up." prefix here)',
+  description: 'Query end-user (app_user) profiles by MongoDB filter via /o?method=user_details. Requires the users plugin. Field names are used WITHOUT the "up." prefix here (unlike drill/retention). For details on a specific user use user_profiles_get; for counts grouped by a property use user_profiles_breakdown.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
       query: {
         type: 'string',
-        description: 'MongoDB query object as JSON string (e.g., \'{"country":"US"}\' or \'{}\'). Note: Do NOT use "up." prefix here',
+        description: 'MongoDB filter as a JSON string (e.g. \'{"country":"US"}\'). Field names go WITHOUT the "up." prefix. Defaults to \'{}\' (all users).',
       },
     },
     required: [],
@@ -73,25 +73,25 @@ export async function handleQueryUserProfiles(context: ToolContext, args: any): 
 
 export const breakdownUserProfilesToolDefinition = {
   name: 'user_profiles_breakdown',
-  description: 'Break down user counts by specific properties (e.g., country, app version)',
+  description: 'Group app-user profiles by one or more properties and count users per bucket via /o?method=user_details&projectionKey=. Requires the users plugin. For the raw profile records use user_profiles_query.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
       query: {
         type: 'string',
-        description: 'MongoDB query object as JSON string to filter users (e.g., \'{"country":"US"}\' or \'{}\'). Do NOT use "up." prefix',
+        description: 'MongoDB filter as a JSON string (e.g. \'{"country":"US"}\'). Field names go WITHOUT the "up." prefix. Defaults to \'{}\'.',
       },
       projection_key: {
         type: 'string',
-        description: 'JSON array of property keys to break down by (e.g., \'["av"]\' for app version, \'["country"]\' for country)',
+        description: 'JSON-encoded array of property keys to group by (e.g. \'["av"]\' for app version, \'["country"]\').',
       },
     },
     required: ['projection_key'],
@@ -155,21 +155,21 @@ export async function handleBreakdownUserProfiles(context: ToolContext, args: an
 
 export const getUserProfileDetailsToolDefinition = {
   name: 'user_profiles_get',
-  description: 'Get detailed information about a specific user by their UID',
+  description: 'Get the full profile of a single app-user by UID via /o?method=user_details. Requires the users plugin. For bulk listing use user_profiles_query; for grouped counts use user_profiles_breakdown.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { 
-        type: 'string', 
-        description: 'Application ID (optional if app_name is provided)' 
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
       },
-      app_name: { 
-        type: 'string', 
-        description: 'Application name (alternative to app_id)' 
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
       },
       uid: {
         type: 'string',
-        description: 'User ID (UID) to get details for',
+        description: 'User identifier (uid) assigned by Countly. Obtain it from user_profiles_query results.',
       },
     },
     required: ['uid'],

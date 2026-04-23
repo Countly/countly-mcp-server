@@ -9,7 +9,7 @@ import { ToolContext, ToolResult } from './types.js';
 
 export const listAppsToolDefinition = {
   name: 'apps_list',
-  description: 'List all available applications with their names and IDs',
+  description: 'List every Countly application the authenticated user can access, with each app name and _id. Use this first whenever an app_id is needed but unknown, or to answer "which apps are in this account?". Takes no arguments. For details of a single app by name use apps_get_by_name.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -36,11 +36,11 @@ export async function handleListApps(context: ToolContext, _: any): Promise<Tool
 
 export const getAppByNameToolDefinition = {
   name: 'apps_get_by_name',
-  description: 'Get app information by app name',
+  description: 'Look up a single app by its exact name (case-insensitive) and return its full record (_id, keys, category, timezone, etc.). Errors if no app matches. To list all apps use apps_list.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_name: { type: 'string', description: 'Application name' },
+      app_name: { type: 'string', description: 'Exact application name to look up (case-insensitive). Must match an existing app; call apps_list to see valid names.' },
     },
     required: ['app_name'],
   },
@@ -74,14 +74,14 @@ export async function handleGetAppByName(context: ToolContext, args: any): Promi
 
 export const createAppToolDefinition = {
   name: 'apps_create',
-  description: 'Create a new app in Countly (requires global admin privileges)',
+  description: 'Create a new Countly application via /i/apps/create. Requires global admin privileges. Returns the created app including its _id and API keys.',
   inputSchema: {
     type: 'object',
     properties: {
-      name: { type: 'string', description: 'Application name' },
-      country: { type: 'string', description: 'Country code (e.g., "US")' },
-      timezone: { type: 'string', description: 'Timezone (e.g., "America/New_York")' },
-      category: { type: 'string', description: 'App category (optional)' },
+      name: { type: 'string', description: 'Name for the new app. Shown in the dashboard and used by apps_get_by_name.' },
+      country: { type: 'string', description: 'Default country ISO code (e.g. "US"). Optional.' },
+      timezone: { type: 'string', description: 'IANA timezone for the app (e.g. "America/New_York"). Optional.' },
+      category: { type: 'string', description: 'Numeric category ID string (see Countly category list). Optional.' },
     },
     required: ['name'],
   },
@@ -133,16 +133,16 @@ appData.category = category;
 
 export const updateAppToolDefinition = {
   name: 'apps_update',
-  description: 'Update an existing app in Countly',
+  description: 'Update mutable fields of an existing Countly app (name, country, timezone, category) via /i/apps/update. Only supplied fields change. For creating a new app use apps_create.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
-      name: { type: 'string', description: 'New application name (optional)' },
-      country: { type: 'string', description: 'Country code (optional)' },
-      timezone: { type: 'string', description: 'Timezone (optional)' },
-      category: { type: 'string', description: 'App category (optional)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
+      name: { type: 'string', description: 'New display name for the app. Omit to keep current.' },
+      country: { type: 'string', description: 'New default country ISO code (e.g. "US"). Omit to keep current.' },
+      timezone: { type: 'string', description: 'New IANA timezone (e.g. "America/New_York"). Omit to keep current.' },
+      category: { type: 'string', description: 'New category ID string. Omit to keep current.' },
     },
   },
 };
@@ -201,12 +201,12 @@ updateData.category = category;
 
 export const deleteAppToolDefinition = {
   name: 'apps_delete',
-  description: 'Delete an app from Countly (requires global admin privileges)',
+  description: 'Permanently delete a Countly app and all its data via /i/apps/delete. Requires global admin privileges. WARNING: irreversible. To wipe analytics data but keep the app use apps_reset.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -247,12 +247,12 @@ export async function handleDeleteApp(context: ToolContext, args: any): Promise<
 
 export const resetAppToolDefinition = {
   name: 'apps_reset',
-  description: 'Reset all data for an app (requires global admin privileges)',
+  description: 'Delete all analytics data for an app (sessions, events, users, crashes, etc.) while keeping the app record and keys intact, via /i/apps/reset. Requires global admin privileges. WARNING: irreversible. To also remove the app itself use apps_delete.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };

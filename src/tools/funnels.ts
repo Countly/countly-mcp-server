@@ -16,31 +16,31 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const listFunnelsToolDefinition = {
   name: 'funnels_list',
-  description: 'List all funnels with their configurations and performance metrics. Funnels track user progression through a sequence of events.',
+  description: 'List conversion funnels with configurations and rollup metrics, paginated and optionally name-filtered, via /o?method=get_funnels. Requires the funnels plugin. For per-period analytics of one funnel use funnels_data.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       skip: {
         type: 'number',
-        description: 'Number of records to skip for pagination',
+        description: 'Number of records to skip for pagination. Defaults to 0.',
         default: 0,
       },
       limit: {
         type: 'number',
-        description: 'Maximum number of records to return',
+        description: 'Maximum number of records to return. Defaults to 10.',
         default: 10,
       },
       search: {
         type: 'string',
-        description: 'Search term to filter funnels by name',
+        description: 'Case-insensitive substring filter on funnel name.',
       },
     },
   },
@@ -88,30 +88,30 @@ export async function handleListFunnels(
 
 export const getFunnelDataToolDefinition = {
   name: 'funnels_data',
-  description: 'Get funnel analytics data for a specific time period with optional filtering.',
+  description: 'Get per-step conversion data (counts, drop-off, rates) for one funnel in a period, via /o?method=funnel. Requires the funnels plugin. For the users at a specific step use funnels_step_users; for who dropped off between steps use funnels_dropoff_users.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       funnel_id: {
         type: 'string',
-        description: 'Funnel ID to get data for',
+        description: 'Funnel identifier to fetch data for. Obtain it from funnels_list.',
       },
       period: {
         type: 'string',
-        description: 'Time period for data. Possible values: "30days", "7days", "yesterday", "hour", or custom range',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".',
         default: '30days',
       },
       filter: {
         type: 'string',
-        description: 'Optional MongoDB query filter as JSON string (e.g., \'{"up.country":"US"}\')',
+        description: 'Optional MongoDB filter as a JSON string (e.g. \'{"up.country":"US"}\'). Defaults to \'{}\'.',
         default: '{}',
       },
     },
@@ -167,34 +167,34 @@ export async function handleGetFunnelData(
 
 export const getFunnelStepUsersToolDefinition = {
   name: 'funnels_step_users',
-  description: 'Get list of user IDs (UIDs) who reached a specific step in the funnel.',
+  description: 'Return UIDs of users who reached a specific funnel step in the given period, via /o?method=funnel&users_for_step=. Requires the funnels plugin. For users who dropped off between two steps use funnels_dropoff_users.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       funnel_id: {
         type: 'string',
-        description: 'Funnel ID',
+        description: 'Funnel identifier. Obtain it from funnels_list.',
       },
       step: {
         type: 'number',
-        description: 'Step number (0-indexed) to get users for',
+        description: 'Zero-indexed step number to retrieve users for (0 = first step).',
       },
       period: {
         type: 'string',
-        description: 'Time period for data',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".',
         default: '30days',
       },
       filter: {
         type: 'string',
-        description: 'Optional MongoDB query filter as JSON string',
+        description: 'Optional MongoDB filter as a JSON string. Defaults to \'{}\'.',
         default: '{}',
       },
     },
@@ -240,38 +240,38 @@ export async function handleGetFunnelStepUsers(
 
 export const getFunnelDropoffUsersToolDefinition = {
   name: 'funnels_dropoff_users',
-  description: 'Get list of user IDs (UIDs) who dropped off between two steps in the funnel.',
+  description: 'Return UIDs of users who dropped off between two steps of a funnel, via /o?method=funnel&users_between_steps=. Requires the funnels plugin. For users who reached a single step use funnels_step_users.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       funnel_id: {
         type: 'string',
-        description: 'Funnel ID',
+        description: 'Funnel identifier. Obtain it from funnels_list.',
       },
       from_step: {
         type: 'number',
-        description: 'Starting step number (use -1 for users who never entered the funnel)',
+        description: 'Starting zero-indexed step number. Use -1 for users who never entered the funnel.',
       },
       to_step: {
         type: 'number',
-        description: 'Ending step number (the step they dropped off from)',
+        description: 'Ending zero-indexed step the users dropped off from.',
       },
       period: {
         type: 'string',
-        description: 'Time period for data',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range. Defaults to "30days".',
         default: '30days',
       },
       filter: {
         type: 'string',
-        description: 'Optional MongoDB query filter as JSON string',
+        description: 'Optional MongoDB filter as a JSON string. Defaults to \'{}\'.',
         default: '{}',
       },
     },
@@ -318,30 +318,30 @@ export async function handleGetFunnelDropoffUsers(
 
 export const createFunnelToolDefinition = {
   name: 'funnels_create',
-  description: 'Create a new conversion funnel to track user progression through a sequence of events. Define steps, queries for filtering, and session requirements.',
+  description: 'Create a new conversion funnel (ordered steps, per-step filters, session scope) via /i/funnels/add. Requires the funnels plugin. The queries, query_texts, and step_groups arrays are auto-padded to match steps.length when shorter.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       name: {
         type: 'string',
-        description: 'Funnel name',
+        description: 'Display name for the funnel.',
       },
       description: {
         type: 'string',
-        description: 'Funnel description',
+        description: 'Optional free-form description.',
       },
       type: {
         type: 'string',
         enum: ['session-independent', 'same-session'],
-        description: 'Funnel type: "session-independent" (events can happen across sessions) or "same-session" (all events must occur in same session)',
+        description: 'Scope: "session-independent" (events can occur in any order of sessions) or "same-session" (all events must occur within one session). Defaults to "session-independent".',
         default: 'session-independent',
       },
       steps: {
@@ -349,14 +349,14 @@ export const createFunnelToolDefinition = {
         items: {
           type: 'string',
         },
-        description: 'Array of event names representing funnel steps in order (e.g., ["[CLY]_session", "Product Viewed", "Added to Cart", "Purchase"])',
+        description: 'Ordered event keys that make up the funnel (e.g. ["[CLY]_session","Product Viewed","Added to Cart","Purchase"]).',
       },
       queries: {
         type: 'array',
         items: {
           type: 'string',
         },
-        description: 'Array of MongoDB query JSON strings for each step (e.g., [\'{"up.country":"US"}\', \'{}\', \'{}\', \'{}\']). Use {} for no filter',
+        description: 'Per-step MongoDB filters as JSON strings; use "{}" for no filter (e.g. [\'{"up.country":"US"}\', \'{}\', \'{}\', \'{}\']). Defaults to [] (auto-expanded to "{}" per step).',
         default: [],
       },
       query_texts: {
@@ -364,7 +364,7 @@ export const createFunnelToolDefinition = {
         items: {
           type: 'string',
         },
-        description: 'Array of human-readable query descriptions for each step (e.g., ["Country = US", "", "", ""])',
+        description: 'Per-step human-readable filter labels (e.g. ["Country = US","","",""]). Defaults to [] (auto-expanded to "" per step).',
         default: [],
       },
       step_groups: {
@@ -381,7 +381,7 @@ export const createFunnelToolDefinition = {
             },
           },
         },
-        description: 'Array of step group objects defining relationships between steps. Each has "c" (conjunction: "and"/"or") and "g" (group number)',
+        description: 'Per-step grouping rules: each entry has c ("and"/"or") and g (group index). Defaults to [] (auto-expanded to {c:"and",g:<step index>}).',
         default: [],
       },
     },
@@ -449,62 +449,62 @@ export async function handleCreateFunnel(
 
 export const updateFunnelToolDefinition = {
   name: 'funnels_update',
-  description: 'Update an existing funnel configuration including name, description, steps, and filters.',
+  description: 'Update an existing funnel (name, description, type, steps, filters, step groups) via /i/funnels/edit. Only supplied fields change; others are preserved. Requires the funnels plugin.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       funnel_id: {
         type: 'string',
-        description: 'Funnel ID to update',
+        description: 'Funnel identifier to update. Obtain it from funnels_list.',
       },
       name: {
         type: 'string',
-        description: 'New funnel name',
+        description: 'New funnel name. Omit to keep current.',
       },
       description: {
         type: 'string',
-        description: 'New funnel description',
+        description: 'New description. Omit to keep current.',
       },
       type: {
         type: 'string',
         enum: ['session-independent', 'same-session'],
-        description: 'Funnel type',
+        description: 'New funnel scope. Omit to keep current.',
       },
       steps: {
         type: 'array',
         items: {
           type: 'string',
         },
-        description: 'Array of event names for funnel steps',
+        description: 'Replacement ordered list of event keys. Omit to keep current.',
       },
       queries: {
         type: 'array',
         items: {
           type: 'string',
         },
-        description: 'Array of MongoDB query JSON strings for each step',
+        description: 'Replacement per-step MongoDB filters (JSON strings). Omit to keep current.',
       },
       query_texts: {
         type: 'array',
         items: {
           type: 'string',
         },
-        description: 'Array of human-readable query descriptions',
+        description: 'Replacement per-step human-readable filter labels. Omit to keep current.',
       },
       step_groups: {
         type: 'array',
         items: {
           type: 'object',
         },
-        description: 'Array of step group objects',
+        description: 'Replacement per-step grouping entries (see funnels_create.step_groups). Omit to keep current.',
       },
     },
     required: ['funnel_id'],
@@ -579,21 +579,21 @@ export async function handleUpdateFunnel(
 
 export const deleteFunnelToolDefinition = {
   name: 'funnels_delete',
-  description: 'Delete a funnel. This action cannot be undone.',
+  description: 'Delete a funnel definition via /i/funnels/delete. Requires the funnels plugin. WARNING: irreversible.',
   inputSchema: {
     type: 'object',
     properties: {
       app_id: {
         type: 'string',
-        description: 'Application ID (optional if app_name is provided)',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
       },
       app_name: {
         type: 'string',
-        description: 'Application name (alternative to app_id)',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
       },
       funnel_id: {
         type: 'string',
-        description: 'Funnel ID to delete',
+        description: 'Funnel identifier to delete. Obtain it from funnels_list.',
       },
     },
     required: ['funnel_id'],

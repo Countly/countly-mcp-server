@@ -7,12 +7,12 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getLiveUsersToolDefinition = {
   name: 'live_users',
-  description: 'Get current online user count and new user count for this moment. Shows users currently using the app in real-time.',
+  description: 'Get the current online user count and current new-user count (a single snapshot) via /o?method=concurrent&mode=0. Requires the concurrent_users plugin. For country/device/carrier breakdown use live_metrics.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -56,12 +56,12 @@ export async function handleGetLiveUsers(context: ToolContext, args: any): Promi
 
 export const getLiveMetricsToolDefinition = {
   name: 'live_metrics',
-  description: 'Get breakdown by countries, devices and carriers for users currently online. Shows demographic distribution of live users.',
+  description: 'Get the country/device/carrier breakdown of users currently online via /o?method=concurrent&mode=1. Requires the concurrent_users plugin. For the simple total use live_users.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -106,12 +106,12 @@ export async function handleGetLiveMetrics(context: ToolContext, args: any): Pro
 
 export const getLiveLastHourToolDefinition = {
   name: 'live_last_hour',
-  description: 'Get online user and new user count data for the last hour. Returns minute-by-minute data with 60 data points.',
+  description: 'Get per-minute online/new-user counts for the last 60 minutes (60 data points) via /o?method=concurrent&mode=2. Requires the concurrent_users plugin. For longer windows use live_last_day or live_last_30_days.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -155,12 +155,12 @@ export async function handleGetLiveLastHour(context: ToolContext, args: any): Pr
 
 export const getLiveLastDayToolDefinition = {
   name: 'live_last_day',
-  description: 'Get online user and new user count for the last day. Returns hour-by-hour data with 24 data points.',
+  description: 'Get per-hour online/new-user counts for the last 24 hours (24 data points) via /o?method=concurrent&mode=3. Requires the concurrent_users plugin. For finer resolution use live_last_hour; for longer use live_last_30_days.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -204,12 +204,12 @@ export async function handleGetLiveLastDay(context: ToolContext, args: any): Pro
 
 export const getLiveLast30DaysToolDefinition = {
   name: 'live_last_30_days',
-  description: 'Get online user and new user count for the last 30 days. Returns daily data with 30 data points.',
+  description: 'Get per-day online/new-user counts for the last 30 days (30 data points) via /o?method=concurrent&mode=4. Requires the concurrent_users plugin. For peak records use live_overall.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };
@@ -253,12 +253,12 @@ export async function handleGetLiveLast30Days(context: ToolContext, args: any): 
 
 export const getLiveOverallToolDefinition = {
   name: 'live_overall',
-  description: 'Get maximum values for online user count and new user count. Shows peak concurrent usage records.',
+  description: 'Get the all-time peak concurrent online-users and peak new-users records for an app via /o?method=concurrent&mode=5. Requires the concurrent_users plugin.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
     },
   },
 };

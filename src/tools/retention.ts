@@ -7,36 +7,36 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getRetentionToolDefinition = {
   name: 'retention',
-  description: 'Get retention data showing how many consecutive same events (like sessions) users did before breaking the streak. Supports three retention types: Full (strict - breaks on first skip), Classic (Day N - checks specific days independently), and Unbounded (lenient - counts any return after a day).',
+  description: 'Compute user retention (cohort return curves) for an app via /o?method=retention. Requires the retention_segments plugin. Offers three modes: "full" (streak broken on first skipped day), "classic" (independent Day N percentages), "unbounded" (retained if user returns on or after Day N). Defaults to the session event.',
   inputSchema: {
     type: 'object',
     properties: {
-      app_id: { type: 'string', description: 'Application ID (optional if app_name is provided)' },
-      app_name: { type: 'string', description: 'Application name (alternative to app_id)' },
+      app_id: { type: 'string', description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.' },
+      app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       rettype: {
         type: 'string',
         enum: ['full', 'classic', 'unbounded'],
-        description: 'Retention type: "full" (strict - retention breaks on first skip day), "classic" (Day N - users who returned on specific day, days affect only themselves), "unbounded" (lenient - users who returned on or after a specific day, all days between Day 0 and last session are retained). Defaults to "full".'
+        description: 'Retention definition: "full" (strict streak), "classic" (Day N return %, independent days), "unbounded" (lenient: any return on/after Day N counts). Defaults to "full".'
       },
       period: {
         type: 'string',
-        description: 'Period type for retention calculation. Common values: "adaily" (all daily), "aweekly" (all weekly), "amonthly" (all monthly), or standard periods like "30days", "7days", etc. Defaults to "adaily".'
+        description: 'Retention bucketing period: "adaily" (all daily), "aweekly" (all weekly), "amonthly" (all monthly), or a standard range like "30days", "7days". Defaults to "adaily".'
       },
       range: {
         type: 'string',
-        description: 'Optional date range as JSON array [startMilliseconds, endMilliseconds]. Example: "[1760389200000,1762984799999]". If not provided, uses the period parameter.'
+        description: 'Optional explicit date range as a JSON array string "[startMilliseconds,endMilliseconds]" (e.g. "[1760389200000,1762984799999]"). When provided, overrides period.'
       },
       evt: {
         type: 'string',
-        description: 'Event key to track retention for. Use "[CLY]_session" for session-based retention, or any custom event key. Defaults to "[CLY]_session".'
+        description: 'Event key to track retention on. Use "[CLY]_session" for session-based retention or any custom event key. Defaults to "[CLY]_session".'
       },
       query: {
         type: 'string',
-        description: 'Optional MongoDB query as JSON string to filter events. Example: \'{"country":"US"}\' or \'{}\'. Defaults to \'{}\' (all events).'
+        description: 'Optional MongoDB filter as a JSON string applied to events (e.g. \'{"country":"US"}\'). Defaults to \'{}\'.'
       },
       save_report: {
         type: 'boolean',
-        description: 'Whether to save this retention report for later access. Defaults to false.'
+        description: 'When true, persist this retention calculation as a server-side saved report. Defaults to false.'
       },
     },
   },

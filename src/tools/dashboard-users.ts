@@ -7,7 +7,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const getAllDashboardUsersToolDefinition = {
   name: 'dashboard_users',
-  description: 'Get a list of all dashboard users (admin/management users who access the Countly dashboard)',
+  description: 'List every dashboard user (Countly admin/management accounts that log into the dashboard) via /o/users/all. Takes no arguments. This is NOT for app end-users; for those use user_profiles_query.',
   inputSchema: {
     type: 'object',
     properties: {},
