@@ -88,6 +88,25 @@ interface ToolCallHistory {
   result?: any;
 }
 
+/**
+ * Keys that are never worth keeping in the loop-detector history, and which
+ * are sensitive enough that a crash/heap-dump shouldn't preserve them. Scrub
+ * on ingress rather than on comparison so the stored history is clean from
+ * the start.
+ */
+const SENSITIVE_ARG_KEYS = new Set<string>(['countly_auth_token']);
+
+function scrubSensitiveArgs(args: any): any {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    return args;
+  }
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(args)) {
+    out[k] = SENSITIVE_ARG_KEYS.has(k) ? '[REDACTED]' : v;
+  }
+  return out;
+}
+
 class LoopDetector {
   private history: ToolCallHistory[] = [];
   private readonly maxHistorySize = 20;
@@ -96,21 +115,26 @@ class LoopDetector {
 
   addCall(toolName: string, args: any): { isLoop: boolean; warning?: string } {
     const now = Date.now();
-    
+
     // Clean old entries
     this.history = this.history.filter(call => now - call.timestamp < this.timeWindow);
-    
+
+    // Strip secrets before we retain the args anywhere. The loop detector
+    // keeps args in memory for up to 30s; any auth token passed as a tool
+    // argument would otherwise survive in heap snapshots or crash reports.
+    const safeArgs = scrubSensitiveArgs(args);
+
     // Create a normalized args signature for comparison
-    const argsSignature = this.normalizeArgs(args);
-    
+    const argsSignature = this.normalizeArgs(safeArgs);
+
     // Count similar calls in recent history
     const similarCalls = this.history.filter(call => {
       const callArgsSignature = this.normalizeArgs(call.args);
       return call.toolName === toolName && callArgsSignature === argsSignature;
     });
-    
-    // Add current call to history
-    this.history.push({ toolName, args, timestamp: now });
+
+    // Add current call to history (scrubbed args — never raw)
+    this.history.push({ toolName, args: safeArgs, timestamp: now });
     
     // Keep history size manageable
     if (this.history.length > this.maxHistorySize) {

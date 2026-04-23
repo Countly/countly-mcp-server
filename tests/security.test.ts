@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { AppCache, AppCacheRegistry } from '../src/lib/app-cache.js';
 import { assertSafeServerHost, assertSafeServerUrl } from '../src/lib/config.js';
+import { redactSensitiveInMessage } from '../src/lib/error-handler.js';
 import {
   extractClientIp,
   parseCorsAllowed,
@@ -285,6 +286,43 @@ describe('RateLimiter', () => {
     rl.check('c');
     rl.check('d'); // evicts oldest
     expect(rl.size()).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('redactSensitiveInMessage', () => {
+  it('redacts auth_token query param in URL-ish strings', () => {
+    const msg = 'Request failed: https://api.count.ly/o/apps/mine?auth_token=abc123xyz&app_id=42';
+    expect(redactSensitiveInMessage(msg)).not.toContain('abc123xyz');
+    expect(redactSensitiveInMessage(msg)).toContain('auth_token=[REDACTED]');
+  });
+
+  it('redacts api_key in URL-ish strings', () => {
+    const msg = 'request to /o?method=apps&api_key=deadbeef';
+    expect(redactSensitiveInMessage(msg)).toContain('api_key=[REDACTED]');
+  });
+
+  it('redacts token values inside JSON error bodies', () => {
+    const msg = 'HTTP 401 error: {"error":"bad","auth_token":"secret-value"}';
+    const out = redactSensitiveInMessage(msg);
+    expect(out).not.toContain('secret-value');
+    expect(out).toContain('"auth_token":"[REDACTED]"');
+  });
+
+  it('redacts countly-token header lines', () => {
+    const msg = 'bad request: countly-token: abc.def.ghi expired';
+    expect(redactSensitiveInMessage(msg)).toContain('countly-token: [REDACTED]');
+    expect(redactSensitiveInMessage(msg)).not.toContain('abc.def.ghi');
+  });
+
+  it('redacts Authorization header lines (case-insensitive)', () => {
+    const msg = 'GET /o/apps/mine\nAuthorization: Bearer xyz-token';
+    expect(redactSensitiveInMessage(msg)).toContain('[REDACTED]');
+    expect(redactSensitiveInMessage(msg)).not.toContain('xyz-token');
+  });
+
+  it('preserves benign messages', () => {
+    expect(redactSensitiveInMessage('App not found: MyApp')).toBe('App not found: MyApp');
+    expect(redactSensitiveInMessage('')).toBe('');
   });
 });
 

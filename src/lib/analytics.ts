@@ -9,6 +9,8 @@ import Countly from 'countly-sdk-nodejs';
 import { createHash } from 'crypto';
 import { createRequire } from 'module';
 
+import { redactSensitiveInMessage } from './error-handler.js';
+
 const ANALYTICS_URL = 'https://stats.count.ly';
 const ANALYTICS_APP_KEY = '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7';
 
@@ -197,14 +199,19 @@ class Analytics {
       return;
     }
 
+    // Defence-in-depth: redact anything that looks like a bearer token /
+    // API key before it leaves the process for stats.count.ly or the
+    // Countly crash-log endpoint.
+    const redacted = redactSensitiveInMessage(errorMessage);
+
     this.trackEvent('error_occurred', {
       error_type: errorType,
-      error_message: errorMessage.substring(0, 100), // Limit length
+      error_message: redacted.substring(0, 100), // Limit length
       tool: toolName || 'unknown',
     });
 
     // Also record as crash for visibility
-    Countly.log_error(new Error(`${errorType}: ${errorMessage}`));
+    Countly.log_error(new Error(`${errorType}: ${redacted}`));
   }
 
   /**

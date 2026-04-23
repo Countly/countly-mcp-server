@@ -13,6 +13,39 @@ import { AxiosError } from 'axios';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
+ * Replace obviously-sensitive substrings in a free-form error message so we
+ * don't propagate auth tokens into MCP error responses, analytics events,
+ * or operator logs.
+ *
+ * Matches:
+ *  - `auth_token=<value>` / `api_key=<value>` / `token=<value>` inside a URL
+ *    or JSON blob (value ends at `&`, `"`, whitespace, or end of string)
+ *  - `countly-token: <value>` style HTTP header lines
+ *  - JSON field values for the same keys (e.g. `"auth_token":"xxx"`)
+ *
+ * This is best-effort — it can't catch tokens that don't appear next to a
+ * labelled key. Useful as a last-line-of-defense when the upstream Countly
+ * server echoes parts of the request back in its error body.
+ */
+export function redactSensitiveInMessage(message: string): string {
+  if (!message) {
+    return message;
+  }
+  return message
+    // url / form style: auth_token=... until & or whitespace or end
+    .replace(/(auth_token|api_key|token|countly_auth_token|countly-token)\s*=\s*[^&\s"']+/gi,
+      '$1=[REDACTED]')
+    // JSON-style: "auth_token":"..."
+    .replace(/"(auth_token|api_key|token|countly_auth_token|countly-token)"\s*:\s*"[^"]*"/gi,
+      '"$1":"[REDACTED]"')
+    // HTTP header style: `countly-token: xxx` or `Authorization: Bearer xxx`
+    // — grab the whole value to end-of-line so we also catch the token after
+    // a scheme word ("Bearer", "Token", etc).
+    .replace(/(countly-token|authorization)\s*:\s*[^\r\n]+/gi,
+      '$1: [REDACTED]');
+}
+
+/**
  * Extract detailed error information from an Axios error
  */
 export function extractErrorDetails(error: unknown): {
@@ -79,21 +112,21 @@ export function extractErrorDetails(error: unknown): {
     }
     
     return {
-      message,
+      message: redactSensitiveInMessage(message),
       statusCode,
       details: responseData,
     };
   }
-  
+
   // For non-Axios errors
   if (error instanceof Error) {
     return {
-      message: error.message,
+      message: redactSensitiveInMessage(error.message),
     };
   }
-  
+
   return {
-    message: String(error),
+    message: redactSensitiveInMessage(String(error)),
   };
 }
 

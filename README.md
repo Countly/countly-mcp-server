@@ -294,6 +294,85 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 
 For complete documentation, examples, and per-tool CRUD mappings, see **[TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md)**.
 
+## Security & Production Hardening
+
+The HTTP transport is designed to be usable both as a public-facing MCP
+endpoint (e.g. `mcp.count.ly`) and as a self-hosted single-tenant server.
+The defaults favor compatibility; operators should opt into the tighter
+settings below based on their deployment model.
+
+### Multi-tenant isolation
+
+The HTTP transport is safe to use with multiple concurrent clients using
+different Countly auth tokens. Each request gets its own outbound axios
+instance with the `countly-token` header baked in, and each tenant's apps
+cache is keyed by SHA-256(token) so one tenant's apps cannot leak into
+another tenant's `resolveAppId` lookup.
+
+No operator configuration is required for this.
+
+### SSRF
+
+Caller-supplied server URLs (via `X-Countly-Server-Url` header or
+`?server_url=` query param) are validated against an SSRF denylist —
+loopback, link-local, RFC 1918, carrier-grade NAT, cloud metadata
+endpoints (`169.254.169.254`), `.local`/`.localhost`, and non-HTTP(S)
+schemes are rejected with a 400. This is a syntactic check; defense
+against DNS-rebinding still requires egress firewalling the server.
+
+### Credentials in URLs are deprecated
+
+Passing the auth token via `?auth_token=` is supported for backward
+compatibility but emits a rate-limited security warning to stderr.
+Tokens in URLs leak into access logs, browser history, and Referer
+headers. Migrate callers to `X-Countly-Auth-Token` — URL-param support
+will be removed in a future release.
+
+### Rate limiting
+
+The `/mcp` endpoint has a per-IP sliding-window rate limiter, defaulting
+to 120 requests per minute. Tune via `COUNTLY_RATE_LIMIT_RPM=<n>`
+(set to `0` to disable). Behind a trusted reverse proxy, set
+`COUNTLY_TRUST_PROXY=true` so the first `X-Forwarded-For` hop is used as
+the client IP.
+
+### CORS
+
+The default is `Access-Control-Allow-Origin: *` so browser-based MCP
+clients from any origin can connect. If your deployment only needs to
+serve specific origins, lock it down:
+
+```bash
+COUNTLY_CORS_ALLOWED_ORIGINS="https://dash.example.com,https://ops.example.com"
+```
+
+The server will then echo only allowed origins and add `Vary: Origin`.
+Pre-flight requests from disallowed origins get a 403.
+
+### Self-hosted single-tenant deployments
+
+If you're running this as a single-tenant server (e.g. `docker run` on a
+VPS for your own AI assistant), prefer one of:
+
+- **Bind to localhost only** and tunnel through SSH:
+  `docker run -p 127.0.0.1:3000:3000 ...`
+- **Bind behind a reverse proxy** (Caddy, Nginx, Traefik) that terminates
+  TLS, adds authentication if needed, and sets a trusted `X-Forwarded-For`
+  (then set `COUNTLY_TRUST_PROXY=true`).
+
+The default Dockerfile binds to `0.0.0.0:3000` so it works inside a
+container without extra flags. This means `docker run -p 3000:3000 ...`
+exposes the MCP endpoint to the public internet — use an explicit local
+bind, a reverse proxy, or an external firewall if that's not what you
+want.
+
+### Telemetry
+
+Analytics are **disabled by default**. Opt in with `ENABLE_ANALYTICS=true`.
+No authentication tokens, server URLs, or tool arguments are ever sent
+to `stats.count.ly`; error messages shipped to the analytics SDK are
+redacted for token-shaped substrings.
+
 ## Docker Deployment
 
 ### Docker Hub
