@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 
 
+import { AsyncLocalStorage } from 'async_hooks';
 import { realpathSync } from 'fs';
 import http from 'http';
 import url from 'url';
@@ -26,7 +27,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig } from './lib/config.js';
@@ -49,6 +50,21 @@ interface HttpConfig {
   port?: number;
   hostname?: string;
   cors?: boolean;
+}
+
+/**
+ * Per-request authentication + endpoint context.
+ *
+ * In HTTP transport the MCP server is multi-tenant: each incoming request
+ * may carry its own Countly auth token and server URL (via headers or URL
+ * params). Previously those were mutated onto the shared `this.config` and
+ * `this.httpClient.defaults`, which led to cross-tenant token mixing under
+ * concurrency. We now stash per-request state in an AsyncLocalStorage so the
+ * MCP tool handler can pick it up across await boundaries without sharing.
+ */
+interface RequestState {
+  authToken?: string;
+  serverUrl: string;
 }
 
 interface ToolCallHistory {
@@ -116,16 +132,34 @@ class LoopDetector {
 class CountlyMCPServer {
   private server: Server;
   private config: CountlyConfig;
+  /**
+   * Shared fallback axios client. Used only for stdio-mode operation where
+   * a single long-lived process serves a single tenant via env/file
+   * credentials. HTTP-transport callers each get a fresh per-request client
+   * via `createRequestHttpClient()` so concurrent tenants can't mix tokens.
+   */
   private httpClient: AxiosInstance;
-  private appCache: AppCache;
+  /**
+   * Per-tenant app caches keyed by SHA-256(authToken). See the class comment
+   * on AppCacheRegistry — sharing one AppCache across tenants is a
+   * cross-tenant data-leak bug.
+   */
+  private appCacheRegistry: AppCacheRegistry;
   private toolsConfig: ToolsConfig;
   private loopDetector: LoopDetector;
   private lastTokenInUrlWarnAt: number = 0;
+  /**
+   * AsyncLocalStorage carrying the per-request auth token + serverUrl from
+   * the HTTP middleware to the MCP tool handler across await boundaries.
+   * Falls back to null (no store) in stdio mode where no middleware runs.
+   */
+  private requestContext: AsyncLocalStorage<RequestState>;
 
   constructor(testMode: boolean = false) {
-    this.appCache = new AppCache();
+    this.appCacheRegistry = new AppCacheRegistry();
     this.toolsConfig = loadToolsConfig(process.env);
     this.loopDetector = new LoopDetector();
+    this.requestContext = new AsyncLocalStorage<RequestState>();
     
     // Initialize analytics. Opt-in: enabled only when ENABLE_ANALYTICS=true.
     // README has always documented this as "disabled by default"; the previous
@@ -185,19 +219,27 @@ class CountlyMCPServer {
    */
   private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
     const metadata = (request as any)?._meta || (request as any)?.meta;
-    
+
     // Try to get from metadata or args first
     let authToken = resolveAuthToken({ metadata, args });
-    
-    // If not found in metadata/args, use the one already configured (from headers or environment)
+
+    // Per-request HTTP state from AsyncLocalStorage (HTTP middleware sets it)
+    if (!authToken) {
+      const reqState = this.requestContext.getStore();
+      if (reqState?.authToken) {
+        authToken = reqState.authToken;
+      }
+    }
+
+    // Server-level config fallback (env / file in stdio mode)
     if (!authToken && this.config.authToken) {
       authToken = this.config.authToken;
     }
-    
+
     if (!authToken) {
       throw createMissingAuthError();
     }
-    
+
     return { authToken };
   }
 
@@ -211,41 +253,49 @@ class CountlyMCPServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      let originalAuthToken: string | undefined;
       const startTime = Date.now();
 
       try {
         // Extract credentials from request (client-side)
         const credentials = this.getCredentials(request, args);
-        
+
         // Track authentication method used
         const metadata = (request as any)?._meta || (request as any)?.meta;
         if (metadata?.countlyAuthToken) {
           analytics.trackAuthMethod('metadata');
         } else if (args?.countly_auth_token) {
           analytics.trackAuthMethod('args');
-        } else if (credentials.authToken) {
+        } else if (this.requestContext.getStore()?.authToken) {
           analytics.trackAuthMethod('headers');
         } else if (process.env.COUNTLY_AUTH_TOKEN) {
           analytics.trackAuthMethod('env');
         }
-        
-        // Store the original auth token temporarily for this request
-        originalAuthToken = this.config.authToken;
-        
-        // Set the auth token in config and as header
-        if (credentials.authToken) {
-          this.config.authToken = credentials.authToken;
-          this.setAuthHeader(credentials.authToken);
-        }
+
+        // Resolve the per-request endpoint (header/URL-param override via
+        // AsyncLocalStorage falls through to the server-level config).
+        const reqState = this.requestContext.getStore();
+        const serverUrl = reqState?.serverUrl || this.config.serverUrl;
+        const authToken = credentials.authToken;
+
+        // Build a fresh axios client for this request so concurrent tenants
+        // cannot share headers / baseURL on the same object. The shared
+        // `this.httpClient` is intentionally untouched.
+        const perReqHttpClient = this.createRequestHttpClient(authToken, serverUrl);
+
+        // Per-tenant app cache. Keyed by SHA-256(authToken) inside the
+        // registry so one tenant's apps cannot leak into another's
+        // resolveAppId lookup.
+        const perTenantAppCache = this.appCacheRegistry.for(authToken);
 
         // Create tool context
         const context: ToolContext = {
-          resolveAppId: async (args: any) => await this.resolveAppIdentifier(args),
-          getAuthParams: () => this.getAuthParams(),
-          httpClient: this.httpClient,
-          appCache: this.appCache,
-          getApps: async () => await this.getApps(),
+          resolveAppId: async (a: any) =>
+            await this.resolveAppIdentifierWithContext(a, perReqHttpClient, perTenantAppCache, authToken),
+          getAuthParams: () => (authToken ? { auth_token: authToken } : {}),
+          httpClient: perReqHttpClient,
+          appCache: perTenantAppCache,
+          getApps: async () =>
+            await this.getAppsWithContext(perReqHttpClient, perTenantAppCache, authToken),
         };
         
         // Get all tool metadata and filter based on tools configuration
@@ -322,11 +372,9 @@ class CountlyMCPServer {
           ErrorCode.InternalError,
           `Error executing tool ${name}: ${error instanceof Error ? error.message : String(error)}`
         );
-      } finally {
-        // Restore original auth token and header
-        this.config.authToken = originalAuthToken;
-        this.setAuthHeader(originalAuthToken);
       }
+      // No finally {} needed — per-request httpClient and cache are local to
+      // this handler. Nothing shared was mutated.
     });
   }
 
@@ -334,25 +382,9 @@ class CountlyMCPServer {
     // Handle resources/list requests
     this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
       try {
-        // Unify auth token resolution for resources
-        const metadata = (request as any)?._meta || (request as any)?.meta;
-        const args = (request as any)?.params || {};
-        let authToken = resolveAuthToken({ metadata, args });
-        if (!authToken && this.config.authToken) {
-          authToken = this.config.authToken;
-        }
-        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-          authToken = process.env.COUNTLY_AUTH_TOKEN;
-        }
-        if (authToken) {
-          this.setAuthHeader(authToken);
-        }
+        const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
-        const resources = await listResources(
-          this.httpClient,
-          this.appCache,
-          getAuthParams
-        );
+        const resources = await listResources(client, cache, getAuthParams);
         analytics.trackHttpRequest('/resources/list', 'MCP');
         return { resources };
       } catch (error) {
@@ -371,27 +403,10 @@ class CountlyMCPServer {
     // Handle resources/read requests
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       try {
-        // Unify auth token resolution for resources
-        const metadata = (request as any)?._meta || (request as any)?.meta;
-        const args = (request as any)?.params || {};
-        let authToken = resolveAuthToken({ metadata, args });
-        if (!authToken && this.config.authToken) {
-          authToken = this.config.authToken;
-        }
-        if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-          authToken = process.env.COUNTLY_AUTH_TOKEN;
-        }
-        if (authToken) {
-          this.setAuthHeader(authToken);
-        }
+        const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
         const { uri } = request.params;
-        const content = await readResource(
-          uri,
-          this.httpClient,
-          this.appCache,
-          getAuthParams
-        );
+        const content = await readResource(uri, client, cache, getAuthParams);
         analytics.trackHttpRequest('/resources/read', 'MCP');
         return { contents: [content] };
       } catch (error) {
@@ -510,15 +525,69 @@ class CountlyMCPServer {
     );
   }
 
-  private async getApps(): Promise<CountlyApp[]> {
-    // Check if cache is still valid
-    if (!this.appCache.isExpired()) {
-      return this.appCache.getAll();
+  /**
+   * Build a fresh axios instance for a single MCP request. Baking the
+   * auth token into the per-request instance's default headers (instead of
+   * the shared `this.httpClient`) means concurrent tenants never see each
+   * other's credentials — even if their handlers interleave across await
+   * points.
+   */
+  private createRequestHttpClient(
+    authToken: string | undefined,
+    serverUrl: string
+  ): AxiosInstance {
+    const headers: Record<string, string> = {};
+    if (authToken) {
+      headers['countly-token'] = authToken;
     }
+    return axios.create({
+      baseURL: serverUrl,
+      timeout: this.config.timeout,
+      headers,
+    });
+  }
 
-    const params = this.getAuthParams();
-    const response = await this.httpClient.get('/o/apps/mine', { params });
-    
+  /**
+   * Resolve the effective auth token + build a per-request axios client and
+   * a per-tenant AppCache for non-tool MCP requests (resources, prompts).
+   * Priority order: tool args > MCP metadata > AsyncLocalStorage (HTTP
+   * middleware) > server-level config (env/file).
+   */
+  private buildPerRequestClient(request: any): {
+    client: AxiosInstance;
+    cache: AppCache;
+    authToken: string | undefined;
+  } {
+    const metadata = request?._meta || request?.meta;
+    const args = request?.params || {};
+    let authToken = resolveAuthToken({ metadata, args });
+    const reqState = this.requestContext.getStore();
+    if (!authToken && reqState?.authToken) {
+      authToken = reqState.authToken;
+    }
+    if (!authToken && this.config.authToken) {
+      authToken = this.config.authToken;
+    }
+    if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
+      authToken = process.env.COUNTLY_AUTH_TOKEN;
+    }
+    const serverUrl = reqState?.serverUrl || this.config.serverUrl;
+    const client = this.createRequestHttpClient(authToken, serverUrl);
+    const cache = this.appCacheRegistry.for(authToken);
+    return { client, cache, authToken };
+  }
+
+  private async getAppsWithContext(
+    client: AxiosInstance,
+    cache: AppCache,
+    authToken: string | undefined
+  ): Promise<CountlyApp[]> {
+    if (!cache.isExpired()) {
+      return cache.getAll();
+    }
+    const params = authToken ? { auth_token: authToken } : {};
+    const response = await client.get('/o/apps/mine', { params });
+
     let apps: CountlyApp[];
     if (response.data && Array.isArray(response.data)) {
       apps = response.data;
@@ -529,18 +598,18 @@ class CountlyMCPServer {
     } else {
       apps = [];
     }
-    
-    this.appCache.update(apps);
+
+    cache.update(apps);
     return apps;
   }
 
-  private async resolveAppId(args: any): Promise<string> {
-    const apps = await this.getApps();
-    return resolveAppIdentifier(args, apps);
-  }
-
-  private async resolveAppIdentifier(args: any): Promise<string> {
-    const apps = await this.getApps();
+  private async resolveAppIdentifierWithContext(
+    args: any,
+    client: AxiosInstance,
+    cache: AppCache,
+    authToken: string | undefined
+  ): Promise<string> {
+    const apps = await this.getAppsWithContext(client, cache, authToken);
     return resolveAppIdentifier(args, apps);
   }
 
@@ -706,6 +775,12 @@ class CountlyMCPServer {
           const serverUrl = headerServerUrl || paramServerUrl;
           const authToken = headerAuthToken || paramAuthToken;
           
+          // Build per-request state. Instead of mutating `this.config` and
+          // `this.httpClient.defaults` (which would be shared across
+          // concurrent tenants and race), stash state in AsyncLocalStorage
+          // and let the MCP handlers pull their per-request axios client out
+          // of the registry keyed by token.
+          let effectiveServerUrl = this.config.serverUrl;
           if (serverUrl) {
             // Remove trailing slashes safely without regex
             let cleanUrl = serverUrl;
@@ -714,9 +789,7 @@ class CountlyMCPServer {
             }
             // SSRF guard: the serverUrl is caller-controlled over HTTP, so
             // reject private/loopback/link-local targets (including cloud
-            // metadata endpoints like 169.254.169.254) before wiring it into
-            // the axios client. Without this check, any HTTP caller could
-            // redirect the MCP server's outbound requests at internal hosts.
+            // metadata endpoints like 169.254.169.254) before using it.
             try {
               assertSafeServerUrl(cleanUrl);
             } catch (err) {
@@ -726,28 +799,30 @@ class CountlyMCPServer {
               res.end(JSON.stringify({ error: 'Invalid server_url', message: msg }));
               return;
             }
-            this.config.serverUrl = cleanUrl;
-            this.httpClient.defaults.baseURL = this.config.serverUrl;
+            effectiveServerUrl = cleanUrl;
             const source = headerServerUrl ? 'headers' : 'URL parameters';
-            console.error(`Using Countly server from ${source}:`, this.config.serverUrl);
+            console.error(`Using Countly server from ${source}:`, effectiveServerUrl);
           }
-          
+
           if (authToken) {
-            this.config.authToken = authToken;
-            this.setAuthHeader(authToken);
             const source = headerAuthToken ? 'headers' : 'URL parameters';
             console.error(`Auth token configured from ${source}`);
-            // Deprecation: tokens in URL query params end up in access logs,
-            // reverse-proxy logs, browser history, and Referer headers.
-            // Rate-limit the warning so we log it at most once per minute
-            // even under heavy HTTP traffic.
             if (!headerAuthToken && paramAuthToken) {
               this.warnTokenInUrl();
             }
           }
-          
-          // Handle with StreamableHTTPServerTransport (modern protocol)
-          await transport.handleRequest(req, res);
+
+          // Run the MCP SDK handler inside an AsyncLocalStorage scope so the
+          // CallTool / resource handlers (which execute across await points)
+          // can read the per-request auth token + serverUrl without any
+          // shared-state mutation. This closes the cross-tenant token-mixing
+          // window previously present in the HTTP transport.
+          await this.requestContext.run(
+            { authToken: authToken || undefined, serverUrl: effectiveServerUrl },
+            async () => {
+              await transport.handleRequest(req, res);
+            }
+          );
           return;
         }
         
