@@ -265,8 +265,17 @@ async function handleUpdateHook(args: z.infer<typeof updateHookTool.inputSchema>
     enabled: args.enabled !== undefined ? args.enabled : existingHook.enabled,
   };
 
-  // Update trigger if provided
-  if (args.trigger_type && args.trigger_config) {
+  // Update trigger if provided. Both fields must be supplied together so the
+  // trigger object stays internally consistent — partial updates can easily
+  // leave type and configuration out of sync (e.g. new type with stale cron
+  // config). Fail loudly instead of silently ignoring the request.
+  if (args.trigger_type || args.trigger_config) {
+    if (!args.trigger_type || !args.trigger_config) {
+      throw new Error(
+        'hooks_update: trigger_type and trigger_config must be provided together. ' +
+        'Supply both to change the trigger, or neither to keep it unchanged.'
+      );
+    }
     const triggerConfig = JSON.parse(args.trigger_config);
     hookConfig.trigger = {
       type: args.trigger_type,
