@@ -49,9 +49,10 @@ describe('Tools Configuration', () => {
       'times_of_day',
       'hooks',
       'metadata',
-    ];      const actualCategories = Object.keys(TOOL_CATEGORIES);
-      expect(actualCategories.sort()).toEqual(expectedCategories.sort());
-    });
+    ];
+    const actualCategories = Object.keys(TOOL_CATEGORIES);
+    expect(actualCategories.sort()).toEqual(expectedCategories.sort());
+  });
 
     it('should have correct number of operations per category', () => {
     const expectedCounts = {
@@ -86,7 +87,8 @@ describe('Tools Configuration', () => {
       times_of_day: 1,
       hooks: 5,
       metadata: 1,
-    };    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
+    };
+    for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
       expect(toolCount).toBe(expectedCounts[category as keyof typeof expectedCounts]);
     }

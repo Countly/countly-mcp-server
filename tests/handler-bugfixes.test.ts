@@ -1,3 +1,4 @@
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleCreateNote } from '../src/tools/notes.js';
 import { hooksHandlers } from '../src/tools/hooks.js';
@@ -102,7 +103,7 @@ describe('hooks.ts handleUpdateHook: trigger_type and trigger_config must be pai
     });
   });
 
-  it('rejects supplying only trigger_type', async () => {
+  it('rejects supplying only trigger_type with an InvalidParams McpError', async () => {
     const handler = hooksHandlers.hooks_update;
     await expect(
       handler(
@@ -112,10 +113,16 @@ describe('hooks.ts handleUpdateHook: trigger_type and trigger_config must be pai
         } as any,
         context
       )
-    ).rejects.toThrow(/trigger_type and trigger_config must be provided together/);
+    ).rejects.toSatisfy((err: unknown) => {
+      return (
+        err instanceof McpError &&
+        err.code === ErrorCode.InvalidParams &&
+        /trigger_type and trigger_config must be provided together/.test(err.message)
+      );
+    });
   });
 
-  it('rejects supplying only trigger_config', async () => {
+  it('rejects supplying only trigger_config with an InvalidParams McpError', async () => {
     const handler = hooksHandlers.hooks_update;
     await expect(
       handler(
@@ -125,7 +132,13 @@ describe('hooks.ts handleUpdateHook: trigger_type and trigger_config must be pai
         } as any,
         context
       )
-    ).rejects.toThrow(/trigger_type and trigger_config must be provided together/);
+    ).rejects.toSatisfy((err: unknown) => {
+      return (
+        err instanceof McpError &&
+        err.code === ErrorCode.InvalidParams &&
+        /trigger_type and trigger_config must be provided together/.test(err.message)
+      );
+    });
   });
 
   it('accepts both fields together', async () => {
