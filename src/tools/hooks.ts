@@ -8,7 +8,9 @@
  * Requires: hooks plugin
  */
 
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+
 import { safeApiCall } from '../lib/error-handler.js';
 import type { ToolContext } from './types.js';
 
@@ -266,7 +268,8 @@ async function handleUpdateHook(args: z.infer<typeof updateHookTool.inputSchema>
   // config). Fail loudly instead of silently ignoring the request.
   if (args.trigger_type || args.trigger_config) {
     if (!args.trigger_type || !args.trigger_config) {
-      throw new Error(
+      throw new McpError(
+        ErrorCode.InvalidParams,
         'hooks_update: trigger_type and trigger_config must be provided together. ' +
         'Supply both to change the trigger, or neither to keep it unchanged.'
       );
