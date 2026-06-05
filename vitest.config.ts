@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 
 export default defineConfig({
   test: {
@@ -6,6 +6,9 @@ export default defineConfig({
     environment: 'node',
     watch: false,
     passWithNoTests: true,
+    // Keep test discovery scoped to this branch — Claude Code keeps other
+    // branches' worktrees under .claude/worktrees, which vitest would otherwise glob.
+    exclude: [...configDefaults.exclude, '**/.claude/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
