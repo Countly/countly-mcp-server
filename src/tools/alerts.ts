@@ -17,9 +17,9 @@ export const createAlertToolDefinition = {
         type: 'object',
         description: 'Alert configuration object',
         properties: {
-          _id: { 
-            type: ['string', 'null'], 
-            description: 'Alert ID for updates, null for new alerts' 
+          _id: {
+            type: 'string',
+            description: 'Alert ID of an existing alert to update. Omit to create a new alert.'
           },
           alertName: { 
             type: 'string', 
@@ -34,41 +34,39 @@ export const createAlertToolDefinition = {
             type: 'string',
             description: 'Specific metric to monitor. For crashes: "# of crashes/errors", "non-fatal crashes/errors per session", "fatal crashes/errors per session", "new crash/error". For sessions: "average session duration", "# of sessions". For users: "# of users", "# of new users". For events: "count", "sum", "duration", "average sum", "average duration". For views: "bounce rate", "# of page views". For cohorts: "# of users in the cohort". For profile_groups: "# of users in the profile group". For dataPoints: "total data points". For onlineUsers: "t" (# of online users), "o" (overall record), "m" (30-day record). For nps/rating/survey: "# of responses", "new NPS response", "new rating response", "new survey response". For revenue: "total revenue", "average revenue per user", "average revenue per paying user", "# of paying users"'
           },
-          alertDataSubType2: { 
-            type: ['string', 'null'], 
-            description: 'Additional subtype ID when applicable. Required for: events (event key), views (view ID), cohorts (cohort ID), profile_groups (group ID), survey (widget ID), nps (widget ID), rating (widget ID)' 
+          alertDataSubType2: {
+            type: 'string',
+            description: 'Additional subtype ID when applicable. Required for: events (event key), views (view ID), cohorts (cohort ID), profile_groups (group ID), survey (widget ID), nps (widget ID), rating (widget ID). Omit otherwise.'
           },
-          compareType: { 
-            type: ['string', 'null'],
-            enum: ['increased', 'decreased', 'more', 'less', null],
-            description: 'Comparison operator. Use "increased"/"decreased" for percentage changes over time periods. Use "more"/"less" for absolute value comparisons (especially for onlineUsers). Set to null for metrics like "new crash/error" that don\'t support comparison'
+          compareType: {
+            type: 'string',
+            enum: ['increased', 'decreased', 'more', 'less'],
+            description: 'Comparison operator. Use "increased"/"decreased" for percentage changes over time periods. Use "more"/"less" for absolute value comparisons (especially for onlineUsers). Omit for metrics like "new crash/error" that don\'t support comparison'
           },
-          period: { 
-            type: ['string', 'null'],
-            enum: ['daily', 'monthly', 'hourly', null],
-            description: 'Time period for comparison. "daily" (last day), "monthly" (last month), "hourly" (last hour). Set to null for metrics like "new crash/error", onlineUsers records (o, m) that don\'t use periods. Note: hourly not available when filters are applied'
+          period: {
+            type: 'string',
+            enum: ['daily', 'monthly', 'hourly'],
+            description: 'Time period for comparison. "daily" (last day), "monthly" (last month), "hourly" (last hour). Omit for metrics like "new crash/error", onlineUsers records (o, m) that don\'t use periods. Note: hourly not available when filters are applied'
           },
-          compareValue: { 
-            type: ['string', 'null'], 
-            description: 'Threshold value or percentage for the alert. For percentage comparisons (increased/decreased): use "10" for 10%. For absolute comparisons (more/less): use actual number like "100". Set to null for metrics without comparison' 
+          compareValue: {
+            type: 'string',
+            description: 'Threshold value or percentage for the alert. For percentage comparisons (increased/decreased): use "10" for 10%. For absolute comparisons (more/less): use actual number like "100". Omit for metrics without comparison'
           },
           compareValue2: {
-            type: ['string', 'null'],
-            description: 'Secondary value for onlineUsers type "t" - represents minutes for the condition'
+            type: 'string',
+            description: 'Secondary value for onlineUsers type "t" - represents minutes for the condition. Omit for other types.'
           },
           selectedApps: { 
             type: 'array',
             items: { type: 'string' },
             description: 'Array of app IDs to monitor. Use single app ID in array for most alerts. Can use "all" for dataPoints type if user is global admin' 
           },
-          filterKey: { 
-            type: ['string', 'null'], 
-            description: 'Optional filter key. For crashes: "App Version". For events: custom segment name. For rating: "Rating". For nps: "NPS scale". Set to null if no filter' 
+          filterKey: {
+            type: 'string',
+            description: 'Optional filter key. For crashes: "App Version". For events: custom segment name. For rating: "Rating". For nps: "NPS scale". Omit if no filter'
           },
           filterValue: {
-            type: ['string', 'array', 'null'],
-            items: { type: 'string' },
-            description: 'Optional filter value. For crashes: array of version strings (e.g. ["22:02:0"]). For rating: array of numbers 1-5. For nps: "detractor"/"passive"/"promoter". For events: string value. Set to null if no filter'
+            description: 'Optional filter value; a string or an array of strings depending on the data type. For crashes: array of version strings (e.g. ["22:02:0"]). For rating: array of numbers 1-5. For nps: "detractor"/"passive"/"promoter". For events: string value. Omit if no filter'
           },
           alertBy: { 
             type: 'string',
