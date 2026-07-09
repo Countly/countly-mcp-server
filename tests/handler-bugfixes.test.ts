@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleCreateNote } from '../src/tools/notes.js';
-import { hooksHandlers } from '../src/tools/hooks.js';
+import { handleUpdateHook } from '../src/tools/hooks.js';
 import { TOOL_CATEGORIES } from '../src/lib/tools-config.js';
 import { ToolContext } from '../src/tools/types.js';
 
@@ -104,15 +104,11 @@ describe('hooks.ts handleUpdateHook: trigger_type and trigger_config must be pai
   });
 
   it('rejects supplying only trigger_type with an InvalidParams McpError', async () => {
-    const handler = hooksHandlers.hooks_update;
     await expect(
-      handler(
-        {
-          hook_id: 'hook-42',
-          trigger_type: 'IncomingDataTrigger' as const,
-        } as any,
-        context
-      )
+      handleUpdateHook(context, {
+        hook_id: 'hook-42',
+        trigger_type: 'IncomingDataTrigger',
+      })
     ).rejects.toSatisfy((err: unknown) => {
       return (
         err instanceof McpError &&
@@ -123,15 +119,11 @@ describe('hooks.ts handleUpdateHook: trigger_type and trigger_config must be pai
   });
 
   it('rejects supplying only trigger_config with an InvalidParams McpError', async () => {
-    const handler = hooksHandlers.hooks_update;
     await expect(
-      handler(
-        {
-          hook_id: 'hook-42',
-          trigger_config: '{"event":["app123***foo"]}',
-        } as any,
-        context
-      )
+      handleUpdateHook(context, {
+        hook_id: 'hook-42',
+        trigger_config: '{"event":["app123***foo"]}',
+      })
     ).rejects.toSatisfy((err: unknown) => {
       return (
         err instanceof McpError &&
@@ -147,16 +139,12 @@ describe('hooks.ts handleUpdateHook: trigger_type and trigger_config must be pai
       data: { result: 'success' },
     });
 
-    const handler = hooksHandlers.hooks_update;
     await expect(
-      handler(
-        {
-          hook_id: 'hook-42',
-          trigger_type: 'IncomingDataTrigger' as const,
-          trigger_config: '{"event":["app123***foo"]}',
-        } as any,
-        context
-      )
+      handleUpdateHook(context, {
+        hook_id: 'hook-42',
+        trigger_type: 'IncomingDataTrigger',
+        trigger_config: '{"event":["app123***foo"]}',
+      })
     ).resolves.toBeDefined();
   });
 
@@ -165,15 +153,11 @@ describe('hooks.ts handleUpdateHook: trigger_type and trigger_config must be pai
       data: { result: 'success' },
     });
 
-    const handler = hooksHandlers.hooks_update;
     await expect(
-      handler(
-        {
-          hook_id: 'hook-42',
-          name: 'renamed',
-        } as any,
-        context
-      )
+      handleUpdateHook(context, {
+        hook_id: 'hook-42',
+        name: 'renamed',
+      })
     ).resolves.toBeDefined();
   });
 });

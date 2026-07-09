@@ -144,14 +144,14 @@ import { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetada
 export { dashboardsToolDefinitions, dashboardsToolHandlers, dashboardsToolMetadata, DashboardsTools };
 
 // Times of Day
-import { timesOfDayTools, timesOfDayHandlers } from './times-of-day.js';
+import { timesOfDayToolDefinitions, timesOfDayToolHandlers, timesOfDayToolMetadata, TimesOfDayTools } from './times-of-day.js';
 
-export { timesOfDayTools, timesOfDayHandlers };
+export { timesOfDayToolDefinitions, timesOfDayToolHandlers, timesOfDayToolMetadata, TimesOfDayTools };
 
 // Hooks
-import { hooksTools, hooksHandlers } from './hooks.js';
+import { hooksToolDefinitions, hooksToolHandlers, hooksToolMetadata, HooksTools } from './hooks.js';
 
-export { hooksTools, hooksHandlers };
+export { hooksToolDefinitions, hooksToolHandlers, hooksToolMetadata, HooksTools };
 
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
@@ -190,8 +190,8 @@ export function getAllToolDefinitions() {
     ...serverLogsToolDefinitions,
     ...emailReportsToolDefinitions,
     ...dashboardsToolDefinitions,
-    ...timesOfDayTools,
-    ...hooksTools,
+    ...timesOfDayToolDefinitions,
+    ...hooksToolDefinitions,
   ];
 }
 
@@ -229,8 +229,8 @@ export function getAllToolHandlers() {
     ...serverLogsToolHandlers,
     ...emailReportsToolHandlers,
     ...dashboardsToolHandlers,
-    ...timesOfDayHandlers,
-    ...hooksHandlers,
+    ...timesOfDayToolHandlers,
+    ...hooksToolHandlers,
   };
 }
 
@@ -268,5 +268,7 @@ export function getAllToolMetadata() {
     serverLogsToolMetadata,
     emailReportsToolMetadata,
     dashboardsToolMetadata,
+    timesOfDayToolMetadata,
+    hooksToolMetadata,
   ];
 }
