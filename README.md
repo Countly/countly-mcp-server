@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **133 Tools** across 30 categories for comprehensive Countly operations
+- **151 Tools** across 33 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (133 available)
+### Tools (151 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -282,7 +282,7 @@ COUNTLY_TOOLS_ALERTS=NONE      # Alerts: Completely disabled
 COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
-**Available Categories:**
+**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 33):
 - `CORE` - Core tools (ping, get_version, get_plugins) (3 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
@@ -294,8 +294,6 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 - `DATABASE` - Direct database access (6 tools)
 - `DASHBOARD_USERS` - Dashboard user management (1 tool)
 - `APP_USERS` - App user management (3 tools)
-
-**Total: 42 tools across 11 categories**
 
 For complete documentation, examples, and per-tool CRUD mappings, see **[TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md)**.
 
@@ -557,7 +555,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 134 tools across 30 categories for comprehensive Countly integration:
+The server provides 151 tools across 33 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -740,6 +738,34 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`hooks_update`** - Update an existing webhook/hook configuration.
 - **`hooks_delete`** - Delete a webhook/hook by its ID.
 - **`hooks_internal_triggers_get`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
+
+### Journeys (requires `journey_engine` plugin, Countly Enterprise)
+- **`journeys_list`** - List journey definitions for an app, including version summaries, status, and usage counters.
+- **`journeys_get`** - Get one journey definition by ID with all versions and their block graphs.
+- **`journeys_create`** - Create a new journey (definition plus first draft version) from a block graph.
+- **`journeys_update`** - Update a journey's name and/or the blocks of one of its versions.
+- **`journeys_delete`** - Soft-delete a journey definition and all its versions.
+- **`journeys_publish`** - Publish (activate) or unpublish (set back to draft) a journey version.
+- **`journeys_pause`** - Pause an active journey version and its running instances.
+- **`journeys_resume`** - Resume a paused journey version.
+- **`journeys_block_reference`** - Get the journey block JSON schema reference (block types, per-subtype fields, validation rules, sample graphs) for authoring blocks.
+- **`journeys_stats_summary`** - Get summary KPIs for a journey (users entered/engaged/completed/dropped off, content viewed/interacted) with period-over-period change.
+- **`journeys_stats_table`** - Get the per-block journey statistics table with pagination (long queries return a task id to poll).
+- **`journeys_stats_performance`** - Get time-series journey performance data for trend charts.
+- **`journeys_stats_uids`** - List user UIDs in a journey stat bucket (entered, completed, dropped off, etc.).
+
+### Content Blocks (requires `content` plugin, Countly Enterprise)
+- **`content_blocks_list`** - List all content blocks (in-app content such as banners, modals, surveys) for an app.
+- **`content_blocks_get`** - Get one content block by ID with its full definitions and metadata.
+- **`content_blocks_preview`** - Get a browser preview URL showing the content block rendered exactly as end users see it.
+- **`content_blocks_create`** - Create a content block that can be delivered through journeys.
+- **`content_blocks_update`** - Update an existing content block (title, type, blocks, favorite).
+- **`content_blocks_delete`** - Delete a content block (fails if the block is still used in a journey).
+- **`content_assets_list`** - List uploaded content assets (images/videos) with metadata.
+- **`content_assets_upload`** - Upload an image asset (base64, max 5MB) for use in content blocks.
+- **`content_assets_update`** - Update an asset's name and/or tags.
+- **`content_assets_delete`** - Delete an uploaded content asset.
+- **`content_langs_list`** - List languages eligible for content translations.
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
