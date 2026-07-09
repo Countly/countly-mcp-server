@@ -89,7 +89,7 @@ describe('Tools Configuration', () => {
       times_of_day: 1,
       hooks: 5,
       journeys: 8,
-      content: 5,
+      content: 6,
       metadata: 1,
     };
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -108,12 +108,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 140 tools', () => {
+    it('should have total of 141 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(140);
+      expect(totalTools).toBe(141);
     });
   });
 

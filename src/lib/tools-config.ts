@@ -351,6 +351,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     operations: {
       'content_blocks_list': 'R',
       'content_blocks_get': 'R',
+      'content_blocks_preview': 'R',
       'content_blocks_create': 'C',
       'content_blocks_update': 'U',
       'content_blocks_delete': 'D',

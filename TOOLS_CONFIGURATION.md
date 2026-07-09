@@ -591,7 +591,7 @@ async function journeyExamples() {
 ```
 
 ### content
-**Tools**: `content_blocks_list`, `content_blocks_get`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`
+**Tools**: `content_blocks_list`, `content_blocks_get`, `content_blocks_preview`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`
 
 **Requires plugin**: `content` (Countly Enterprise)
 
@@ -621,6 +621,12 @@ async function contentExamples() {
         }
       }
     ])
+  });
+
+  // Get a browser preview URL (renders the block as end users see it)
+  const preview = await tools.content_blocks_preview({
+    app_name: 'MyApp',
+    content_id: '507f1f77bcf86cd799439011'
   });
 
   // Update the title only (other fields preserved)

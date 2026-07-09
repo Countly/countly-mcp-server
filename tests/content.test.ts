@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   handleListContentBlocks,
   handleGetContentBlock,
+  handlePreviewContentBlock,
   handleCreateContentBlock,
   handleUpdateContentBlock,
   handleDeleteContentBlock,
@@ -66,6 +67,37 @@ describe('Content Tools', () => {
         { params: { app_id: 'app123', _id: 'content1' } }
       );
       expect(result.content[0].text).toContain('Welcome Banner');
+    });
+  });
+
+  describe('handlePreviewContentBlock', () => {
+    it('should return a preview URL after validating the block exists', async () => {
+      mockContext.httpClient.get = vi.fn().mockResolvedValue({ data: sampleContentBlock });
+      (mockContext.httpClient as any).defaults = { baseURL: 'https://countly.example.com/' };
+
+      const result = await handlePreviewContentBlock(mockContext, {
+        app_id: 'app123',
+        content_id: 'content1',
+      });
+
+      expect(mockContext.httpClient.get).toHaveBeenCalledWith(
+        '/o/content/by-id',
+        { params: { app_id: 'app123', _id: 'content1' } }
+      );
+      expect(result.content[0].text).toContain(
+        'https://countly.example.com/_external/content/?id=content1&app_id=app123'
+      );
+      expect(result.content[0].text).toContain('Welcome Banner');
+    });
+
+    it('should propagate errors when the block does not exist', async () => {
+      mockContext.httpClient.get = vi.fn().mockRejectedValue(new Error('Content not found'));
+      (mockContext.httpClient as any).defaults = { baseURL: 'https://countly.example.com' };
+
+      await expect(handlePreviewContentBlock(mockContext, {
+        app_id: 'app123',
+        content_id: 'missing',
+      })).rejects.toThrow();
     });
   });
 

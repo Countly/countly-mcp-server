@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (140 available)
+### Tools (141 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -754,6 +754,7 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 ### Content Blocks (requires `content` plugin, Countly Enterprise)
 - **`content_blocks_list`** - List all content blocks (in-app content such as banners, modals, surveys) for an app.
 - **`content_blocks_get`** - Get one content block by ID with its full definitions and metadata.
+- **`content_blocks_preview`** - Get a browser preview URL showing the content block rendered exactly as end users see it.
 - **`content_blocks_create`** - Create a content block that can be delivered through journeys.
 - **`content_blocks_update`** - Update an existing content block (title, type, blocks, favorite).
 - **`content_blocks_delete`** - Delete a content block (fails if the block is still used in a journey).

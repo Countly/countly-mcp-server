@@ -112,6 +112,72 @@ export async function handleGetContentBlock(
 }
 
 // ============================================================================
+// PREVIEW CONTENT BLOCK TOOL
+// ============================================================================
+
+export const previewContentBlockToolDefinition = {
+  name: 'content_blocks_preview',
+  description: 'Get a browser preview URL for a content block. The URL points to the Countly server\'s public /_external/content renderer (the same page SDK webviews load), showing the block exactly as end users see it. Requires the content plugin (Countly Enterprise). To find content block IDs use content_blocks_list.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      content_id: {
+        type: 'string',
+        description: 'Content block ID (_id) to preview. Obtain it from content_blocks_list.',
+      },
+    },
+    required: ['content_id'],
+  },
+};
+
+export async function handlePreviewContentBlock(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = input.app_id as string | undefined;
+  const app_name = input.app_name as string | undefined;
+  const content_id = input.content_id as string;
+
+  const appId = await context.resolveAppId({ app_id, app_name });
+
+  // Validate the block exists (and pick up its title/type) so we never hand
+  // out a dead preview link.
+  const existingResponse = await safeApiCall(
+    () => context.httpClient.get('/o/content/by-id', {
+      params: {
+        app_id: appId,
+        _id: content_id,
+      },
+    }),
+    'Failed to get content block'
+  );
+
+  const block = existingResponse.data || {};
+  const serverUrl = (context.httpClient.defaults.baseURL || '').replace(/\/+$/, '');
+  const previewUrl = `${serverUrl}/_external/content/?id=${encodeURIComponent(content_id)}&app_id=${encodeURIComponent(appId)}`;
+
+  const lines = [
+    `Preview URL for content block "${block.details?.title || content_id}"${block.type ? ` (type: ${block.type})` : ''}:`,
+    '',
+    previewUrl,
+    '',
+    'Open this URL in a browser to see the content rendered exactly as end users see it. Note: the renderer endpoint is public (no dashboard login required), so treat the link accordingly.',
+  ];
+
+  return {
+    content: [{ type: 'text', text: lines.join('\n') }],
+  };
+}
+
+// ============================================================================
 // CREATE CONTENT BLOCK TOOL
 // ============================================================================
 
@@ -378,6 +444,7 @@ export async function handleDeleteContentBlock(
 export const contentToolDefinitions = [
   listContentBlocksToolDefinition,
   getContentBlockToolDefinition,
+  previewContentBlockToolDefinition,
   createContentBlockToolDefinition,
   updateContentBlockToolDefinition,
   deleteContentBlockToolDefinition,
@@ -386,6 +453,7 @@ export const contentToolDefinitions = [
 export const contentToolHandlers = {
   'content_blocks_list': 'content_blocks_list',
   'content_blocks_get': 'content_blocks_get',
+  'content_blocks_preview': 'content_blocks_preview',
   'content_blocks_create': 'content_blocks_create',
   'content_blocks_update': 'content_blocks_update',
   'content_blocks_delete': 'content_blocks_delete',
@@ -400,6 +468,10 @@ export class ContentTools {
 
   async content_blocks_get(args: any): Promise<ToolResult> {
     return handleGetContentBlock(this.context, args);
+  }
+
+  async content_blocks_preview(args: any): Promise<ToolResult> {
+    return handlePreviewContentBlock(this.context, args);
   }
 
   async content_blocks_create(args: any): Promise<ToolResult> {
