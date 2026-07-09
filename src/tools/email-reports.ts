@@ -1,14 +1,14 @@
 /**
  * Email Reports Tools
- * 
+ *
  * Tools for creating and managing periodic email reports of metrics.
- * 
+ *
  * Requires: reports plugin
  */
 
-import { z } from 'zod';
 import { safeApiCall } from '../lib/error-handler.js';
-import type { ToolContext } from './types.js';
+import { withDefault } from '../lib/validation.js';
+import type { ToolContext, ToolResult } from './types.js';
 
 /**
  * Tool: email_reports_list
@@ -17,18 +17,26 @@ import type { ToolContext } from './types.js';
 export const listEmailReportsTool = {
   name: 'email_reports_list',
   description: 'List scheduled email reports (core and dashboard) configured for an app via /o/reports/all. Requires the reports plugin. To create new reports use email_reports_core_create or email_reports_dashboard_create.',
-  inputSchema: z.object({
-    app_id: z.string()
-      .optional()
-      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
-    app_name: z.string()
-      .optional()
-      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+    },
+  },
 };
 
-async function handleListEmailReports(args: z.infer<typeof listEmailReportsTool.inputSchema>, context: ToolContext) {
-  const app_id = await context.resolveAppId(args);
+export async function handleListEmailReports(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(input);
 
   const params = {
     ...context.getAuthParams(),
@@ -43,7 +51,7 @@ async function handleListEmailReports(args: z.infer<typeof listEmailReportsTool.
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: `Email reports for app ${app_id}:\n\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
@@ -57,68 +65,116 @@ async function handleListEmailReports(args: z.infer<typeof listEmailReportsTool.
 export const createCoreEmailReportTool = {
   name: 'email_reports_core_create',
   description: 'Create a scheduled "core" email report covering analytics, events, crashes, and star-rating for one or more apps via /i/reports/create?report_type=core. Requires the reports plugin. For dashboard-based reports use email_reports_dashboard_create.',
-  inputSchema: z.object({
-    app_id: z.string()
-      .optional()
-      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
-    app_name: z.string()
-      .optional()
-      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
-    title: z.string()
-      .describe('Human-readable report title.'),
-    apps: z.array(z.string())
-      .describe('App IDs to include as data sources in the report (can include apps beyond the one scheduling the report).'),
-    emails: z.array(z.string())
-      .describe('Recipient email addresses.'),
-    metrics: z.object({
-      analytics: z.boolean().optional().describe('Include analytics section (sessions, users).'),
-      events: z.boolean().optional().describe('Include events section.'),
-      crash: z.boolean().optional().describe('Include crashes section.'),
-      'star-rating': z.boolean().optional().describe('Include star-rating/feedback section.'),
-    }).describe('Which sections to include. Set each flag to true to include.'),
-    frequency: z.enum(['daily', 'weekly', 'monthly'])
-      .describe('Send cadence.'),
-    timezone: z.string()
-      .describe('IANA timezone used to schedule delivery (e.g. "America/New_York", "Europe/London").'),
-    day: z.number()
-      .optional()
-      .describe('For "weekly": day of week 0-6 (Sun-Sat). For "monthly": day of month 1-31. Ignored for "daily".'),
-    hour: z.number()
-      .describe('Hour of day 0-23 when the report should be sent (in the given timezone).'),
-    minute: z.number()
-      .optional()
-      .default(0)
-      .describe('Minute of hour 0-59. Defaults to 0.'),
-    selectedEvents: z.array(z.string())
-      .optional()
-      .describe('Event keys to highlight, each formatted "app_id***event_key". Used with metrics.events.'),
-    sendPdf: z.boolean()
-      .optional()
-      .default(true)
-      .describe('Attach a PDF rendering of the report. Defaults to true.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      title: {
+        type: 'string',
+        description: 'Human-readable report title.',
+      },
+      apps: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'App IDs to include as data sources in the report (can include apps beyond the one scheduling the report).',
+      },
+      emails: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Recipient email addresses.',
+      },
+      metrics: {
+        type: 'object',
+        description: 'Which sections to include. Set each flag to true to include.',
+        properties: {
+          analytics: {
+            type: 'boolean',
+            description: 'Include analytics section (sessions, users).',
+          },
+          events: {
+            type: 'boolean',
+            description: 'Include events section.',
+          },
+          crash: {
+            type: 'boolean',
+            description: 'Include crashes section.',
+          },
+          'star-rating': {
+            type: 'boolean',
+            description: 'Include star-rating/feedback section.',
+          },
+        },
+      },
+      frequency: {
+        type: 'string',
+        enum: ['daily', 'weekly', 'monthly'],
+        description: 'Send cadence.',
+      },
+      timezone: {
+        type: 'string',
+        description: 'IANA timezone used to schedule delivery (e.g. "America/New_York", "Europe/London").',
+      },
+      day: {
+        type: 'number',
+        description: 'For "weekly": day of week 0-6 (Sun-Sat). For "monthly": day of month 1-31. Ignored for "daily".',
+      },
+      hour: {
+        type: 'number',
+        description: 'Hour of day 0-23 when the report should be sent (in the given timezone).',
+      },
+      minute: {
+        type: 'number',
+        description: 'Minute of hour 0-59. Defaults to 0.',
+        default: 0,
+      },
+      selectedEvents: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Event keys to highlight, each formatted "app_id***event_key". Used with metrics.events.',
+      },
+      sendPdf: {
+        type: 'boolean',
+        description: 'Attach a PDF rendering of the report. Defaults to true.',
+        default: true,
+      },
+    },
+    required: ['title', 'apps', 'emails', 'metrics', 'frequency', 'timezone', 'hour'],
+  },
 };
 
-async function handleCreateCoreEmailReport(args: z.infer<typeof createCoreEmailReportTool.inputSchema>, context: ToolContext) {
-  const app_id = await context.resolveAppId(args);
+export async function handleCreateCoreEmailReport(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(input);
+
+  const minute = withDefault(input.minute as number | undefined, 0);
+  const sendPdf = withDefault(input.sendPdf as boolean | undefined, true);
 
   const reportArgs = {
     _id: null,
-    title: args.title,
+    title: input.title as string,
     report_type: 'core',
-    apps: args.apps,
-    emails: args.emails,
-    metrics: args.metrics,
+    apps: input.apps as string[],
+    emails: input.emails as string[],
+    metrics: input.metrics as Record<string, boolean>,
     metricsArray: [],
-    frequency: args.frequency,
-    timezone: args.timezone,
-    day: args.day || null,
-    hour: args.hour,
-    minute: args.minute,
+    frequency: input.frequency as string,
+    timezone: input.timezone as string,
+    day: (input.day as number | undefined) || null,
+    hour: input.hour as number,
+    minute,
     dashboards: null,
     date_range: null,
-    sendPdf: args.sendPdf,
-    selectedEvents: args.selectedEvents || [],
+    sendPdf,
+    selectedEvents: (input.selectedEvents as string[] | undefined) || [],
   };
 
   const params = {
@@ -135,7 +191,7 @@ async function handleCreateCoreEmailReport(args: z.infer<typeof createCoreEmailR
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: `Core email report created successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
@@ -149,60 +205,91 @@ async function handleCreateCoreEmailReport(args: z.infer<typeof createCoreEmailR
 export const createDashboardEmailReportTool = {
   name: 'email_reports_dashboard_create',
   description: 'Create a scheduled email report built from a specific custom dashboard via /i/reports/create?report_type=dashboards. Requires the reports plugin (and typically the dashboards plugin for the referenced dashboard). For metric-based reports use email_reports_core_create.',
-  inputSchema: z.object({
-    app_id: z.string()
-      .optional()
-      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
-    app_name: z.string()
-      .optional()
-      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
-    title: z.string()
-      .describe('Human-readable report title.'),
-    emails: z.array(z.string())
-      .describe('Recipient email addresses.'),
-    dashboards: z.string()
-      .describe('Dashboard identifier to render. Obtain it from dashboards_list.'),
-    date_range: z.string()
-      .describe('Date range evaluated when the report runs (e.g. "7days", "30days", "60days").'),
-    frequency: z.enum(['daily', 'weekly', 'monthly'])
-      .describe('Send cadence.'),
-    timezone: z.string()
-      .describe('IANA timezone for delivery scheduling (e.g. "America/New_York").'),
-    day: z.number()
-      .optional()
-      .describe('For "weekly": day of week 0-6 (Sun-Sat). For "monthly": day of month 1-31. Ignored for "daily".'),
-    hour: z.number()
-      .describe('Hour of day 0-23 when the report should be sent.'),
-    minute: z.number()
-      .optional()
-      .default(0)
-      .describe('Minute of hour 0-59. Defaults to 0.'),
-    sendPdf: z.boolean()
-      .optional()
-      .default(true)
-      .describe('Attach a PDF rendering of the dashboard. Defaults to true.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      title: {
+        type: 'string',
+        description: 'Human-readable report title.',
+      },
+      emails: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Recipient email addresses.',
+      },
+      dashboards: {
+        type: 'string',
+        description: 'Dashboard identifier to render. Obtain it from dashboards_list.',
+      },
+      date_range: {
+        type: 'string',
+        description: 'Date range evaluated when the report runs (e.g. "7days", "30days", "60days").',
+      },
+      frequency: {
+        type: 'string',
+        enum: ['daily', 'weekly', 'monthly'],
+        description: 'Send cadence.',
+      },
+      timezone: {
+        type: 'string',
+        description: 'IANA timezone for delivery scheduling (e.g. "America/New_York").',
+      },
+      day: {
+        type: 'number',
+        description: 'For "weekly": day of week 0-6 (Sun-Sat). For "monthly": day of month 1-31. Ignored for "daily".',
+      },
+      hour: {
+        type: 'number',
+        description: 'Hour of day 0-23 when the report should be sent.',
+      },
+      minute: {
+        type: 'number',
+        description: 'Minute of hour 0-59. Defaults to 0.',
+        default: 0,
+      },
+      sendPdf: {
+        type: 'boolean',
+        description: 'Attach a PDF rendering of the dashboard. Defaults to true.',
+        default: true,
+      },
+    },
+    required: ['title', 'emails', 'dashboards', 'date_range', 'frequency', 'timezone', 'hour'],
+  },
 };
 
-async function handleCreateDashboardEmailReport(args: z.infer<typeof createDashboardEmailReportTool.inputSchema>, context: ToolContext) {
-  const app_id = await context.resolveAppId(args);
+export async function handleCreateDashboardEmailReport(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(input);
+
+  const minute = withDefault(input.minute as number | undefined, 0);
+  const sendPdf = withDefault(input.sendPdf as boolean | undefined, true);
 
   const reportArgs = {
     _id: null,
-    title: args.title,
+    title: input.title as string,
     report_type: 'dashboards',
     apps: [],
-    emails: args.emails,
+    emails: input.emails as string[],
     metrics: {},
     metricsArray: [],
-    frequency: args.frequency,
-    timezone: args.timezone,
-    day: args.day || null,
-    hour: args.hour,
-    minute: args.minute,
-    dashboards: args.dashboards,
-    date_range: args.date_range,
-    sendPdf: args.sendPdf,
+    frequency: input.frequency as string,
+    timezone: input.timezone as string,
+    day: (input.day as number | undefined) || null,
+    hour: input.hour as number,
+    minute,
+    dashboards: input.dashboards as string,
+    date_range: input.date_range as string,
+    sendPdf,
   };
 
   const params = {
@@ -219,7 +306,7 @@ async function handleCreateDashboardEmailReport(args: z.infer<typeof createDashb
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: `Dashboard email report created successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
@@ -233,85 +320,110 @@ async function handleCreateDashboardEmailReport(args: z.infer<typeof createDashb
 export const updateEmailReportTool = {
   name: 'email_reports_update',
   description: 'Update fields on an existing email report (schedule, recipients, toggle enabled, etc.) via /i/reports/update. Only supplied fields change. Requires the reports plugin.',
-  inputSchema: z.object({
-    app_id: z.string()
-      .optional()
-      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
-    app_name: z.string()
-      .optional()
-      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
-    report_id: z.string()
-      .describe('Report identifier (_id) to update. Obtain it from email_reports_list.'),
-    title: z.string()
-      .optional()
-      .describe('New report title.'),
-    emails: z.array(z.string())
-      .optional()
-      .describe('New recipient email list (replaces existing).'),
-    frequency: z.enum(['daily', 'weekly', 'monthly'])
-      .optional()
-      .describe('New send cadence.'),
-    timezone: z.string()
-      .optional()
-      .describe('New IANA timezone for scheduling.'),
-    day: z.number()
-      .optional()
-      .describe('New day-of-week (0-6) for weekly or day-of-month (1-31) for monthly.'),
-    hour: z.number()
-      .optional()
-      .describe('New hour of day 0-23.'),
-    minute: z.number()
-      .optional()
-      .describe('New minute of hour 0-59.'),
-    enabled: z.boolean()
-      .optional()
-      .describe('Enable or disable the schedule without deleting the report.'),
-    sendPdf: z.boolean()
-      .optional()
-      .describe('Toggle PDF attachment.'),
-    report_data: z.record(z.string(), z.any())
-      .optional()
-      .describe('Extra raw fields to merge into the update payload (escape hatch for fields not covered above).'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      report_id: {
+        type: 'string',
+        description: 'Report identifier (_id) to update. Obtain it from email_reports_list.',
+      },
+      title: {
+        type: 'string',
+        description: 'New report title.',
+      },
+      emails: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'New recipient email list (replaces existing).',
+      },
+      frequency: {
+        type: 'string',
+        enum: ['daily', 'weekly', 'monthly'],
+        description: 'New send cadence.',
+      },
+      timezone: {
+        type: 'string',
+        description: 'New IANA timezone for scheduling.',
+      },
+      day: {
+        type: 'number',
+        description: 'New day-of-week (0-6) for weekly or day-of-month (1-31) for monthly.',
+      },
+      hour: {
+        type: 'number',
+        description: 'New hour of day 0-23.',
+      },
+      minute: {
+        type: 'number',
+        description: 'New minute of hour 0-59.',
+      },
+      enabled: {
+        type: 'boolean',
+        description: 'Enable or disable the schedule without deleting the report.',
+      },
+      sendPdf: {
+        type: 'boolean',
+        description: 'Toggle PDF attachment.',
+      },
+      report_data: {
+        type: 'object',
+        description: 'Extra raw fields to merge into the update payload (escape hatch for fields not covered above).',
+        additionalProperties: true,
+      },
+    },
+    required: ['report_id'],
+  },
 };
 
-async function handleUpdateEmailReport(args: z.infer<typeof updateEmailReportTool.inputSchema>, context: ToolContext) {
-  const app_id = await context.resolveAppId(args);
+export async function handleUpdateEmailReport(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(input);
+  const report_id = input.report_id as string;
 
   // Build update object with only provided fields
   const updateArgs: Record<string, any> = {
-    _id: args.report_id,
+    _id: report_id,
   };
 
-  if (args.title !== undefined) {
-    updateArgs.title = args.title;
+  if (input.title !== undefined) {
+    updateArgs.title = input.title;
   }
-  if (args.emails !== undefined) {
-    updateArgs.emails = args.emails;
+  if (input.emails !== undefined) {
+    updateArgs.emails = input.emails;
   }
-  if (args.frequency !== undefined) {
-    updateArgs.frequency = args.frequency;
+  if (input.frequency !== undefined) {
+    updateArgs.frequency = input.frequency;
   }
-  if (args.timezone !== undefined) {
-    updateArgs.timezone = args.timezone;
+  if (input.timezone !== undefined) {
+    updateArgs.timezone = input.timezone;
   }
-  if (args.day !== undefined) {
-    updateArgs.day = args.day;
+  if (input.day !== undefined) {
+    updateArgs.day = input.day;
   }
-  if (args.hour !== undefined) {
-    updateArgs.hour = args.hour;
+  if (input.hour !== undefined) {
+    updateArgs.hour = input.hour;
   }
-  if (args.minute !== undefined) {
-    updateArgs.minute = args.minute;
+  if (input.minute !== undefined) {
+    updateArgs.minute = input.minute;
   }
-  if (args.enabled !== undefined) {
-    updateArgs.enabled = args.enabled;
+  if (input.enabled !== undefined) {
+    updateArgs.enabled = input.enabled;
   }
-  if (args.sendPdf !== undefined) {
-    updateArgs.sendPdf = args.sendPdf;
+  if (input.sendPdf !== undefined) {
+    updateArgs.sendPdf = input.sendPdf;
   }
-  if (args.report_data) {
-    Object.assign(updateArgs, args.report_data);
+  if (input.report_data) {
+    Object.assign(updateArgs, input.report_data as Record<string, unknown>);
   }
 
   const params = {
@@ -322,13 +434,13 @@ async function handleUpdateEmailReport(args: z.infer<typeof updateEmailReportToo
 
   const response = await safeApiCall(
     () => context.httpClient.get('/i/reports/update', { params }),
-    `Failed to update email report: ${args.report_id}`
+    `Failed to update email report: ${report_id}`
   );
 
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: `Email report updated successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
@@ -342,36 +454,48 @@ async function handleUpdateEmailReport(args: z.infer<typeof updateEmailReportToo
 export const previewEmailReportTool = {
   name: 'email_reports_preview',
   description: 'Render an email report preview without delivering it (for inspection) via /i/reports/preview. Requires the reports plugin. To actually send use email_reports_send.',
-  inputSchema: z.object({
-    app_id: z.string()
-      .optional()
-      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
-    app_name: z.string()
-      .optional()
-      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
-    report_id: z.string()
-      .describe('Report identifier (_id) to preview. Obtain it from email_reports_list.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      report_id: {
+        type: 'string',
+        description: 'Report identifier (_id) to preview. Obtain it from email_reports_list.',
+      },
+    },
+    required: ['report_id'],
+  },
 };
 
-async function handlePreviewEmailReport(args: z.infer<typeof previewEmailReportTool.inputSchema>, context: ToolContext) {
-  const app_id = await context.resolveAppId(args);
+export async function handlePreviewEmailReport(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(input);
+  const report_id = input.report_id as string;
 
   const params = {
     ...context.getAuthParams(),
     app_id,
-    args: JSON.stringify({ _id: args.report_id }),
+    args: JSON.stringify({ _id: report_id }),
   };
 
   const response = await safeApiCall(
     () => context.httpClient.get('/i/reports/preview', { params }),
-    `Failed to preview email report: ${args.report_id}`
+    `Failed to preview email report: ${report_id}`
   );
 
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: `Email report preview:\n\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
@@ -385,36 +509,48 @@ async function handlePreviewEmailReport(args: z.infer<typeof previewEmailReportT
 export const sendEmailReportTool = {
   name: 'email_reports_send',
   description: 'Send an email report to its configured recipients immediately (outside its normal schedule) via /i/reports/send. Requires the reports plugin. To see it without sending use email_reports_preview.',
-  inputSchema: z.object({
-    app_id: z.string()
-      .optional()
-      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
-    app_name: z.string()
-      .optional()
-      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
-    report_id: z.string()
-      .describe('Report identifier (_id) to send now. Obtain it from email_reports_list.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      report_id: {
+        type: 'string',
+        description: 'Report identifier (_id) to send now. Obtain it from email_reports_list.',
+      },
+    },
+    required: ['report_id'],
+  },
 };
 
-async function handleSendEmailReport(args: z.infer<typeof sendEmailReportTool.inputSchema>, context: ToolContext) {
-  const app_id = await context.resolveAppId(args);
+export async function handleSendEmailReport(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(input);
+  const report_id = input.report_id as string;
 
   const params = {
     ...context.getAuthParams(),
     app_id,
-    args: JSON.stringify({ _id: args.report_id }),
+    args: JSON.stringify({ _id: report_id }),
   };
 
   const response = await safeApiCall(
     () => context.httpClient.get('/i/reports/send', { params }),
-    `Failed to send email report: ${args.report_id}`
+    `Failed to send email report: ${report_id}`
   );
 
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: `Email report sent successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
@@ -428,36 +564,48 @@ async function handleSendEmailReport(args: z.infer<typeof sendEmailReportTool.in
 export const deleteEmailReportTool = {
   name: 'email_reports_delete',
   description: 'Delete an email report configuration via /i/reports/delete. Requires the reports plugin. WARNING: irreversible. To disable temporarily set enabled=false via email_reports_update instead.',
-  inputSchema: z.object({
-    app_id: z.string()
-      .optional()
-      .describe('Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'),
-    app_name: z.string()
-      .optional()
-      .describe('Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'),
-    report_id: z.string()
-      .describe('Report identifier (_id) to delete. Obtain it from email_reports_list.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      report_id: {
+        type: 'string',
+        description: 'Report identifier (_id) to delete. Obtain it from email_reports_list.',
+      },
+    },
+    required: ['report_id'],
+  },
 };
 
-async function handleDeleteEmailReport(args: z.infer<typeof deleteEmailReportTool.inputSchema>, context: ToolContext) {
-  const app_id = await context.resolveAppId(args);
+export async function handleDeleteEmailReport(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const app_id = await context.resolveAppId(input);
+  const report_id = input.report_id as string;
 
   const params = {
     ...context.getAuthParams(),
     app_id,
-    args: JSON.stringify({ _id: args.report_id }),
+    args: JSON.stringify({ _id: report_id }),
   };
 
   const response = await safeApiCall(
     () => context.httpClient.get('/i/reports/delete', { params }),
-    `Failed to delete email report: ${args.report_id}`
+    `Failed to delete email report: ${report_id}`
   );
 
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: `Email report deleted successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
@@ -500,50 +648,50 @@ export class EmailReportsTools {
   /**
    * List all email reports
    */
-  async listEmailReports(args: z.infer<typeof listEmailReportsTool.inputSchema>) {
-    return handleListEmailReports(args, this.context);
+  async listEmailReports(args: any): Promise<ToolResult> {
+    return handleListEmailReports(this.context, args);
   }
 
   /**
    * Create a core email report
    */
-  async createCoreEmailReport(args: z.infer<typeof createCoreEmailReportTool.inputSchema>) {
-    return handleCreateCoreEmailReport(args, this.context);
+  async createCoreEmailReport(args: any): Promise<ToolResult> {
+    return handleCreateCoreEmailReport(this.context, args);
   }
 
   /**
    * Create a dashboard email report
    */
-  async createDashboardEmailReport(args: z.infer<typeof createDashboardEmailReportTool.inputSchema>) {
-    return handleCreateDashboardEmailReport(args, this.context);
+  async createDashboardEmailReport(args: any): Promise<ToolResult> {
+    return handleCreateDashboardEmailReport(this.context, args);
   }
 
   /**
    * Update an email report
    */
-  async updateEmailReport(args: z.infer<typeof updateEmailReportTool.inputSchema>) {
-    return handleUpdateEmailReport(args, this.context);
+  async updateEmailReport(args: any): Promise<ToolResult> {
+    return handleUpdateEmailReport(this.context, args);
   }
 
   /**
    * Preview an email report
    */
-  async previewEmailReport(args: z.infer<typeof previewEmailReportTool.inputSchema>) {
-    return handlePreviewEmailReport(args, this.context);
+  async previewEmailReport(args: any): Promise<ToolResult> {
+    return handlePreviewEmailReport(this.context, args);
   }
 
   /**
    * Send an email report
    */
-  async sendEmailReport(args: z.infer<typeof sendEmailReportTool.inputSchema>) {
-    return handleSendEmailReport(args, this.context);
+  async sendEmailReport(args: any): Promise<ToolResult> {
+    return handleSendEmailReport(this.context, args);
   }
 
   /**
    * Delete an email report
    */
-  async deleteEmailReport(args: z.infer<typeof deleteEmailReportTool.inputSchema>) {
-    return handleDeleteEmailReport(args, this.context);
+  async deleteEmailReport(args: any): Promise<ToolResult> {
+    return handleDeleteEmailReport(this.context, args);
   }
 }
 

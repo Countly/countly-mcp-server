@@ -83,25 +83,12 @@ describe('every listed tool is routable by the dispatcher', () => {
 });
 
 describe('every tool definition ships a JSON Schema, not a zod schema', () => {
-  // KNOWN OFFENDERS: these modules still declare inputSchema with zod, which
+  // KNOWN OFFENDERS: modules that declare inputSchema with zod, which
   // serializes as {"def":{...}} (no properties, no descriptions) in the
   // tools/list response. They route correctly, but clients cannot see their
-  // parameters. Remove entries from this set as each module is migrated to
-  // plain JSON Schema — do NOT add new entries.
-  const KNOWN_ZOD_SCHEMA_MODULES = new Set([
-    // datapoint.ts
-    'datapoints_stats', 'datapoints_top_apps', 'datapoints_punch_card',
-    // server-logs.ts
-    'server_logs_files_list', 'server_logs_contents',
-    // dashboards.ts
-    'dashboards_list', 'dashboards_data', 'dashboards_create',
-    'dashboards_update', 'dashboards_delete', 'dashboards_widget_add',
-    'dashboards_widget_update', 'dashboards_widget_remove',
-    // email-reports.ts
-    'email_reports_list', 'email_reports_core_create',
-    'email_reports_dashboard_create', 'email_reports_update',
-    'email_reports_preview', 'email_reports_send', 'email_reports_delete',
-  ]);
+  // parameters. All modules are now migrated to plain JSON Schema — this set
+  // must stay empty; do NOT add new entries.
+  const KNOWN_ZOD_SCHEMA_MODULES = new Set<string>([]);
 
   const definitionsToCheck = getAllToolDefinitions().filter(
     (d) => !KNOWN_ZOD_SCHEMA_MODULES.has(d.name)
@@ -122,6 +109,48 @@ describe('every tool definition ships a JSON Schema, not a zod schema', () => {
 
       // Must survive the JSON round-trip the MCP transport performs unchanged
       expect(JSON.parse(JSON.stringify(schema))).toEqual(schema);
+    }
+  );
+
+  // Limited MCP clients (WebStorm/JetBrains AI assistant, some Claude API
+  // schema validation) reject composition keywords and union types. anyOf was
+  // removed in 1e82b1b, allOf and z.union in PR #48 — keep schemas to simple
+  // single-type declarations.
+  const FORBIDDEN_KEYWORDS = ['anyOf', 'allOf', 'oneOf', 'not', '$ref'];
+
+  // Walks only positions that hold schemas (properties values, items,
+  // additionalProperties) — a property literally named "type" or "anyOf"
+  // must not trip the checks.
+  function assertClientCompatible(schema: unknown, path: string) {
+    if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) {
+      return;
+    }
+    const node = schema as Record<string, unknown>;
+    for (const keyword of FORBIDDEN_KEYWORDS) {
+      expect(
+        node[keyword],
+        `${path} uses "${keyword}", which limited MCP clients (e.g. WebStorm) reject`
+      ).toBeUndefined();
+    }
+    if ('type' in node) {
+      expect(
+        typeof node.type,
+        `${path}.type must be a single type string, not a union array`
+      ).toBe('string');
+    }
+    if (node.properties && typeof node.properties === 'object') {
+      for (const [key, value] of Object.entries(node.properties)) {
+        assertClientCompatible(value, `${path}.properties.${key}`);
+      }
+    }
+    assertClientCompatible(node.items, `${path}.items`);
+    assertClientCompatible(node.additionalProperties, `${path}.additionalProperties`);
+  }
+
+  it.each(definitionsToCheck.map((d) => [d.name, d]))(
+    '%s inputSchema avoids constructs limited MCP clients reject',
+    (name, definition: any) => {
+      assertClientCompatible(definition.inputSchema, `${name}.inputSchema`);
     }
   );
 

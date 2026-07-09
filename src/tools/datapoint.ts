@@ -1,15 +1,15 @@
 /**
  * Datapoint Tools
- * 
+ *
  * Tools for monitoring data point collection and server statistics.
  * Data points are a measure of collected data and are often tied to server specs and billing.
- * 
+ *
  * Requires: server-stats plugin
  */
 
-import { z } from 'zod';
 import { safeApiCall } from '../lib/error-handler.js';
-import type { ToolContext } from './types.js';
+import { withDefault } from '../lib/validation.js';
+import type { ToolContext, ToolResult } from './types.js';
 
 /**
  * Tool: datapoints_stats
@@ -18,25 +18,36 @@ import type { ToolContext } from './types.js';
 export const getDatapointStatisticsTool = {
   name: 'datapoints_stats',
   description: 'Get data-point counts per app per datapoint type (the billing/usage metric) via /o/server-stats/data-points. Requires the server-stats plugin. For a ranked view use datapoints_top_apps; for hourly load pattern use datapoints_punch_card.',
-  inputSchema: z.object({
-    period: z.string()
-      .optional()
-      .default('30days')
-      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Defaults to "30days".'),
-    selected_app: z.string()
-      .optional()
-      .describe('Optional comma-separated app IDs to restrict results (e.g. "app_id1,app_id2"). Omit for all apps the caller can see.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Defaults to "30days".',
+        default: '30days',
+      },
+      selected_app: {
+        type: 'string',
+        description: 'Optional comma-separated app IDs to restrict results (e.g. "app_id1,app_id2"). Omit for all apps the caller can see.',
+      },
+    },
+  },
 };
 
-async function handleGetDatapointStatistics(args: z.infer<typeof getDatapointStatisticsTool.inputSchema>, context: ToolContext) {
+export async function handleGetDatapointStatistics(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const period = withDefault(input.period as string | undefined, '30days');
+  const selected_app = input.selected_app as string | undefined;
+
   const params: Record<string, string> = {
     ...context.getAuthParams(),
-    period: args.period,
+    period,
   };
 
-  if (args.selected_app) {
-    params.selected_app = args.selected_app;
+  if (selected_app) {
+    params.selected_app = selected_app;
   }
 
   const response = await safeApiCall(
@@ -47,7 +58,7 @@ async function handleGetDatapointStatistics(args: z.infer<typeof getDatapointSta
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: JSON.stringify(response.data, null, 2),
       },
     ],
@@ -61,18 +72,27 @@ async function handleGetDatapointStatistics(args: z.infer<typeof getDatapointSta
 export const getTopDatapointAppsTool = {
   name: 'datapoints_top_apps',
   description: 'Rank apps by data-point volume over a period via /o/server-stats/top. Requires the server-stats plugin. For the full per-type breakdown use datapoints_stats.',
-  inputSchema: z.object({
-    period: z.string()
-      .optional()
-      .default('30days')
-      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".',
+        default: '30days',
+      },
+    },
+  },
 };
 
-async function handleGetTopDatapointApps(args: z.infer<typeof getTopDatapointAppsTool.inputSchema>, context: ToolContext) {
+export async function handleGetTopDatapointApps(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const period = withDefault(input.period as string | undefined, '30days');
+
   const params = {
     ...context.getAuthParams(),
-    period: args.period,
+    period,
   };
 
   const response = await safeApiCall(
@@ -83,7 +103,7 @@ async function handleGetTopDatapointApps(args: z.infer<typeof getTopDatapointApp
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: JSON.stringify(response.data, null, 2),
       },
     ],
@@ -97,18 +117,27 @@ async function handleGetTopDatapointApps(args: z.infer<typeof getTopDatapointApp
 export const getDatapointPunchCardTool = {
   name: 'datapoints_punch_card',
   description: 'Get a weekday x hour punch-card of data-point volume (load distribution across the week) via /o/server-stats/punch-card. Requires the server-stats plugin. Useful for spotting peak hours.',
-  inputSchema: z.object({
-    period: z.string()
-      .optional()
-      .default('30days')
-      .describe('Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds]. Defaults to "30days".',
+        default: '30days',
+      },
+    },
+  },
 };
 
-async function handleGetDatapointPunchCard(args: z.infer<typeof getDatapointPunchCardTool.inputSchema>, context: ToolContext) {
+export async function handleGetDatapointPunchCard(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const period = withDefault(input.period as string | undefined, '30days');
+
   const params = {
     ...context.getAuthParams(),
-    period: args.period,
+    period,
   };
 
   const response = await safeApiCall(
@@ -119,7 +148,7 @@ async function handleGetDatapointPunchCard(args: z.infer<typeof getDatapointPunc
   return {
     content: [
       {
-        type: 'text' as const,
+        type: 'text',
         text: JSON.stringify(response.data, null, 2),
       },
     ],
@@ -154,22 +183,22 @@ export class DatapointTools {
   /**
    * Get data points collected per app per datapoint type
    */
-  async getDatapointStatistics(args: z.infer<typeof getDatapointStatisticsTool.inputSchema>) {
-    return handleGetDatapointStatistics(args, this.context);
+  async getDatapointStatistics(args: any): Promise<ToolResult> {
+    return handleGetDatapointStatistics(this.context, args);
   }
 
   /**
    * Get top apps by data point collection
    */
-  async getTopDatapointApps(args: z.infer<typeof getTopDatapointAppsTool.inputSchema>) {
-    return handleGetTopDatapointApps(args, this.context);
+  async getTopDatapointApps(args: any): Promise<ToolResult> {
+    return handleGetTopDatapointApps(this.context, args);
   }
 
   /**
    * Get hourly datapoint breakdown punchcard
    */
-  async getDatapointPunchCard(args: z.infer<typeof getDatapointPunchCardTool.inputSchema>) {
-    return handleGetDatapointPunchCard(args, this.context);
+  async getDatapointPunchCard(args: any): Promise<ToolResult> {
+    return handleGetDatapointPunchCard(this.context, args);
   }
 }
 
