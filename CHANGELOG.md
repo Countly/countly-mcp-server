@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`hooks_*` and `times_of_day` tools were listed but impossible to call** (#141) — both modules (added in v1.0.2) were wired into `getAllToolDefinitions()`/`getAllToolHandlers()` but never into `getAllToolMetadata()`, which is the only routing source the `CallToolRequestSchema` dispatcher uses. Every call to `hooks_list`, `hooks_test`, `hooks_create`, `hooks_update`, `hooks_delete`, or `times_of_day` returned `McpError -32601 "Unknown tool"`. Their `inputSchema` fields were also raw zod objects, which serialize as `{"def":{...}}` (no `properties`, no descriptions) in the `tools/list` response, so clients saw the tools with zero visible parameters. Both modules are now migrated to the metadata/class pattern used by the rest of the codebase, with hand-written conservative JSON Schema (flat `type`/`properties`/`required`, inline descriptions, string enums — the same client-compatible subset as every other module). As a side effect, `hooks_create`'s `enabled: true` default now actually applies (the zod `.default()` never ran because the schema was never parsed at runtime).
+- **Regression tests for tool registration** (#141) — new `tests/tool-registration.test.ts` asserts every tool returned by `getAllToolDefinitions()` has a dispatcher route in `getAllToolMetadata()` with a real method on its tool class, and that its schema is plain JSON-round-trip-safe JSON Schema. The four modules that still declare zod schemas (`datapoint`, `server-logs`, `dashboards`, `email-reports` — routable, but parameter-less in `tools/list`) are tracked in an explicit known-offenders list that must shrink, never grow.
+
 ## [1.3.0] - 2026-04-23
 
 ### Changed
