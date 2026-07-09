@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Journey stats tools** — `journeys_stats_summary` (KPIs with period-over-period change), `journeys_stats_table` (per-block breakdown, taskmanager-aware: long queries return a task id that can be passed back as `task_id`), `journeys_stats_performance` (time series), and `journeys_stats_uids` (user UID lists per stat bucket), wrapping `/o/journey-engine/stats/*`.
+- **`journeys_block_reference` tool** — static reference documentation for the journey block JSON schema (block types, per-subtype fields, filter/condition formats, publish-time validation rules, and sample graphs), compiled from the journey engine source. Includes runtime caveats the samples get wrong: the engine reads `nextBlock` (not `next_block`), only canonical `BlockSubTypes` strings match at runtime, and `call-webhook`/`run-code`/`repeat`/push/email blocks are not implemented. Referenced from the `blocks` parameter descriptions of `journeys_create`/`journeys_update` so models fetch the schema before authoring graphs.
+- **Content asset tools** — `content_assets_list`, `content_assets_upload` (base64 in, multipart out, 5MB limit enforced client-side), `content_assets_update`, `content_assets_delete`, wrapping `/o/content/assets` and `/i/content/asset-*`, plus `content_langs_list` for translation-eligible languages via `/o/content/langs`.
+- **Journeys tools** — new `journeys` category (requires the `journey_engine` plugin, Countly Enterprise): `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`. Write operations post JSON bodies to `/i/journey-engine/journeys/*` and reads use `/o/journey-engine/*`, matching the API exposed by both the current enterprise plugins and the new Countly platform codebase. Update/publish/pause/resume resolve the target journey version automatically when the journey has exactly one candidate version; otherwise they list the available versions and ask for `version_id`.
+- **Content blocks tools** — new `content` category (requires the `content` plugin, Countly Enterprise): `content_blocks_list`, `content_blocks_get`, `content_blocks_preview`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`, wrapping `/o/content`, `/o/content/by-id`, `/i/content/save`, and `/i/content/delete`. `content_blocks_update` fetches the existing block first so omitted fields (title, type, blocks, favorite) are preserved. `content_blocks_preview` validates the block exists, then returns a link to the server's public `/_external/content` renderer (the page SDK webviews load) so users can see the block rendered in a browser.
+
 ## [1.3.0] - 2026-04-23
 
 ### Changed
