@@ -8,6 +8,11 @@ import {
   handlePublishJourney,
   handlePauseJourney,
   handleResumeJourney,
+  handleJourneyStatsSummary,
+  handleJourneyStatsTable,
+  handleJourneyStatsPerformance,
+  handleJourneyStatsUids,
+  handleJourneyBlockReference,
 } from '../src/tools/journeys.js';
 import { ToolContext } from '../src/tools/types.js';
 
@@ -368,6 +373,131 @@ describe('Journeys Tools', () => {
 
       expect(result.content[0].text).toContain('No version with status "active"');
       expect(mockContext.httpClient.post).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleJourneyBlockReference', () => {
+    it('should return static block schema documentation without any API call', async () => {
+      const result = await handleJourneyBlockReference(mockContext, {});
+
+      expect(mockContext.httpClient.get).not.toHaveBeenCalled();
+      expect(mockContext.httpClient.post).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain('blockType');
+      expect(result.content[0].text).toContain('incoming-data');
+      expect(result.content[0].text).toContain('updateStatement');
+      expect(result.content[0].text).toContain('nextBlocks');
+    });
+  });
+
+  describe('handleJourneyStatsSummary', () => {
+    it('should request summary stats with optional version and period', async () => {
+      mockContext.httpClient.get = vi.fn().mockResolvedValue({ data: { usersEntered: 10 } });
+
+      await handleJourneyStatsSummary(mockContext, {
+        app_id: 'app123',
+        journey_id: 'journey1',
+        version_id: 'version1',
+        period: '30days',
+      });
+
+      expect(mockContext.httpClient.get).toHaveBeenCalledWith(
+        '/o/journey-engine/stats/summary',
+        {
+          params: {
+            app_id: 'app123',
+            journeyDefinitionId: 'journey1',
+            journeyVersionId: 'version1',
+            period: '30days',
+          },
+        }
+      );
+    });
+  });
+
+  describe('handleJourneyStatsTable', () => {
+    it('should request the stats table with pagination defaults', async () => {
+      mockContext.httpClient.get = vi.fn().mockResolvedValue({ data: { aaData: [] } });
+
+      await handleJourneyStatsTable(mockContext, {
+        app_id: 'app123',
+        journey_id: 'journey1',
+      });
+
+      expect(mockContext.httpClient.get).toHaveBeenCalledWith(
+        '/o/journey-engine/stats/table',
+        {
+          params: {
+            app_id: 'app123',
+            journeyDefinitionId: 'journey1',
+            iDisplayStart: '0',
+            iDisplayLength: '10',
+            sEcho: '1',
+          },
+        }
+      );
+    });
+
+    it('should pass task_id to fetch a long-running query result', async () => {
+      mockContext.httpClient.get = vi.fn().mockResolvedValue({ data: { aaData: [] } });
+
+      await handleJourneyStatsTable(mockContext, {
+        app_id: 'app123',
+        journey_id: 'journey1',
+        task_id: 'task42',
+      });
+
+      expect(mockContext.httpClient.get).toHaveBeenCalledWith(
+        '/o/journey-engine/stats/table',
+        expect.objectContaining({
+          params: expect.objectContaining({ taskId: 'task42' }),
+        })
+      );
+    });
+  });
+
+  describe('handleJourneyStatsPerformance', () => {
+    it('should request performance time-series data', async () => {
+      mockContext.httpClient.get = vi.fn().mockResolvedValue({ data: [] });
+
+      await handleJourneyStatsPerformance(mockContext, {
+        app_id: 'app123',
+        journey_id: 'journey1',
+        period: '7days',
+      });
+
+      expect(mockContext.httpClient.get).toHaveBeenCalledWith(
+        '/o/journey-engine/stats/performance',
+        {
+          params: {
+            app_id: 'app123',
+            journeyDefinitionId: 'journey1',
+            period: '7days',
+          },
+        }
+      );
+    });
+  });
+
+  describe('handleJourneyStatsUids', () => {
+    it('should request user UIDs for a stat bucket', async () => {
+      mockContext.httpClient.get = vi.fn().mockResolvedValue({ data: { uids: ['u1'] } });
+
+      await handleJourneyStatsUids(mockContext, {
+        app_id: 'app123',
+        journey_id: 'journey1',
+        uid_type: 'users_completed',
+      });
+
+      expect(mockContext.httpClient.get).toHaveBeenCalledWith(
+        '/o/journey-engine/stats/uids',
+        {
+          params: {
+            app_id: 'app123',
+            journeyDefinitionId: 'journey1',
+            uidType: 'users_completed',
+          },
+        }
+      );
     });
   });
 

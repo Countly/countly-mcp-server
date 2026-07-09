@@ -530,7 +530,7 @@ async function funnelExamples() {
 ```
 
 ### journeys
-**Tools**: `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`
+**Tools**: `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`, `journeys_block_reference`, `journeys_stats_summary`, `journeys_stats_table`, `journeys_stats_performance`, `journeys_stats_uids`
 
 **Requires plugin**: `journey_engine` (Countly Enterprise)
 
@@ -591,7 +591,7 @@ async function journeyExamples() {
 ```
 
 ### content
-**Tools**: `content_blocks_list`, `content_blocks_get`, `content_blocks_preview`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`
+**Tools**: `content_blocks_list`, `content_blocks_get`, `content_blocks_preview`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`, `content_assets_list`, `content_assets_upload`, `content_assets_update`, `content_assets_delete`, `content_langs_list`
 
 **Requires plugin**: `content` (Countly Enterprise)
 

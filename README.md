@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (141 available)
+### Tools (151 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -750,6 +750,11 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`journeys_publish`** - Publish (activate) or unpublish (set back to draft) a journey version.
 - **`journeys_pause`** - Pause an active journey version and its running instances.
 - **`journeys_resume`** - Resume a paused journey version.
+- **`journeys_block_reference`** - Get the journey block JSON schema reference (block types, per-subtype fields, validation rules, sample graphs) for authoring blocks.
+- **`journeys_stats_summary`** - Get summary KPIs for a journey (users entered/engaged/completed/dropped off, content viewed/interacted) with period-over-period change.
+- **`journeys_stats_table`** - Get the per-block journey statistics table with pagination (long queries return a task id to poll).
+- **`journeys_stats_performance`** - Get time-series journey performance data for trend charts.
+- **`journeys_stats_uids`** - List user UIDs in a journey stat bucket (entered, completed, dropped off, etc.).
 
 ### Content Blocks (requires `content` plugin, Countly Enterprise)
 - **`content_blocks_list`** - List all content blocks (in-app content such as banners, modals, surveys) for an app.
@@ -758,6 +763,11 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`content_blocks_create`** - Create a content block that can be delivered through journeys.
 - **`content_blocks_update`** - Update an existing content block (title, type, blocks, favorite).
 - **`content_blocks_delete`** - Delete a content block (fails if the block is still used in a journey).
+- **`content_assets_list`** - List uploaded content assets (images/videos) with metadata.
+- **`content_assets_upload`** - Upload an image asset (base64, max 5MB) for use in content blocks.
+- **`content_assets_update`** - Update an asset's name and/or tags.
+- **`content_assets_delete`** - Delete an uploaded content asset.
+- **`content_langs_list`** - List languages eligible for content translations.
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

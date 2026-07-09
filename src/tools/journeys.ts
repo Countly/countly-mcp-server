@@ -189,7 +189,7 @@ export async function handleGetJourney(
 // CREATE JOURNEY TOOL
 // ============================================================================
 
-const BLOCKS_DESCRIPTION = 'JSON-encoded array of journey blocks forming the version graph. Each block is an object with: id (unique string, e.g. "block_1"), blockType ("trigger", "engagement", "logical", "data_pipeline", or "end"), subType (e.g. trigger: "incoming-data", "profile-update", "cohort-entry", "cohort-exit", "schedule", "webhook"; engagement: "in-app-content", "survey", "email"; logical: "wait-trigger", "wait-period", "wait-date", "continue-if", "switch", "repeat"; data_pipeline: "record-event", "update-profile", "call-webhook"), nextBlock (id of the next block), and subtype-specific fields such as filters (array of {key, conditions} for triggers), contentId (for in-app-content blocks), eventKey (for record-event blocks), or updateStatement (array of single-key objects for update-profile blocks).';
+const BLOCKS_DESCRIPTION = 'JSON-encoded array of journey blocks forming the version graph. Call journeys_block_reference first for the full block schema, field requirements, and sample graphs. Each block is an object with: id (unique string, e.g. "block_1"), blockType ("trigger", "engagement", "logical", "data_pipeline", or "end"), subType (e.g. trigger: "incoming-data", "profile-update", "cohort-entry", "cohort-exit", "schedule", "webhook"; engagement: "in-app-content", "survey", "email"; logical: "wait-trigger", "wait-period", "wait-date", "continue-if", "switch", "repeat"; data_pipeline: "record-event", "update-profile", "call-webhook"), nextBlock (id of the next block), and subtype-specific fields such as filters (array of {key, conditions} for triggers), contentId (for in-app-content blocks), eventKey (for record-event blocks), or updateStatement (array of single-key objects for update-profile blocks).';
 
 export const createJourneyToolDefinition = {
   name: 'journeys_create',
@@ -653,6 +653,455 @@ export async function handleResumeJourney(
 }
 
 // ============================================================================
+// JOURNEY BLOCK REFERENCE TOOL
+// ============================================================================
+
+const JOURNEY_BLOCK_REFERENCE = `# Countly Journey Engine - blocks schema reference
+
+Reference for authoring the "blocks" array used by journeys_create and journeys_update
+(POST /i/journey-engine/journeys/save). Derived from the journey engine source
+(enums, runtime execution code, and the publish-time validator).
+
+## Block common fields
+
+- "id" (string, required): unique block id within the journey; used as the link target.
+- "blockType" (string, required): one of "trigger", "engagement", "logical", "data_pipeline", "end".
+- "subType" (string, required for every block except "end"): see per-type lists below.
+- "nextBlock" (string, optional): id of the next block to execute. This is the ONLY linking
+  field the engine reads for linear flow; if absent, the journey ends after this block.
+  (Legacy samples use "next_block" - the engine does NOT read that; always use "nextBlock".)
+
+The FIRST block (blocks[0]) must be the trigger; the engine matches journeys by
+blocks[0].blockType == "trigger" and blocks[0].subType.
+
+Branching blocks link differently: "continue-if" uses "nextBlocks" (array),
+"switch" uses per-condition "nextBlock" entries inside "conditions".
+
+## blockType: trigger
+
+Valid subType values and when they fire:
+- "incoming-data": any incoming SDK data (sessions, views, custom events, crashes,
+  surveys, star ratings, NPS, push actions, consent)
+- "cohort-entry" / "cohort-exit": user enters/exits an auto cohort
+- "profile-group-entry" / "profile-group-exit": user enters/exits a manual profile group
+- "profile-update": user profile updated
+- "journey-exit": user exits another journey
+
+Fields:
+- "filters" (array, required): filter objects, OR-combined (any match fires the trigger).
+- "nextBlock" (string): first block after entry.
+
+Filter format - each element is either:
+1. A raw MongoDB-style query object matched against the incoming data, e.g.
+   {"key": "Login"} or {"$or": [{"cohort": "cohort1"}, {"cohort": "cohort2"}]}
+2. A {key, conditions} object - "key" is merged with the fields of "conditions"
+   into a single query, e.g. {"key": "[CLY]_session", "conditions": {"up.av": {"$in": ["1.0"]}}}
+
+## blockType: engagement
+
+subType values: "in-app-content", "survey", "push-notificatiion" (note the enum's spelling), "email".
+Only "in-app-content" is fully implemented ("survey" sends content then waits for a
+response; "push-notificatiion" and "email" are stubs with no runtime effect).
+
+"in-app-content" fields:
+- "contentId" (string, required): content block id (see content_blocks_list).
+- "priority" (number, optional): push priority, defaults to 3 (low).
+- "expiration_type" (string, optional): "exact" or "dynamic".
+- "expiration_date" (string/date, optional): absolute expiry when expiration_type is "exact".
+- "duration" (string, optional): relative duration, e.g. "2d2h2m2s".
+- "nextBlock" (string, optional): journey completes here if omitted.
+
+## blockType: logical
+
+subType values: "wait-period", "wait-date", "wait-trigger", "continue-if", "switch",
+"repeat" ("repeat" is declared but not implemented - do not use).
+
+wait-period / wait-date:
+- "untilDate" (number, ms epoch): absolute resume time (wait-date). Takes precedence.
+- "waitPeriod" (number, ms): relative delay (wait-period).
+- "nextBlock" (string, required): block to run when the wait elapses.
+
+wait-trigger:
+- "filters" (array, required): same format as trigger filters; a matching event
+  for the user resumes the journey.
+- "nextBlock" (string, required).
+
+continue-if:
+- "condition" (object, required): MongoDB-style query evaluated against journey data.
+- "nextBlocks" (array of strings, required): [ifTrueBlockId, ifFalseBlockId].
+  Index 0 runs when true, index 1 when false. With only one element and a false
+  condition, the user is dropped.
+
+switch:
+- "conditions" (array, required): ordered list of {"condition": <query>, "nextBlock": <id>}.
+  First matching condition wins; if none match, the user is dropped.
+
+## blockType: data_pipeline
+
+subType values: "record-event", "update-profile", "call-webhook", "run-code".
+"call-webhook" and "run-code" are NOT implemented - executing them errors the journey.
+
+record-event:
+- "eventKey" (string, required): non-empty, must not start with "." or "$"
+  (runtime also rejects keys containing ".").
+- "nextBlock" (string, optional).
+
+update-profile:
+- "updateStatement" (array, required): non-empty; each element is an object with
+  EXACTLY ONE key/value pair. A {"custom": {...}} statement merges into the user's
+  custom properties; any other key sets a top-level profile field.
+  Example: [{"name": "VIP"}, {"custom": {"tier": "gold"}}]
+- "nextBlock" (string, optional).
+
+## blockType: end
+
+Terminal block: {"id": "block_9", "blockType": "end"}. Note: the publish-time
+validator requires a subType on every block it sees, so journeys commonly end by
+omitting "nextBlock" on the last functional block instead of using an explicit
+end block.
+
+## Hard validation rules (enforced at publish, not at save)
+
+- "blocks" must be an array; every block must have a "subType".
+- record-event: "eventKey" required, non-empty, not starting with "." or "$".
+- update-profile: "updateStatement" required, non-empty array, each element an
+  object with exactly one non-empty string key.
+- Link integrity (nextBlock ids existing) is NOT validated - double-check ids.
+
+## Sample 1 - minimal journey (trigger -> in-app content)
+
+\`\`\`json
+[
+  {"id": "block_1", "blockType": "trigger", "subType": "incoming-data",
+   "filters": [{"key": "Login"}], "nextBlock": "block_2"},
+  {"id": "block_2", "blockType": "engagement", "subType": "in-app-content",
+   "contentId": "<content_block_id>", "priority": 1}
+]
+\`\`\`
+
+## Sample 2 - trigger -> wait -> engagement with branching
+
+\`\`\`json
+[
+  {"id": "block_1", "blockType": "trigger", "subType": "incoming-data",
+   "filters": [{"key": "Start"}], "nextBlock": "block_2"},
+  {"id": "block_2", "blockType": "logical", "subType": "wait-period",
+   "waitPeriod": 86400000, "nextBlock": "block_3"},
+  {"id": "block_3", "blockType": "logical", "subType": "continue-if",
+   "condition": {"$or": [{"AccountType": "Business"}, {"Country": "NL"}]},
+   "nextBlocks": ["block_4", "block_5"]},
+  {"id": "block_4", "blockType": "engagement", "subType": "in-app-content",
+   "contentId": "<content_block_id>", "priority": 1},
+  {"id": "block_5", "blockType": "data_pipeline", "subType": "update-profile",
+   "updateStatement": [{"custom": {"segment": "other"}}]}
+]
+\`\`\`
+`;
+
+export const journeyBlockReferenceToolDefinition = {
+  name: 'journeys_block_reference',
+  description: 'Get the reference documentation for the journey block JSON schema: block types, subtypes, per-subtype fields, filter/condition formats, validation rules, and complete sample block graphs. Call this BEFORE authoring the blocks parameter of journeys_create or journeys_update. Static documentation - makes no server request.',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+};
+
+export async function handleJourneyBlockReference(
+  _context: ToolContext,
+  _input: Record<string, unknown>
+): Promise<ToolResult> {
+  return {
+    content: [{ type: 'text', text: JOURNEY_BLOCK_REFERENCE }],
+  };
+}
+
+// ============================================================================
+// JOURNEY STATS TOOLS
+// ============================================================================
+
+const STATS_PERIOD_DESCRIPTION = 'Time period, e.g. "30days", "7days", "hour", "month", "60days", or "0days" for all time. Defaults to all time.';
+
+export const journeyStatsSummaryToolDefinition = {
+  name: 'journeys_stats_summary',
+  description: 'Get summary KPIs for a journey via /o/journey-engine/stats/summary: users entered, engaged, completed, dropped off, content viewed/interacted, with change vs the previous period. Requires the journey_engine plugin (Countly Enterprise). For per-block breakdowns use journeys_stats_table.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      journey_id: {
+        type: 'string',
+        description: 'Journey definition ID. Obtain it from journeys_list.',
+      },
+      version_id: {
+        type: 'string',
+        description: 'Journey version ID to restrict stats to. Omit for all versions.',
+      },
+      period: {
+        type: 'string',
+        description: STATS_PERIOD_DESCRIPTION,
+      },
+    },
+    required: ['journey_id'],
+  },
+};
+
+export async function handleJourneyStatsSummary(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const appId = await context.resolveAppId({
+    app_id: input.app_id as string | undefined,
+    app_name: input.app_name as string | undefined,
+  });
+
+  const queryParams: Record<string, string> = {
+    app_id: appId,
+    journeyDefinitionId: input.journey_id as string,
+  };
+  if (input.version_id) {
+    queryParams.journeyVersionId = input.version_id as string;
+  }
+  if (input.period) {
+    queryParams.period = input.period as string;
+  }
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/journey-engine/stats/summary', { params: queryParams }),
+    'Failed to get journey stats summary'
+  );
+
+  return {
+    content: [{ type: 'text', text: JSON.stringify(response.data, null, 2) }],
+  };
+}
+
+export const journeyStatsTableToolDefinition = {
+  name: 'journeys_stats_table',
+  description: 'Get the per-block journey statistics table via /o/journey-engine/stats/table (block-by-block user counts with pagination). Long-running queries may return a task id instead of data; re-call this tool with task_id to fetch the result. Requires the journey_engine plugin (Countly Enterprise).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      journey_id: {
+        type: 'string',
+        description: 'Journey definition ID. Obtain it from journeys_list.',
+      },
+      version_id: {
+        type: 'string',
+        description: 'Journey version ID to restrict stats to. Omit for all versions.',
+      },
+      status: {
+        type: 'string',
+        description: 'Optional journey instance status filter, e.g. "running", "completed", "stopped", "paused", "error".',
+      },
+      period: {
+        type: 'string',
+        description: STATS_PERIOD_DESCRIPTION,
+      },
+      skip: {
+        type: 'number',
+        description: 'Number of rows to skip for pagination. Defaults to 0.',
+        default: 0,
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of rows to return. Defaults to 10.',
+        default: 10,
+      },
+      task_id: {
+        type: 'string',
+        description: 'Task ID returned by a previous call whose query ran long. Provide it to fetch the completed result instead of starting a new query.',
+      },
+    },
+    required: ['journey_id'],
+  },
+};
+
+export async function handleJourneyStatsTable(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const appId = await context.resolveAppId({
+    app_id: input.app_id as string | undefined,
+    app_name: input.app_name as string | undefined,
+  });
+  const skip = withDefault(input.skip as number | undefined, 0);
+  const limit = withDefault(input.limit as number | undefined, 10);
+
+  const queryParams: Record<string, string> = {
+    app_id: appId,
+    journeyDefinitionId: input.journey_id as string,
+    iDisplayStart: skip.toString(),
+    iDisplayLength: limit.toString(),
+    sEcho: '1',
+  };
+  if (input.version_id) {
+    queryParams.journeyVersionId = input.version_id as string;
+  }
+  if (input.status) {
+    queryParams.status = input.status as string;
+  }
+  if (input.period) {
+    queryParams.period = input.period as string;
+  }
+  if (input.task_id) {
+    queryParams.taskId = input.task_id as string;
+  }
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/journey-engine/stats/table', { params: queryParams }),
+    'Failed to get journey stats table'
+  );
+
+  return {
+    content: [{ type: 'text', text: JSON.stringify(response.data, null, 2) }],
+  };
+}
+
+export const journeyStatsPerformanceToolDefinition = {
+  name: 'journeys_stats_performance',
+  description: 'Get time-series journey performance data via /o/journey-engine/stats/performance (daily entered/engaged/completed/drop-off counts for charting trends). Requires the journey_engine plugin (Countly Enterprise). For headline totals use journeys_stats_summary.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      journey_id: {
+        type: 'string',
+        description: 'Journey definition ID. Obtain it from journeys_list.',
+      },
+      version_id: {
+        type: 'string',
+        description: 'Journey version ID to restrict stats to. Omit for all versions.',
+      },
+      period: {
+        type: 'string',
+        description: STATS_PERIOD_DESCRIPTION,
+      },
+    },
+    required: ['journey_id'],
+  },
+};
+
+export async function handleJourneyStatsPerformance(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const appId = await context.resolveAppId({
+    app_id: input.app_id as string | undefined,
+    app_name: input.app_name as string | undefined,
+  });
+
+  const queryParams: Record<string, string> = {
+    app_id: appId,
+    journeyDefinitionId: input.journey_id as string,
+  };
+  if (input.version_id) {
+    queryParams.journeyVersionId = input.version_id as string;
+  }
+  if (input.period) {
+    queryParams.period = input.period as string;
+  }
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/journey-engine/stats/performance', { params: queryParams }),
+    'Failed to get journey performance stats'
+  );
+
+  return {
+    content: [{ type: 'text', text: JSON.stringify(response.data, null, 2) }],
+  };
+}
+
+export const journeyStatsUidsToolDefinition = {
+  name: 'journeys_stats_uids',
+  description: 'Get the list of user UIDs in a journey stat bucket via /o/journey-engine/stats/uids (e.g. all users who entered, completed, or dropped off). Use user_profiles_get to inspect individual users afterwards. Requires the journey_engine plugin (Countly Enterprise).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.',
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.',
+      },
+      journey_id: {
+        type: 'string',
+        description: 'Journey definition ID. Obtain it from journeys_list.',
+      },
+      uid_type: {
+        type: 'string',
+        enum: ['users_entered', 'users_engaged', 'users_completed', 'content_viewed', 'content_interacted', 'users_drop_off'],
+        description: 'Which stat bucket to list user UIDs for.',
+      },
+      version_id: {
+        type: 'string',
+        description: 'Journey version ID to restrict stats to. Omit for all versions.',
+      },
+      period: {
+        type: 'string',
+        description: STATS_PERIOD_DESCRIPTION,
+      },
+    },
+    required: ['journey_id', 'uid_type'],
+  },
+};
+
+export async function handleJourneyStatsUids(
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const appId = await context.resolveAppId({
+    app_id: input.app_id as string | undefined,
+    app_name: input.app_name as string | undefined,
+  });
+
+  const queryParams: Record<string, string> = {
+    app_id: appId,
+    journeyDefinitionId: input.journey_id as string,
+    uidType: input.uid_type as string,
+  };
+  if (input.version_id) {
+    queryParams.journeyVersionId = input.version_id as string;
+  }
+  if (input.period) {
+    queryParams.period = input.period as string;
+  }
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o/journey-engine/stats/uids', { params: queryParams }),
+    'Failed to get journey user UIDs'
+  );
+
+  return {
+    content: [{ type: 'text', text: JSON.stringify(response.data, null, 2) }],
+  };
+}
+
+// ============================================================================
 // Export Combined Arrays
 // ============================================================================
 
@@ -665,6 +1114,11 @@ export const journeysToolDefinitions = [
   publishJourneyToolDefinition,
   pauseJourneyToolDefinition,
   resumeJourneyToolDefinition,
+  journeyStatsSummaryToolDefinition,
+  journeyStatsTableToolDefinition,
+  journeyStatsPerformanceToolDefinition,
+  journeyStatsUidsToolDefinition,
+  journeyBlockReferenceToolDefinition,
 ];
 
 export const journeysToolHandlers = {
@@ -676,6 +1130,11 @@ export const journeysToolHandlers = {
   'journeys_publish': 'journeys_publish',
   'journeys_pause': 'journeys_pause',
   'journeys_resume': 'journeys_resume',
+  'journeys_stats_summary': 'journeys_stats_summary',
+  'journeys_stats_table': 'journeys_stats_table',
+  'journeys_stats_performance': 'journeys_stats_performance',
+  'journeys_stats_uids': 'journeys_stats_uids',
+  'journeys_block_reference': 'journeys_block_reference',
 } as const;
 
 export class JourneysTools {
@@ -711,6 +1170,26 @@ export class JourneysTools {
 
   async journeys_resume(args: any): Promise<ToolResult> {
     return handleResumeJourney(this.context, args);
+  }
+
+  async journeys_stats_summary(args: any): Promise<ToolResult> {
+    return handleJourneyStatsSummary(this.context, args);
+  }
+
+  async journeys_stats_table(args: any): Promise<ToolResult> {
+    return handleJourneyStatsTable(this.context, args);
+  }
+
+  async journeys_stats_performance(args: any): Promise<ToolResult> {
+    return handleJourneyStatsPerformance(this.context, args);
+  }
+
+  async journeys_stats_uids(args: any): Promise<ToolResult> {
+    return handleJourneyStatsUids(this.context, args);
+  }
+
+  async journeys_block_reference(args: any): Promise<ToolResult> {
+    return handleJourneyBlockReference(this.context, args);
   }
 }
 
