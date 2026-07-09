@@ -48,6 +48,8 @@ describe('Tools Configuration', () => {
       'dashboards',
       'times_of_day',
       'hooks',
+      'journeys',
+      'content',
       'metadata',
     ];
     const actualCategories = Object.keys(TOOL_CATEGORIES);
@@ -86,6 +88,8 @@ describe('Tools Configuration', () => {
       dashboards: 8,
       times_of_day: 1,
       hooks: 5,
+      journeys: 13,
+      content: 11,
       metadata: 1,
     };
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -104,12 +108,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 133 tools', () => {
+    it('should have total of 151 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(127);
+      expect(totalTools).toBe(151);
     });
   });
 
