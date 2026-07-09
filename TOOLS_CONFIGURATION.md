@@ -37,6 +37,8 @@ The following categories are **only available if their corresponding plugin is i
 - **user_profiles** → requires `users` plugin
 - **cohorts** → requires `cohorts` plugin
 - **funnels** → requires `funnels` plugin
+- **journeys** → requires `journey_engine` plugin (Countly Enterprise)
+- **content** → requires `content` plugin (Countly Enterprise)
 
 ### Categories Available by Default
 
@@ -523,6 +525,115 @@ async function funnelExamples() {
   await tools.funnels_delete({
     app_name: 'MyApp',
     funnel_id: '3a3adcf59207776125297286960504ff'
+  });
+}
+```
+
+### journeys
+**Tools**: `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`
+
+**Requires plugin**: `journey_engine` (Countly Enterprise)
+
+Manage user journeys - automated multi-step engagement flows built from trigger, logical, engagement, and data-pipeline blocks. A journey consists of a definition and one or more versions; each version holds the block graph. New journeys start as drafts and must be published to run.
+
+**Examples:**
+```typescript
+async function journeyExamples() {
+  // List all journeys
+  const journeys = await tools.journeys_list({
+    app_name: 'MyApp'
+  });
+
+  // Create a journey triggered by session start
+  const journey = await tools.journeys_create({
+    app_name: 'MyApp',
+    name: 'Onboarding Journey',
+    blocks: JSON.stringify([
+      {
+        id: 'block_1',
+        blockType: 'trigger',
+        subType: 'incoming-data',
+        filters: [
+          { key: '[CLY]_session', conditions: {} }
+        ],
+        nextBlock: 'block_2'
+      },
+      {
+        id: 'block_2',
+        blockType: 'end',
+        subType: 'journey-exit'
+      }
+    ])
+  });
+
+  // Publish the journey (activates its version)
+  await tools.journeys_publish({
+    app_name: 'MyApp',
+    journey_id: '67164f4a1f1bd90d6354430a'
+  });
+
+  // Pause and resume
+  await tools.journeys_pause({
+    app_name: 'MyApp',
+    journey_id: '67164f4a1f1bd90d6354430a'
+  });
+  await tools.journeys_resume({
+    app_name: 'MyApp',
+    journey_id: '67164f4a1f1bd90d6354430a'
+  });
+
+  // Soft-delete the journey
+  await tools.journeys_delete({
+    app_name: 'MyApp',
+    journey_id: '67164f4a1f1bd90d6354430a'
+  });
+}
+```
+
+### content
+**Tools**: `content_blocks_list`, `content_blocks_get`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`
+
+**Requires plugin**: `content` (Countly Enterprise)
+
+Manage content blocks - reusable in-app content (banners, modals, surveys) delivered to users, typically through journey "in-app-content" engagement blocks.
+
+**Examples:**
+```typescript
+async function contentExamples() {
+  // List all content blocks
+  const blocks = await tools.content_blocks_list({
+    app_name: 'MyApp'
+  });
+
+  // Create a welcome banner
+  const created = await tools.content_blocks_create({
+    app_name: 'MyApp',
+    title: 'Welcome Banner',
+    type: 'Banner',
+    blocks: JSON.stringify([
+      {
+        layout: 'banner',
+        placement: {
+          small: { position: 'center', heightMultiplier: 1, fullScreenOverride: false }
+        },
+        elements: {
+          title: { text: 'Welcome to MyApp!' }
+        }
+      }
+    ])
+  });
+
+  // Update the title only (other fields preserved)
+  await tools.content_blocks_update({
+    app_name: 'MyApp',
+    content_id: '507f1f77bcf86cd799439011',
+    title: 'Updated Welcome Banner'
+  });
+
+  // Delete (fails if the block is still used in a journey)
+  await tools.content_blocks_delete({
+    app_name: 'MyApp',
+    content_id: '507f1f77bcf86cd799439011'
   });
 }
 ```

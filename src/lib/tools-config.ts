@@ -333,6 +333,31 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'hooks',
     availableByDefault: false,
   },
+  journeys: {
+    operations: {
+      'journeys_list': 'R',
+      'journeys_get': 'R',
+      'journeys_create': 'C',
+      'journeys_update': 'U',
+      'journeys_delete': 'D',
+      'journeys_publish': 'U',
+      'journeys_pause': 'U',
+      'journeys_resume': 'U',
+    },
+    requiresPlugin: 'journey_engine',
+    availableByDefault: false,
+  },
+  content: {
+    operations: {
+      'content_blocks_list': 'R',
+      'content_blocks_get': 'R',
+      'content_blocks_create': 'C',
+      'content_blocks_update': 'U',
+      'content_blocks_delete': 'D',
+    },
+    requiresPlugin: 'content',
+    availableByDefault: false,
+  },
 };
 
 /**

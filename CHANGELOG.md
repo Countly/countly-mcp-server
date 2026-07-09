@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Journeys tools** — new `journeys` category (requires the `journey_engine` plugin, Countly Enterprise): `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`. Write operations post JSON bodies to `/i/journey-engine/journeys/*` and reads use `/o/journey-engine/*`, matching the API exposed by both the current enterprise plugins and the new Countly platform codebase. Update/publish/pause/resume resolve the target journey version automatically when the journey has exactly one candidate version; otherwise they list the available versions and ask for `version_id`.
+- **Content blocks tools** — new `content` category (requires the `content` plugin, Countly Enterprise): `content_blocks_list`, `content_blocks_get`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`, wrapping `/o/content`, `/o/content/by-id`, `/i/content/save`, and `/i/content/delete`. `content_blocks_update` fetches the existing block first so omitted fields (title, type, blocks, favorite) are preserved.
+
 ## [1.3.0] - 2026-04-23
 
 ### Changed

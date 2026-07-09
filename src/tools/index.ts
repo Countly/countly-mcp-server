@@ -153,6 +153,16 @@ import { hooksTools, hooksHandlers } from './hooks.js';
 
 export { hooksTools, hooksHandlers };
 
+// Journeys
+import { journeysToolDefinitions, journeysToolHandlers, journeysToolMetadata, JourneysTools } from './journeys.js';
+
+export { journeysToolDefinitions, journeysToolHandlers, journeysToolMetadata, JourneysTools };
+
+// Content Blocks
+import { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools } from './content.js';
+
+export { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -192,6 +202,8 @@ export function getAllToolDefinitions() {
     ...dashboardsToolDefinitions,
     ...timesOfDayTools,
     ...hooksTools,
+    ...journeysToolDefinitions,
+    ...contentToolDefinitions,
   ];
 }
 
@@ -231,6 +243,8 @@ export function getAllToolHandlers() {
     ...dashboardsToolHandlers,
     ...timesOfDayHandlers,
     ...hooksHandlers,
+    ...journeysToolHandlers,
+    ...contentToolHandlers,
   };
 }
 
@@ -268,5 +282,7 @@ export function getAllToolMetadata() {
     serverLogsToolMetadata,
     emailReportsToolMetadata,
     dashboardsToolMetadata,
+    journeysToolMetadata,
+    contentToolMetadata,
   ];
 }

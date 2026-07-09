@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (133 available)
+### Tools (140 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -740,6 +740,23 @@ The server provides 134 tools across 30 categories for comprehensive Countly int
 - **`hooks_update`** - Update an existing webhook/hook configuration.
 - **`hooks_delete`** - Delete a webhook/hook by its ID.
 - **`hooks_internal_triggers_get`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
+
+### Journeys (requires `journey_engine` plugin, Countly Enterprise)
+- **`journeys_list`** - List journey definitions for an app, including version summaries, status, and usage counters.
+- **`journeys_get`** - Get one journey definition by ID with all versions and their block graphs.
+- **`journeys_create`** - Create a new journey (definition plus first draft version) from a block graph.
+- **`journeys_update`** - Update a journey's name and/or the blocks of one of its versions.
+- **`journeys_delete`** - Soft-delete a journey definition and all its versions.
+- **`journeys_publish`** - Publish (activate) or unpublish (set back to draft) a journey version.
+- **`journeys_pause`** - Pause an active journey version and its running instances.
+- **`journeys_resume`** - Resume a paused journey version.
+
+### Content Blocks (requires `content` plugin, Countly Enterprise)
+- **`content_blocks_list`** - List all content blocks (in-app content such as banners, modals, surveys) for an app.
+- **`content_blocks_get`** - Get one content block by ID with its full definitions and metadata.
+- **`content_blocks_create`** - Create a content block that can be delivered through journeys.
+- **`content_blocks_update`** - Update an existing content block (title, type, blocks, favorite).
+- **`content_blocks_delete`** - Delete a content block (fails if the block is still used in a journey).
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
