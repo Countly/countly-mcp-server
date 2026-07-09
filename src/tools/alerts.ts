@@ -7,7 +7,7 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const createAlertToolDefinition = {
   name: 'alerts_create',
-  description: 'Create or update an alert (threshold monitor on crashes, sessions, users, events, views, cohorts, NPS, ratings, revenue, etc.) via /i/alert/save. Requires the alerts plugin. Pass an existing alert_config._id to update; omit or null to create. Delivery is email or webhook.',
+  description: 'Create or update an alert (threshold monitor on crashes, sessions, users, events, views, cohorts, NPS, ratings, revenue, etc.) via /i/alert/save. Requires the alerts plugin. Pass an existing alert_config._id to update; omit it to create. Delivery is email or webhook.',
   inputSchema: {
     type: 'object',
     properties: {
