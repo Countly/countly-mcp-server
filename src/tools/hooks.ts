@@ -1,6 +1,6 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
-import { withDefault } from '../lib/validation.js';
+import { parseJsonParam, withDefault } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
 /**
@@ -201,8 +201,8 @@ export async function handleCreateHook(
   const app_id = await context.resolveAppId(input);
 
   // Parse trigger config and effects
-  const triggerConfig = JSON.parse(trigger_config);
-  const effectsArray = JSON.parse(effects);
+  const triggerConfig = parseJsonParam(trigger_config, 'trigger_config');
+  const effectsArray = parseJsonParam(effects, 'effects');
 
   const hookConfig = {
     _id: null,
@@ -362,7 +362,7 @@ export async function handleUpdateHook(
         'Supply both to change the trigger, or neither to keep it unchanged.'
       );
     }
-    const triggerConfig = JSON.parse(trigger_config);
+    const triggerConfig = parseJsonParam(trigger_config, 'trigger_config');
     hookConfig.trigger = {
       type: trigger_type,
       configuration: triggerConfig,
@@ -371,7 +371,7 @@ export async function handleUpdateHook(
 
   // Update effects if provided
   if (effects) {
-    hookConfig.effects = JSON.parse(effects);
+    hookConfig.effects = parseJsonParam(effects, 'effects');
   }
 
   const params = {
