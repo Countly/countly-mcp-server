@@ -244,6 +244,20 @@ describe('Content Tools', () => {
       expect(result.content[0].text).toContain('Invalid blocks JSON');
       expect(mockContext.httpClient.post).not.toHaveBeenCalled();
     });
+
+    it('should error instead of sending an empty type when it cannot be resolved', async () => {
+      const typelessBlock = { ...sampleContentBlock, type: undefined };
+      mockContext.httpClient.get = vi.fn().mockResolvedValue({ data: typelessBlock });
+
+      const result = await handleUpdateContentBlock(mockContext, {
+        app_id: 'app123',
+        content_id: 'content1',
+        title: 'New Title',
+      });
+
+      expect(result.content[0].text).toContain('Could not resolve the content block type');
+      expect(mockContext.httpClient.post).not.toHaveBeenCalled();
+    });
   });
 
   describe('handleListContentAssets', () => {

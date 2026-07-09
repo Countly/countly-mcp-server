@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **133 Tools** across 30 categories for comprehensive Countly operations
+- **151 Tools** across 33 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -282,7 +282,7 @@ COUNTLY_TOOLS_ALERTS=NONE      # Alerts: Completely disabled
 COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
-**Available Categories:**
+**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 33):
 - `CORE` - Core tools (ping, get_version, get_plugins) (3 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
@@ -294,8 +294,6 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 - `DATABASE` - Direct database access (6 tools)
 - `DASHBOARD_USERS` - Dashboard user management (1 tool)
 - `APP_USERS` - App user management (3 tools)
-
-**Total: 42 tools across 11 categories**
 
 For complete documentation, examples, and per-tool CRUD mappings, see **[TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md)**.
 
@@ -557,7 +555,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 134 tools across 30 categories for comprehensive Countly integration:
+The server provides 151 tools across 33 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable

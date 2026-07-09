@@ -356,6 +356,16 @@ export async function handleUpdateContentBlock(
     }
   }
 
+  const resolvedType = type !== undefined ? type : existingBlock.type;
+  if (!resolvedType) {
+    return {
+      content: [{
+        type: 'text',
+        text: `Error: Could not resolve the content block type for "${content_id}" - the stored block has no type. Provide the type parameter explicitly.`,
+      }],
+    };
+  }
+
   const details: Record<string, unknown> = {
     title: title !== undefined ? title : existingDetails.title,
     favorite: favorite !== undefined ? favorite : (existingDetails.favorite === true),
@@ -372,7 +382,7 @@ export async function handleUpdateContentBlock(
       params: {
         app_id: appId,
         content_id,
-        type: type !== undefined ? type : (existingBlock.type || ''),
+        type: resolvedType,
         blocks: JSON.stringify(blocksArray !== undefined ? blocksArray : (existingBlock.blocks || [])),
         details: JSON.stringify(details),
       },
