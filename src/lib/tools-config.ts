@@ -369,6 +369,14 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'content',
     availableByDefault: false,
   },
+  taskboard: {
+    operations: {
+      'taskboard_search': 'R',
+      'taskboard_ask': 'R',
+    },
+    requiresPlugin: 'taskboard',
+    availableByDefault: false,
+  },
 };
 
 /**

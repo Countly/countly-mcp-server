@@ -163,6 +163,11 @@ import { contentToolDefinitions, contentToolHandlers, contentToolMetadata, Conte
 
 export { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools };
 
+// Taskboard
+import { taskboardToolDefinitions, taskboardToolHandlers, taskboardToolMetadata, TaskboardTools } from './taskboard.js';
+
+export { taskboardToolDefinitions, taskboardToolHandlers, taskboardToolMetadata, TaskboardTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -204,6 +209,7 @@ export function getAllToolDefinitions() {
     ...hooksToolDefinitions,
     ...journeysToolDefinitions,
     ...contentToolDefinitions,
+    ...taskboardToolDefinitions,
   ];
 }
 
@@ -245,6 +251,7 @@ export function getAllToolHandlers() {
     ...hooksToolHandlers,
     ...journeysToolHandlers,
     ...contentToolHandlers,
+    ...taskboardToolHandlers,
   };
 }
 
@@ -286,5 +293,6 @@ export function getAllToolMetadata() {
     hooksToolMetadata,
     journeysToolMetadata,
     contentToolMetadata,
+    taskboardToolMetadata,
   ];
 }
