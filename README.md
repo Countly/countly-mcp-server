@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (151 available)
+### Tools (152 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -766,6 +766,9 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`content_assets_update`** - Update an asset's name and/or tags.
 - **`content_assets_delete`** - Delete an uploaded content asset.
 - **`content_langs_list`** - List languages eligible for content translations.
+
+### Support Tickets (requires `tickets` plugin)
+- **`tickets_rag_search`** - Semantic (RAG) search over indexed support-ticket conversations. Returns relevant, PII-redacted transcript snippets for a natural-language query, scoped to the apps the API key can read. Requires the server's `tickets.rag_enabled` setting to be on.
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

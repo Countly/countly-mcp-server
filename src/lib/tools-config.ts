@@ -369,6 +369,13 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'content',
     availableByDefault: false,
   },
+  tickets: {
+    operations: {
+      'tickets_rag_search': 'R',
+    },
+    requiresPlugin: 'tickets',
+    availableByDefault: false,
+  },
 };
 
 /**
