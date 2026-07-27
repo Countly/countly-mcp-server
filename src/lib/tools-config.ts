@@ -374,7 +374,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'tickets_list': 'R',
       'tickets_get': 'R',
       'tickets_stats': 'R',
-      'tickets_rag_search': 'R',
     },
     requiresPlugin: 'tickets',
     availableByDefault: false,

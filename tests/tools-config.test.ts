@@ -91,7 +91,7 @@ describe('Tools Configuration', () => {
       hooks: 5,
       journeys: 13,
       content: 11,
-      tickets: 4,
+      tickets: 3,
       metadata: 1,
     };
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
@@ -115,7 +115,7 @@ describe('Tools Configuration', () => {
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(155);
+      expect(totalTools).toBe(154);
     });
   });
 
