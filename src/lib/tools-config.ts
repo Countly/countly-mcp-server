@@ -372,8 +372,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   knowledge_base: {
     operations: {
       'knowledge_base_spaces': 'R',
-      'knowledge_base_search': 'R',
-      'knowledge_base_ask': 'R',
       'knowledge_base_write': 'C',
     },
     requiresPlugin: 'knowledge-base',

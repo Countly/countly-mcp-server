@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **155 Tools** across 34 categories for comprehensive Countly operations
+- **153 Tools** across 34 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (155 available)
+### Tools (153 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -555,7 +555,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 155 tools across 34 categories for comprehensive Countly integration:
+The server provides 153 tools across 34 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -769,8 +769,6 @@ The server provides 155 tools across 34 categories for comprehensive Countly int
 
 ### Knowledge Base (requires `knowledge-base` plugin)
 - **`knowledge_base_spaces`** - List knowledge base spaces the user can read (discover space ids first).
-- **`knowledge_base_search`** - Semantic search over the knowledge base; returns ranked doc sections with deep-link citations, permission-scoped to the token.
-- **`knowledge_base_ask`** - Ask a question; the server retrieves matching docs and returns a cited answer (LLM-synthesized when configured, extractive otherwise).
 - **`knowledge_base_write`** - Write a page from Markdown; pass a stable `external_ref` for idempotent upserts (ideal for AI agents logging decisions).
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.

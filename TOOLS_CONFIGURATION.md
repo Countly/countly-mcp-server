@@ -646,28 +646,17 @@ async function contentExamples() {
 ```
 
 ### knowledge_base
-**Tools**: `knowledge_base_spaces`, `knowledge_base_search`, `knowledge_base_ask`, `knowledge_base_write`
+**Tools**: `knowledge_base_spaces`, `knowledge_base_write`
 
 **Requires plugin**: `knowledge-base`
 
-Search and write the server's built-in knowledge base (documentation spaces). Reads are permission-scoped to the spaces the authenticated user can see; writes require create rights on the target space and accept Markdown.
+Discover documentation spaces and author pages in the server's built-in knowledge base. Searching documentation is not here — retrieval across all knowledge sources is owned by the `build` plugin. Reads are permission-scoped to the spaces the authenticated user can see; writes require create rights on the target space and accept Markdown.
 
 **Examples:**
 ```typescript
 async function knowledgeBaseExamples() {
   // Discover space ids first
   const spaces = await tools.knowledge_base_spaces({});
-
-  // Semantic search with deep-link citations
-  const hits = await tools.knowledge_base_search({
-    query: 'how do we handle ingestion retries?',
-    limit: 5
-  });
-
-  // Cited answer (LLM-synthesized when the server has an LLM configured)
-  const answer = await tools.knowledge_base_ask({
-    query: 'what was decided about duplicate events?'
-  });
 
   // Record a decision; same external_ref updates the same page next time
   await tools.knowledge_base_write({
