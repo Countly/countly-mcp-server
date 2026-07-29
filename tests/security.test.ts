@@ -38,16 +38,16 @@ describe('assertSafeServerHost: SSRF denylist', () => {
   });
 
   it('rejects AWS / cloud metadata endpoint 169.254.169.254', () => {
-    expect(assertSafeServerHost('169.254.169.254')).toMatch(/169\.254/);
+    expect(assertSafeServerHost('169.254.169.254')).toMatch(/linkLocal/);
   });
 
   it('rejects RFC 1918 10/8', () => {
-    expect(assertSafeServerHost('10.0.0.1')).toMatch(/10\.0\.0\.0\/8/);
+    expect(assertSafeServerHost('10.0.0.1')).toMatch(/private/);
   });
 
   it('rejects RFC 1918 172.16/12', () => {
-    expect(assertSafeServerHost('172.16.0.1')).toMatch(/172\.16/);
-    expect(assertSafeServerHost('172.31.255.254')).toMatch(/172\.16/);
+    expect(assertSafeServerHost('172.16.0.1')).toMatch(/private/);
+    expect(assertSafeServerHost('172.31.255.254')).toMatch(/private/);
   });
 
   it('accepts a public IPv4 (1.1.1.1)', () => {
@@ -55,11 +55,11 @@ describe('assertSafeServerHost: SSRF denylist', () => {
   });
 
   it('rejects RFC 1918 192.168/16', () => {
-    expect(assertSafeServerHost('192.168.1.1')).toMatch(/192\.168/);
+    expect(assertSafeServerHost('192.168.1.1')).toMatch(/private/);
   });
 
   it('rejects carrier-grade NAT 100.64/10', () => {
-    expect(assertSafeServerHost('100.64.0.1')).toMatch(/100\.64/);
+    expect(assertSafeServerHost('100.64.0.1')).toMatch(/carrierGradeNat/);
   });
 
   it('rejects 0.0.0.0/8', () => {
@@ -74,16 +74,25 @@ describe('assertSafeServerHost: SSRF denylist', () => {
     expect(assertSafeServerHost('my-countly.local')).toMatch(/local machine/);
   });
 
+  it('rejects .internal hostnames', () => {
+    expect(assertSafeServerHost('foo.internal')).toMatch(/internal service/);
+  });
+
+  it('rejects known cloud-metadata hostnames', () => {
+    expect(assertSafeServerHost('metadata.google.internal')).toBeTruthy();
+    expect(assertSafeServerHost('kubernetes.default.svc')).toMatch(/metadata service/);
+  });
+
   it('rejects IPv6 loopback', () => {
     expect(assertSafeServerHost('::1')).toMatch(/loopback/);
   });
 
   it('rejects IPv6 link-local fe80::', () => {
-    expect(assertSafeServerHost('fe80::1')).toMatch(/link-local/);
+    expect(assertSafeServerHost('fe80::1')).toMatch(/linkLocal/);
   });
 
   it('rejects IPv6 unique-local fd00::', () => {
-    expect(assertSafeServerHost('fd00::1')).toMatch(/link-local/);
+    expect(assertSafeServerHost('fd00::1')).toMatch(/uniqueLocal/);
   });
 
   it('accepts api.count.ly (normal case)', () => {
@@ -92,6 +101,35 @@ describe('assertSafeServerHost: SSRF denylist', () => {
 
   it('accepts public IPv4 like 1.1.1.1', () => {
     expect(assertSafeServerHost('1.1.1.1')).toBeNull();
+  });
+
+  // ---- Regression: IPv4-mapped IPv6 representation bypass ----
+  // https://github.com/Countly/countly-mcp-server — the previous string/regex
+  // guard let `::ffff:127.0.0.1` (which the OS routes to IPv4 loopback) slip
+  // through because its normalized form `::ffff:7f00:1` matched neither the
+  // dotted-quad IPv4 regex nor the blocked IPv6 prefixes.
+  it('rejects IPv4-mapped IPv6 loopback (::ffff:127.0.0.1)', () => {
+    expect(assertSafeServerHost('::ffff:127.0.0.1')).toMatch(/not allowed/);
+  });
+
+  it('rejects IPv4-mapped IPv6 cloud metadata (::ffff:169.254.169.254)', () => {
+    expect(assertSafeServerHost('::ffff:169.254.169.254')).toMatch(/not allowed/);
+  });
+
+  it('rejects bracketed IPv4-mapped IPv6 loopback ([::ffff:127.0.0.1])', () => {
+    expect(assertSafeServerHost('[::ffff:127.0.0.1]')).toMatch(/not allowed/);
+  });
+
+  it('rejects the hex-collapsed IPv4-mapped form (::ffff:7f00:1)', () => {
+    expect(assertSafeServerHost('::ffff:7f00:1')).toMatch(/not allowed/);
+  });
+
+  it('rejects IPv4-mapped RFC1918 (::ffff:10.0.0.1)', () => {
+    expect(assertSafeServerHost('::ffff:10.0.0.1')).toMatch(/not allowed/);
+  });
+
+  it('accepts an IPv4-mapped public address (::ffff:1.1.1.1)', () => {
+    expect(assertSafeServerHost('::ffff:1.1.1.1')).toBeNull();
   });
 });
 
@@ -122,12 +160,31 @@ describe('assertSafeServerUrl: full URL validation', () => {
     expect(() => assertSafeServerUrl('http://localhost/')).toThrow(/SSRF/);
   });
 
+  // ---- Regression: end-to-end URL bypass via IPv4-mapped IPv6 ----
+  it('throws on IPv4-mapped IPv6 loopback URL', () => {
+    expect(() =>
+      assertSafeServerUrl('http://[::ffff:127.0.0.1]:8080')
+    ).toThrow(/SSRF/);
+  });
+
+  it('throws on IPv4-mapped IPv6 cloud-metadata URL', () => {
+    expect(() =>
+      assertSafeServerUrl('http://[::ffff:169.254.169.254]/latest/meta-data/')
+    ).toThrow(/SSRF/);
+  });
+
+  it('rejects URLs with embedded credentials', () => {
+    expect(() =>
+      assertSafeServerUrl('http://user:pass@api.count.ly')
+    ).toThrow(/credentials/);
+  });
+
   it('accepts a normal Countly URL', () => {
     expect(() => assertSafeServerUrl('https://api.count.ly')).not.toThrow();
   });
 
-  it('accepts an on-prem Countly on a public IP', () => {
-    expect(() => assertSafeServerUrl('https://203.0.113.10')).not.toThrow();
+  it('accepts an on-prem Countly on a routable public IP', () => {
+    expect(() => assertSafeServerUrl('https://8.8.8.8')).not.toThrow();
   });
 });
 
