@@ -5,12 +5,12 @@ import { assertSafeServerHost, assertSafeServerUrl, safeLookup } from '../src/li
 import { redactSensitiveInMessage } from '../src/lib/error-handler.js';
 import {
   ConcurrencyLimiter,
-  enforceBodySizeLimit,
   extractClientIp,
   formatRequestLog,
   parseContentLength,
   parseCorsAllowed,
   RateLimiter,
+  readLimitedBody,
   resolveCorsOrigin,
   sanitizeForLog,
 } from '../src/lib/http-security.js';
@@ -540,7 +540,7 @@ describe('parseContentLength', () => {
   });
 });
 
-/** Minimal mock http.IncomingMessage for enforceBodySizeLimit. */
+/** Minimal mock http.IncomingMessage for readLimitedBody. */
 function mockReq(headers: Record<string, string> = {}) {
   const listeners: Record<string, Array<(arg?: unknown) => void>> = {};
   let destroyed = false;
@@ -594,46 +594,77 @@ function mockRes() {
   };
 }
 
-describe('enforceBodySizeLimit', () => {
-  it('rejects upfront when Content-Length exceeds the limit', () => {
+describe('readLimitedBody', () => {
+  it('rejects upfront when Content-Length exceeds the limit', async () => {
     const req = mockReq({ 'content-length': String(2_000) });
     const res = mockRes();
-    const ok = enforceBodySizeLimit(req as any, res as any, 1_000);
-    expect(ok).toBe(false);
+    const result = await readLimitedBody(req as any, res as any, 1_000);
+    expect(result.ok).toBe(false);
     expect(res.getStatus()).toBe(413);
     expect(req.isDestroyed()).toBe(true);
     expect(res.getBody()).toContain('Payload too large');
   });
 
-  it('accepts when Content-Length is within the limit', () => {
-    const req = mockReq({ 'content-length': '500' });
+  it('buffers the full body when within the limit', async () => {
+    const req = mockReq({ 'content-length': '11' });
     const res = mockRes();
-    const ok = enforceBodySizeLimit(req as any, res as any, 1_000);
-    expect(ok).toBe(true);
+    const p = readLimitedBody(req as any, res as any, 1_000);
+    req.emit('data', Buffer.from('hello '));
+    req.emit('data', Buffer.from('world'));
+    req.emit('end');
+    const result = await p;
+    expect(result.ok).toBe(true);
+    expect(result.body).toBe('hello world');
     expect(res.didEnd()).toBe(false);
     expect(req.isDestroyed()).toBe(false);
   });
 
-  it('streams-rejects when cumulative chunk bytes exceed the limit', () => {
+  it('streams-rejects when cumulative chunk bytes exceed the limit', async () => {
     const req = mockReq();
     const res = mockRes();
-    const ok = enforceBodySizeLimit(req as any, res as any, 100);
-    expect(ok).toBe(true);
-    // Simulate 60+60 bytes arriving — should trip after the second chunk.
+    const p = readLimitedBody(req as any, res as any, 100);
+    // 60 + 60 bytes — should trip after the second chunk.
     req.emit('data', Buffer.alloc(60));
     req.emit('data', Buffer.alloc(60));
+    const result = await p;
+    expect(result.ok).toBe(false);
     expect(res.getStatus()).toBe(413);
     expect(req.isDestroyed()).toBe(true);
   });
 
-  it('streams under the limit without interfering', () => {
+  it('buffers under the limit without interfering', async () => {
     const req = mockReq();
     const res = mockRes();
-    enforceBodySizeLimit(req as any, res as any, 100);
+    const p = readLimitedBody(req as any, res as any, 100);
     req.emit('data', Buffer.alloc(30));
     req.emit('data', Buffer.alloc(30));
+    req.emit('end');
+    const result = await p;
+    expect(result.ok).toBe(true);
+    expect(result.body.length).toBe(60);
     expect(res.didEnd()).toBe(false);
     expect(req.isDestroyed()).toBe(false);
+  });
+
+  it('treats maxBytes<=0 as unlimited and still buffers', async () => {
+    const req = mockReq();
+    const res = mockRes();
+    const p = readLimitedBody(req as any, res as any, 0);
+    req.emit('data', Buffer.alloc(10_000));
+    req.emit('end');
+    const result = await p;
+    expect(result.ok).toBe(true);
+    expect(result.body.length).toBe(10_000);
+    expect(req.isDestroyed()).toBe(false);
+  });
+
+  it('resolves not-ok when the request is aborted', async () => {
+    const req = mockReq();
+    const res = mockRes();
+    const p = readLimitedBody(req as any, res as any, 1_000);
+    req.emit('aborted');
+    const result = await p;
+    expect(result.ok).toBe(false);
   });
 });
 

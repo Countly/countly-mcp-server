@@ -42,11 +42,11 @@ import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
 import {
   ConcurrencyLimiter,
-  enforceBodySizeLimit,
   extractClientIp,
   formatRequestLog,
   parseCorsAllowed,
   RateLimiter,
+  readLimitedBody,
   resolveCorsOrigin,
   sanitizeForLog,
 } from './lib/http-security.js';
@@ -959,14 +959,34 @@ class CountlyMCPServer {
             }
           }
 
-          // Enforce the body-size limit. Checks Content-Length upfront and
-          // streams-counts any subsequent chunks. If the limit is exceeded
-          // we respond 413 Payload Too Large and destroy the socket so a
-          // malicious client can't keep dumping bytes. 0 disables the check.
-          if (maxBodyBytes > 0) {
-            const ok = enforceBodySizeLimit(req, res, maxBodyBytes);
-            if (!ok) {
+          // Read the request body ourselves (enforcing COUNTLY_MAX_BODY_BYTES),
+          // then hand the parsed JSON to the MCP transport below. We must own
+          // the read: attaching a byte-counting `data` listener — as the old
+          // enforceBodySizeLimit did — puts the stream into flowing mode and
+          // drains it before transport.handleRequest() can read it, which made
+          // every request fail as "Parse error: Invalid JSON" whenever the
+          // (default) positive body limit was active. 413/aborted paths have
+          // already responded, so we just stop. Only methods that carry a body
+          // are read; GET/DELETE (SSE stream / session teardown) pass through.
+          let parsedBody: unknown = undefined;
+          if (req.method === 'POST') {
+            const bodyResult = await readLimitedBody(req, res, maxBodyBytes);
+            if (!bodyResult.ok) {
               return;
+            }
+            if (bodyResult.body.length > 0) {
+              try {
+                parsedBody = JSON.parse(bodyResult.body);
+              } catch {
+                // Mirror the JSON-RPC parse error the transport would emit.
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                  jsonrpc: '2.0',
+                  error: { code: -32700, message: 'Parse error: Invalid JSON' },
+                  id: null,
+                }));
+                return;
+              }
             }
           }
 
@@ -1047,7 +1067,10 @@ class CountlyMCPServer {
               serverUrlFromCaller: !!serverUrl,
             },
             async () => {
-              await transport.handleRequest(req, res);
+              // Pass the body we already buffered so the SDK doesn't try to
+              // re-read the (now consumed) request stream. undefined for
+              // bodyless methods, matching the SDK's optional parsedBody arg.
+              await transport.handleRequest(req, res, parsedBody);
             }
           );
           return;
