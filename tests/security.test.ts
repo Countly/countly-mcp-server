@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { AppCache, AppCacheRegistry } from '../src/lib/app-cache.js';
-import { assertSafeServerHost, assertSafeServerUrl } from '../src/lib/config.js';
+import { assertSafeServerHost, assertSafeServerUrl, safeLookup } from '../src/lib/config.js';
 import { redactSensitiveInMessage } from '../src/lib/error-handler.js';
 import {
   ConcurrencyLimiter,
@@ -186,6 +186,87 @@ describe('assertSafeServerUrl: full URL validation', () => {
   it('accepts an on-prem Countly on a routable public IP', () => {
     expect(() => assertSafeServerUrl('https://8.8.8.8')).not.toThrow();
   });
+});
+
+describe('safeLookup: connect-time DNS validation (DNS-rebinding / DNS-based SSRF)', () => {
+  // safeLookup is a dns.lookup-compatible function. We drive it directly with
+  // IP-literal "hostnames" (dns.lookup short-circuits those without a network
+  // query) so the test is hermetic — no external DNS needed.
+
+  it('passes a resolved public address through', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('1.1.1.1', {}, (err, address) => {
+        try {
+          expect(err).toBeNull();
+          expect(address).toBe('1.1.1.1');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('blocks a hostname resolving to loopback', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('127.0.0.1', {}, (err) => {
+        try {
+          expect(err).toBeTruthy();
+          expect((err as NodeJS.ErrnoException).code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('blocks a hostname resolving to cloud metadata', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('169.254.169.254', {}, (err) => {
+        try {
+          expect((err as NodeJS.ErrnoException | null)?.code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('blocks an IPv4-mapped IPv6 resolution', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('::ffff:127.0.0.1', {}, (err) => {
+        try {
+          expect((err as NodeJS.ErrnoException | null)?.code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('supports the options.all array form and blocks if any address is private', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('10.0.0.1', { all: true }, (err) => {
+        try {
+          expect((err as NodeJS.ErrnoException | null)?.code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('accepts the callback-as-second-arg form', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('8.8.8.8', (err, address) => {
+        try {
+          expect(err).toBeNull();
+          expect(address).toBe('8.8.8.8');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
 });
 
 describe('AppCacheRegistry: per-tenant isolation', () => {

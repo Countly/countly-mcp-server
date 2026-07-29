@@ -3,6 +3,7 @@
  * Pure functions for processing and validating configuration
  */
 
+import dns from 'node:dns';
 import { isIP } from 'node:net';
 import ipaddr from 'ipaddr.js';
 
@@ -96,26 +97,27 @@ const BLOCKED_HOSTNAMES = new Set([
 ]);
 
 /**
- * Classify a literal IP (v4 or v6) using ipaddr.js range() detection and
- * decide whether it must be blocked for SSRF safety. Only globally-routable
- * `unicast` addresses are considered safe; every other range (loopback,
- * private, link-local, unique-local, carrier-grade NAT, multicast, reserved,
- * unspecified, broadcast, NAT64, …) is blocked.
+ * Classify a literal IP (v4 or v6) using ipaddr.js range() detection. Only
+ * globally-routable `unicast` addresses are considered safe; every other range
+ * (loopback, private, link-local, unique-local, carrier-grade NAT, multicast,
+ * reserved, unspecified, broadcast, NAT64, …) is unsafe.
  *
  * IPv4-mapped IPv6 (`::ffff:a.b.c.d`, e.g. `::ffff:127.0.0.1`) is unwrapped to
  * its embedded IPv4 address and re-classified, closing the representation
  * bypass where a mapped address is routed to IPv4 loopback/metadata by the OS
  * but slips past naive string/prefix checks.
  *
- * Returns a human-readable reason when the IP is unsafe, or null when safe.
+ * Returns the offending range name (e.g. "loopback"), the literal string
+ * "unparseable" when the input cannot be parsed, or null when the IP is a safe
+ * public unicast address.
  */
-function classifyIpLiteral(ip: string, original: string): string | null {
+function blockedIpRange(ip: string): string | null {
   let parsed: ipaddr.IPv4 | ipaddr.IPv6;
   try {
     parsed = ipaddr.parse(ip);
   } catch {
-    // Unparseable despite net.isIP accepting it — refuse to be safe.
-    return `IP literal "${original}" could not be classified`;
+    // Unparseable — refuse to be safe.
+    return 'unparseable';
   }
 
   let range = parsed.range();
@@ -129,10 +131,22 @@ function classifyIpLiteral(ip: string, original: string): string | null {
     range = (parsed as ipaddr.IPv6).toIPv4Address().range();
   }
 
-  if (range !== 'unicast') {
-    return `IP "${original}" is in a non-public range (${range}) and is not allowed`;
+  return range === 'unicast' ? null : range;
+}
+
+/**
+ * Human-readable wrapper over blockedIpRange for the syntactic host check.
+ * Returns a reason string when the IP is unsafe, or null when safe.
+ */
+function classifyIpLiteral(ip: string, original: string): string | null {
+  const range = blockedIpRange(ip);
+  if (range === null) {
+    return null;
   }
-  return null;
+  if (range === 'unparseable') {
+    return `IP literal "${original}" could not be classified`;
+  }
+  return `IP "${original}" is in a non-public range (${range}) and is not allowed`;
 }
 
 /**
@@ -215,6 +229,101 @@ export function assertSafeServerUrl(url: string): void {
       `Refusing to use server URL "${url}" for SSRF safety: ${reason}.`
     );
   }
+}
+
+/**
+ * Error thrown by safeLookup when a hostname resolves to a blocked address.
+ * Carries a stable `code` so callers can distinguish an SSRF block from a
+ * generic connection failure.
+ */
+export function blockedLookupError(hostname: string, address: string, range: string): Error {
+  const err = new Error(
+    `Blocked SSRF target: "${hostname}" resolved to non-public IP "${address}" (${range})`
+  );
+  (err as NodeJS.ErrnoException).code = 'ESSRFBLOCKED';
+  return err;
+}
+
+type LookupAllCallback = (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void;
+type LookupSingleCallback = (
+  err: NodeJS.ErrnoException | null,
+  address?: string,
+  family?: number
+) => void;
+
+/**
+ * A `dns.lookup`-compatible function that resolves a hostname and then rejects
+ * the lookup if the resolved address is private/reserved/internal.
+ *
+ * Passing this as the `lookup` option of a Node http/https Agent (which axios
+ * honours via httpAgent/httpsAgent) validates the IP AT CONNECT TIME. This is
+ * the piece that a parse-time-only string check cannot provide:
+ *
+ *  1. A hostname whose A/AAAA record simply points at a private/loopback/
+ *     metadata IP is caught here (the syntactic host check never resolves
+ *     names, so it would otherwise pass such a hostname straight through).
+ *  2. DNS-rebinding (TOCTOU) is closed: even if a name resolved to a public
+ *     IP a moment ago, the socket only ever connects to an address that
+ *     passes blockedIpRange here, at the instant of connection.
+ *
+ * Mirrors countly-server's api/utils/ssrf-protection.js `safeLookup`.
+ *
+ * IMPORTANT: only wire this into the client used for CALLER-CONTROLLED server
+ * URLs. The operator's own COUNTLY_SERVER_URL is frequently a private-IP
+ * on-prem host and must NOT be forced through this guard.
+ */
+export function safeLookup(
+  hostname: string,
+  options: dns.LookupOneOptions | dns.LookupAllOptions | dns.LookupOptions | LookupSingleCallback,
+  callback?: LookupSingleCallback | LookupAllCallback
+): void {
+  let opts: dns.LookupOptions;
+  let cb: LookupSingleCallback | LookupAllCallback;
+  if (typeof options === 'function') {
+    cb = options;
+    opts = {};
+  } else {
+    opts = options;
+    cb = callback as LookupSingleCallback | LookupAllCallback;
+  }
+
+  // Use a single explicit signature to sidestep dns.lookup's overloads —
+  // we handle both the single-address and options.all (array) shapes below.
+  const doLookup = dns.lookup as (
+    h: string,
+    o: dns.LookupOptions,
+    cb: (
+      err: NodeJS.ErrnoException | null,
+      address: string | dns.LookupAddress[],
+      family?: number
+    ) => void
+  ) => void;
+  doLookup(hostname, opts, (err, address, family) => {
+    if (err) {
+      (cb as LookupSingleCallback)(err);
+      return;
+    }
+    // When options.all is true, `address` is an array of {address, family}.
+    if (opts && (opts as dns.LookupAllOptions).all) {
+      const list = (Array.isArray(address) ? address : [address]) as dns.LookupAddress[];
+      for (const entry of list) {
+        const range = blockedIpRange(entry.address);
+        if (range) {
+          (cb as LookupAllCallback)(blockedLookupError(hostname, entry.address, range), []);
+          return;
+        }
+      }
+      (cb as LookupAllCallback)(null, list);
+      return;
+    }
+    const addr = address as unknown as string;
+    const range = blockedIpRange(addr);
+    if (range) {
+      (cb as LookupSingleCallback)(blockedLookupError(hostname, addr, range));
+      return;
+    }
+    (cb as LookupSingleCallback)(null, addr, family as number);
+  });
 }
 
 /**
