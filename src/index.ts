@@ -1017,6 +1017,20 @@ class CountlyMCPServer {
               }));
               return;
             }
+            // The configured token belongs to the configured server. A request
+            // naming a different server supplies its own, since getCredentials
+            // would otherwise fall back to the configured one. This is a separate
+            // decision from the address checks above, which say nothing about
+            // which credential is used.
+            if (cleanUrl !== this.config.serverUrl && !authToken) {
+              console.error('Rejected serverUrl override: no auth token supplied with a caller-specified server');
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                error: 'Missing auth token',
+                message: 'A caller-supplied Countly server URL requires a Countly auth token supplied with the same request. The server\'s configured token is only used with its configured server URL.',
+              }));
+              return;
+            }
             effectiveServerUrl = cleanUrl;
             const source = headerServerUrl ? 'headers' : 'URL parameters';
             console.error(`Using Countly server from ${source}:`, sanitizeForLog(effectiveServerUrl));
