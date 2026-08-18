@@ -131,6 +131,21 @@ describe('assertSafeServerHost: SSRF denylist', () => {
   it('accepts an IPv4-mapped public address (::ffff:1.1.1.1)', () => {
     expect(assertSafeServerHost('::ffff:1.1.1.1')).toBeNull();
   });
+
+  // RFC 8215 local-use NAT64 prefix (64:ff9b:1::/48). ipaddr.js@1.9.1 classifies it
+  // as generic unicast, unlike the well-known 64:ff9b::/96, so the classifier must
+  // reject it explicitly. 64:ff9b:1::7f00:1 embeds 127.0.0.1 in its low 32 bits.
+  it('rejects the RFC 8215 local-use NAT64 prefix (64:ff9b:1::7f00:1)', () => {
+    expect(assertSafeServerHost('64:ff9b:1::7f00:1')).toMatch(/nat64-local-use/);
+  });
+
+  it('rejects the bracketed local-use NAT64 literal ([64:ff9b:1::7f00:1])', () => {
+    expect(assertSafeServerHost('[64:ff9b:1::7f00:1]')).toMatch(/not allowed/);
+  });
+
+  it('still allows a public IPv6 unicast address (2001:4860:4860::8888)', () => {
+    expect(assertSafeServerHost('2001:4860:4860::8888')).toBeNull();
+  });
 });
 
 describe('assertSafeServerUrl: full URL validation', () => {
