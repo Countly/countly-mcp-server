@@ -325,7 +325,13 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   hooks: {
     operations: {
       'hooks_list': 'R',
-      'hooks_test': 'R',
+      // 'C', not 'R': /i/hook/test does not simulate the effects, it runs them.
+      // A test call really delivers the configured emails, calls the configured
+      // webhooks and executes the custom code, and Countly Server authorizes the
+      // endpoint with validateCreate. Trying a configuration out before saving it
+      // is part of authoring a hook, so it must not be reachable in a read-only
+      // deployment. See the read-only guard in tests/tools-config.test.ts.
+      'hooks_test': 'C',
       'hooks_create': 'C',
       'hooks_update': 'U',
       'hooks_delete': 'D',
