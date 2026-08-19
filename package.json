@@ -30,7 +30,7 @@
   "author": "Countly MCP Server",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "axios": "^1.18.1",
     "countly-sdk-nodejs": "^24.10.4",
     "dotenv": "^17.4.2"
