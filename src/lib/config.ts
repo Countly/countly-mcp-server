@@ -131,6 +131,20 @@ function blockedIpRange(ip: string): string | null {
     range = (parsed as ipaddr.IPv6).toIPv4Address().range();
   }
 
+  // ipaddr.js@1.9.1 recognizes the well-known NAT64 prefix (64:ff9b::/96 ->
+  // "rfc6052") but classifies the RFC 8215 local-use NAT64 prefix
+  // (64:ff9b:1::/48) as generic unicast. A NAT64 gateway translates the embedded
+  // IPv4 in the low 32 bits to an arbitrary destination, so reject the whole
+  // prefix, matching how the well-known prefix is already rejected. (Network-
+  // specific NAT64 prefixes carved from an operator's own global-unicast space
+  // are indistinguishable from public addresses and cannot be excluded by prefix.)
+  if (parsed.kind() === 'ipv6') {
+    const nat64LocalUse = ipaddr.parseCIDR('64:ff9b:1::/48') as [ipaddr.IPv6, number];
+    if ((parsed as ipaddr.IPv6).match(nat64LocalUse)) {
+      return 'nat64-local-use';
+    }
+  }
+
   return range === 'unicast' ? null : range;
 }
 

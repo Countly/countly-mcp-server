@@ -131,6 +131,21 @@ describe('assertSafeServerHost: SSRF denylist', () => {
   it('accepts an IPv4-mapped public address (::ffff:1.1.1.1)', () => {
     expect(assertSafeServerHost('::ffff:1.1.1.1')).toBeNull();
   });
+
+  // RFC 8215 local-use NAT64 prefix (64:ff9b:1::/48). ipaddr.js@1.9.1 classifies it
+  // as generic unicast, unlike the well-known 64:ff9b::/96, so the classifier must
+  // reject it explicitly. 64:ff9b:1::7f00:1 embeds 127.0.0.1 in its low 32 bits.
+  it('rejects the RFC 8215 local-use NAT64 prefix (64:ff9b:1::7f00:1)', () => {
+    expect(assertSafeServerHost('64:ff9b:1::7f00:1')).toMatch(/nat64-local-use/);
+  });
+
+  it('rejects the bracketed local-use NAT64 literal ([64:ff9b:1::7f00:1])', () => {
+    expect(assertSafeServerHost('[64:ff9b:1::7f00:1]')).toMatch(/not allowed/);
+  });
+
+  it('still allows a public IPv6 unicast address (2001:4860:4860::8888)', () => {
+    expect(assertSafeServerHost('2001:4860:4860::8888')).toBeNull();
+  });
 });
 
 describe('assertSafeServerUrl: full URL validation', () => {
@@ -267,6 +282,42 @@ describe('safeLookup: connect-time DNS validation (DNS-rebinding / DNS-based SSR
         }
       });
     }));
+});
+
+// The range checks decide which hosts a caller may name. They say nothing about
+// which credential is used with them, which is a separate decision: the configured
+// token belongs to the configured server, so a request naming a different server
+// has to supply its own.
+describe('caller-supplied server URL must carry its own token', () => {
+  const configured = 'https://countly.example.test';
+
+  /**
+   * Mirrors the pairing rule applied in the /mcp handler.
+   */
+  function accepts(callerUrl: string | null, callerToken: string | null): boolean {
+    if (!callerUrl || callerUrl === configured) {
+      return true;
+    }
+    return Boolean(callerToken);
+  }
+
+  it('refuses a caller URL with no token, which is the token-exfiltration case', () => {
+    expect(accepts('https://attacker.example.test', null)).toBe(false);
+  });
+
+  it('accepts a caller URL that brings its own token', () => {
+    expect(accepts('https://other-countly.example.test', 'CALLER_TOKEN')).toBe(true);
+  });
+
+  it('still allows the configured server with the configured token', () => {
+    expect(accepts(configured, null)).toBe(true);
+    expect(accepts(null, null)).toBe(true);
+  });
+
+  it('does not depend on the address class of the caller URL', () => {
+    // the point of the rule: a perfectly public host is the dangerous case here
+    expect(accepts('https://198.51.100.10', null)).toBe(false);
+  });
 });
 
 describe('AppCacheRegistry: per-tenant isolation', () => {
