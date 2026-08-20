@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
 
 import { AppCache, AppCacheRegistry } from '../src/lib/app-cache.js';
-import { assertSafeServerHost, assertSafeServerUrl } from '../src/lib/config.js';
+import { assertSafeServerHost, assertSafeServerUrl, safeLookup } from '../src/lib/config.js';
 import { redactSensitiveInMessage } from '../src/lib/error-handler.js';
 import {
   ConcurrencyLimiter,
-  enforceBodySizeLimit,
   extractClientIp,
   formatRequestLog,
   parseContentLength,
   parseCorsAllowed,
   RateLimiter,
+  readLimitedBody,
   resolveCorsOrigin,
   sanitizeForLog,
 } from '../src/lib/http-security.js';
@@ -38,16 +38,16 @@ describe('assertSafeServerHost: SSRF denylist', () => {
   });
 
   it('rejects AWS / cloud metadata endpoint 169.254.169.254', () => {
-    expect(assertSafeServerHost('169.254.169.254')).toMatch(/169\.254/);
+    expect(assertSafeServerHost('169.254.169.254')).toMatch(/linkLocal/);
   });
 
   it('rejects RFC 1918 10/8', () => {
-    expect(assertSafeServerHost('10.0.0.1')).toMatch(/10\.0\.0\.0\/8/);
+    expect(assertSafeServerHost('10.0.0.1')).toMatch(/private/);
   });
 
   it('rejects RFC 1918 172.16/12', () => {
-    expect(assertSafeServerHost('172.16.0.1')).toMatch(/172\.16/);
-    expect(assertSafeServerHost('172.31.255.254')).toMatch(/172\.16/);
+    expect(assertSafeServerHost('172.16.0.1')).toMatch(/private/);
+    expect(assertSafeServerHost('172.31.255.254')).toMatch(/private/);
   });
 
   it('accepts a public IPv4 (1.1.1.1)', () => {
@@ -55,11 +55,11 @@ describe('assertSafeServerHost: SSRF denylist', () => {
   });
 
   it('rejects RFC 1918 192.168/16', () => {
-    expect(assertSafeServerHost('192.168.1.1')).toMatch(/192\.168/);
+    expect(assertSafeServerHost('192.168.1.1')).toMatch(/private/);
   });
 
   it('rejects carrier-grade NAT 100.64/10', () => {
-    expect(assertSafeServerHost('100.64.0.1')).toMatch(/100\.64/);
+    expect(assertSafeServerHost('100.64.0.1')).toMatch(/carrierGradeNat/);
   });
 
   it('rejects 0.0.0.0/8', () => {
@@ -74,16 +74,25 @@ describe('assertSafeServerHost: SSRF denylist', () => {
     expect(assertSafeServerHost('my-countly.local')).toMatch(/local machine/);
   });
 
+  it('rejects .internal hostnames', () => {
+    expect(assertSafeServerHost('foo.internal')).toMatch(/internal service/);
+  });
+
+  it('rejects known cloud-metadata hostnames', () => {
+    expect(assertSafeServerHost('metadata.google.internal')).toBeTruthy();
+    expect(assertSafeServerHost('kubernetes.default.svc')).toMatch(/metadata service/);
+  });
+
   it('rejects IPv6 loopback', () => {
     expect(assertSafeServerHost('::1')).toMatch(/loopback/);
   });
 
   it('rejects IPv6 link-local fe80::', () => {
-    expect(assertSafeServerHost('fe80::1')).toMatch(/link-local/);
+    expect(assertSafeServerHost('fe80::1')).toMatch(/linkLocal/);
   });
 
   it('rejects IPv6 unique-local fd00::', () => {
-    expect(assertSafeServerHost('fd00::1')).toMatch(/link-local/);
+    expect(assertSafeServerHost('fd00::1')).toMatch(/uniqueLocal/);
   });
 
   it('accepts api.count.ly (normal case)', () => {
@@ -92,6 +101,50 @@ describe('assertSafeServerHost: SSRF denylist', () => {
 
   it('accepts public IPv4 like 1.1.1.1', () => {
     expect(assertSafeServerHost('1.1.1.1')).toBeNull();
+  });
+
+  // ---- Regression: IPv4-mapped IPv6 representation bypass ----
+  // https://github.com/Countly/countly-mcp-server — the previous string/regex
+  // guard let `::ffff:127.0.0.1` (which the OS routes to IPv4 loopback) slip
+  // through because its normalized form `::ffff:7f00:1` matched neither the
+  // dotted-quad IPv4 regex nor the blocked IPv6 prefixes.
+  it('rejects IPv4-mapped IPv6 loopback (::ffff:127.0.0.1)', () => {
+    expect(assertSafeServerHost('::ffff:127.0.0.1')).toMatch(/not allowed/);
+  });
+
+  it('rejects IPv4-mapped IPv6 cloud metadata (::ffff:169.254.169.254)', () => {
+    expect(assertSafeServerHost('::ffff:169.254.169.254')).toMatch(/not allowed/);
+  });
+
+  it('rejects bracketed IPv4-mapped IPv6 loopback ([::ffff:127.0.0.1])', () => {
+    expect(assertSafeServerHost('[::ffff:127.0.0.1]')).toMatch(/not allowed/);
+  });
+
+  it('rejects the hex-collapsed IPv4-mapped form (::ffff:7f00:1)', () => {
+    expect(assertSafeServerHost('::ffff:7f00:1')).toMatch(/not allowed/);
+  });
+
+  it('rejects IPv4-mapped RFC1918 (::ffff:10.0.0.1)', () => {
+    expect(assertSafeServerHost('::ffff:10.0.0.1')).toMatch(/not allowed/);
+  });
+
+  it('accepts an IPv4-mapped public address (::ffff:1.1.1.1)', () => {
+    expect(assertSafeServerHost('::ffff:1.1.1.1')).toBeNull();
+  });
+
+  // RFC 8215 local-use NAT64 prefix (64:ff9b:1::/48). ipaddr.js@1.9.1 classifies it
+  // as generic unicast, unlike the well-known 64:ff9b::/96, so the classifier must
+  // reject it explicitly. 64:ff9b:1::7f00:1 embeds 127.0.0.1 in its low 32 bits.
+  it('rejects the RFC 8215 local-use NAT64 prefix (64:ff9b:1::7f00:1)', () => {
+    expect(assertSafeServerHost('64:ff9b:1::7f00:1')).toMatch(/nat64-local-use/);
+  });
+
+  it('rejects the bracketed local-use NAT64 literal ([64:ff9b:1::7f00:1])', () => {
+    expect(assertSafeServerHost('[64:ff9b:1::7f00:1]')).toMatch(/not allowed/);
+  });
+
+  it('still allows a public IPv6 unicast address (2001:4860:4860::8888)', () => {
+    expect(assertSafeServerHost('2001:4860:4860::8888')).toBeNull();
   });
 });
 
@@ -122,12 +175,148 @@ describe('assertSafeServerUrl: full URL validation', () => {
     expect(() => assertSafeServerUrl('http://localhost/')).toThrow(/SSRF/);
   });
 
+  // ---- Regression: end-to-end URL bypass via IPv4-mapped IPv6 ----
+  it('throws on IPv4-mapped IPv6 loopback URL', () => {
+    expect(() =>
+      assertSafeServerUrl('http://[::ffff:127.0.0.1]:8080')
+    ).toThrow(/SSRF/);
+  });
+
+  it('throws on IPv4-mapped IPv6 cloud-metadata URL', () => {
+    expect(() =>
+      assertSafeServerUrl('http://[::ffff:169.254.169.254]/latest/meta-data/')
+    ).toThrow(/SSRF/);
+  });
+
+  it('rejects URLs with embedded credentials', () => {
+    expect(() =>
+      assertSafeServerUrl('http://user:pass@api.count.ly')
+    ).toThrow(/credentials/);
+  });
+
   it('accepts a normal Countly URL', () => {
     expect(() => assertSafeServerUrl('https://api.count.ly')).not.toThrow();
   });
 
-  it('accepts an on-prem Countly on a public IP', () => {
-    expect(() => assertSafeServerUrl('https://203.0.113.10')).not.toThrow();
+  it('accepts an on-prem Countly on a routable public IP', () => {
+    expect(() => assertSafeServerUrl('https://8.8.8.8')).not.toThrow();
+  });
+});
+
+describe('safeLookup: connect-time DNS validation (DNS-rebinding / DNS-based SSRF)', () => {
+  // safeLookup is a dns.lookup-compatible function. We drive it directly with
+  // IP-literal "hostnames" (dns.lookup short-circuits those without a network
+  // query) so the test is hermetic — no external DNS needed.
+
+  it('passes a resolved public address through', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('1.1.1.1', {}, (err, address) => {
+        try {
+          expect(err).toBeNull();
+          expect(address).toBe('1.1.1.1');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('blocks a hostname resolving to loopback', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('127.0.0.1', {}, (err) => {
+        try {
+          expect(err).toBeTruthy();
+          expect((err as NodeJS.ErrnoException).code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('blocks a hostname resolving to cloud metadata', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('169.254.169.254', {}, (err) => {
+        try {
+          expect((err as NodeJS.ErrnoException | null)?.code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('blocks an IPv4-mapped IPv6 resolution', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('::ffff:127.0.0.1', {}, (err) => {
+        try {
+          expect((err as NodeJS.ErrnoException | null)?.code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('supports the options.all array form and blocks if any address is private', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('10.0.0.1', { all: true }, (err) => {
+        try {
+          expect((err as NodeJS.ErrnoException | null)?.code).toBe('ESSRFBLOCKED');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+
+  it('accepts the callback-as-second-arg form', () =>
+    new Promise<void>((resolve, reject) => {
+      safeLookup('8.8.8.8', (err, address) => {
+        try {
+          expect(err).toBeNull();
+          expect(address).toBe('8.8.8.8');
+          resolve();
+        } catch (e) {
+          reject(e as Error);
+        }
+      });
+    }));
+});
+
+// The range checks decide which hosts a caller may name. They say nothing about
+// which credential is used with them, which is a separate decision: the configured
+// token belongs to the configured server, so a request naming a different server
+// has to supply its own.
+describe('caller-supplied server URL must carry its own token', () => {
+  const configured = 'https://countly.example.test';
+
+  /**
+   * Mirrors the pairing rule applied in the /mcp handler.
+   */
+  function accepts(callerUrl: string | null, callerToken: string | null): boolean {
+    if (!callerUrl || callerUrl === configured) {
+      return true;
+    }
+    return Boolean(callerToken);
+  }
+
+  it('refuses a caller URL with no token, which is the token-exfiltration case', () => {
+    expect(accepts('https://attacker.example.test', null)).toBe(false);
+  });
+
+  it('accepts a caller URL that brings its own token', () => {
+    expect(accepts('https://other-countly.example.test', 'CALLER_TOKEN')).toBe(true);
+  });
+
+  it('still allows the configured server with the configured token', () => {
+    expect(accepts(configured, null)).toBe(true);
+    expect(accepts(null, null)).toBe(true);
+  });
+
+  it('does not depend on the address class of the caller URL', () => {
+    // the point of the rule: a perfectly public host is the dangerous case here
+    expect(accepts('https://198.51.100.10', null)).toBe(false);
   });
 });
 
@@ -402,7 +591,7 @@ describe('parseContentLength', () => {
   });
 });
 
-/** Minimal mock http.IncomingMessage for enforceBodySizeLimit. */
+/** Minimal mock http.IncomingMessage for readLimitedBody. */
 function mockReq(headers: Record<string, string> = {}) {
   const listeners: Record<string, Array<(arg?: unknown) => void>> = {};
   let destroyed = false;
@@ -456,46 +645,77 @@ function mockRes() {
   };
 }
 
-describe('enforceBodySizeLimit', () => {
-  it('rejects upfront when Content-Length exceeds the limit', () => {
+describe('readLimitedBody', () => {
+  it('rejects upfront when Content-Length exceeds the limit', async () => {
     const req = mockReq({ 'content-length': String(2_000) });
     const res = mockRes();
-    const ok = enforceBodySizeLimit(req as any, res as any, 1_000);
-    expect(ok).toBe(false);
+    const result = await readLimitedBody(req as any, res as any, 1_000);
+    expect(result.ok).toBe(false);
     expect(res.getStatus()).toBe(413);
     expect(req.isDestroyed()).toBe(true);
     expect(res.getBody()).toContain('Payload too large');
   });
 
-  it('accepts when Content-Length is within the limit', () => {
-    const req = mockReq({ 'content-length': '500' });
+  it('buffers the full body when within the limit', async () => {
+    const req = mockReq({ 'content-length': '11' });
     const res = mockRes();
-    const ok = enforceBodySizeLimit(req as any, res as any, 1_000);
-    expect(ok).toBe(true);
+    const p = readLimitedBody(req as any, res as any, 1_000);
+    req.emit('data', Buffer.from('hello '));
+    req.emit('data', Buffer.from('world'));
+    req.emit('end');
+    const result = await p;
+    expect(result.ok).toBe(true);
+    expect(result.body).toBe('hello world');
     expect(res.didEnd()).toBe(false);
     expect(req.isDestroyed()).toBe(false);
   });
 
-  it('streams-rejects when cumulative chunk bytes exceed the limit', () => {
+  it('streams-rejects when cumulative chunk bytes exceed the limit', async () => {
     const req = mockReq();
     const res = mockRes();
-    const ok = enforceBodySizeLimit(req as any, res as any, 100);
-    expect(ok).toBe(true);
-    // Simulate 60+60 bytes arriving — should trip after the second chunk.
+    const p = readLimitedBody(req as any, res as any, 100);
+    // 60 + 60 bytes — should trip after the second chunk.
     req.emit('data', Buffer.alloc(60));
     req.emit('data', Buffer.alloc(60));
+    const result = await p;
+    expect(result.ok).toBe(false);
     expect(res.getStatus()).toBe(413);
     expect(req.isDestroyed()).toBe(true);
   });
 
-  it('streams under the limit without interfering', () => {
+  it('buffers under the limit without interfering', async () => {
     const req = mockReq();
     const res = mockRes();
-    enforceBodySizeLimit(req as any, res as any, 100);
+    const p = readLimitedBody(req as any, res as any, 100);
     req.emit('data', Buffer.alloc(30));
     req.emit('data', Buffer.alloc(30));
+    req.emit('end');
+    const result = await p;
+    expect(result.ok).toBe(true);
+    expect(result.body.length).toBe(60);
     expect(res.didEnd()).toBe(false);
     expect(req.isDestroyed()).toBe(false);
+  });
+
+  it('treats maxBytes<=0 as unlimited and still buffers', async () => {
+    const req = mockReq();
+    const res = mockRes();
+    const p = readLimitedBody(req as any, res as any, 0);
+    req.emit('data', Buffer.alloc(10_000));
+    req.emit('end');
+    const result = await p;
+    expect(result.ok).toBe(true);
+    expect(result.body.length).toBe(10_000);
+    expect(req.isDestroyed()).toBe(false);
+  });
+
+  it('resolves not-ok when the request is aborted', async () => {
+    const req = mockReq();
+    const res = mockRes();
+    const p = readLimitedBody(req as any, res as any, 1_000);
+    req.emit('aborted');
+    const result = await p;
+    expect(result.ok).toBe(false);
   });
 });
 

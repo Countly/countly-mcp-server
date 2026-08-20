@@ -221,65 +221,123 @@ export function parseContentLength(raw: string | string[] | undefined): number |
 }
 
 /**
- * Enforce a maximum request body size.
- *
- * 1. Reject upfront if the caller's Content-Length header already exceeds
- *    the limit (or if the header is missing and we're strict about it).
- * 2. Attach a streaming data listener that destroys the request if bytes
- *    received exceed the limit. This catches chunked transfers and clients
- *    that lie about Content-Length.
- *
- * Returns true if the request is under the limit (keep processing) or false
- * if it was already rejected (caller should stop).
+ * Minimal structural types for the request/response objects readLimitedBody
+ * needs. Kept loose so the function is unit-testable with lightweight mocks
+ * and does not depend on the concrete node:http classes.
  */
-export function enforceBodySizeLimit(
-  req: {
-    headers: Record<string, string | string[] | undefined>;
-    on: (event: 'data' | 'aborted' | 'end', handler: (arg?: unknown) => void) => unknown;
-    destroy: (err?: Error) => void;
-  },
-  res: { writeHead: (code: number, headers?: Record<string, string>) => unknown; end: (body?: string) => unknown; headersSent?: boolean },
-  maxBytes: number
-): boolean {
-  const declared = parseContentLength(req.headers['content-length']);
-  if (declared !== null && declared > maxBytes) {
-    res.writeHead(413, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Payload too large',
-      max_bytes: maxBytes,
-      declared_content_length: declared,
-    }));
-    // Also close the socket so a malicious client can't keep sending bytes.
-    req.destroy();
-    return false;
-  }
+interface ReadableRequest {
+  headers: Record<string, string | string[] | undefined>;
+  on: (
+    event: 'data' | 'end' | 'aborted' | 'error',
+    handler: (arg?: unknown) => void
+  ) => unknown;
+  destroy: (err?: Error) => void;
+}
+interface WritableResponse {
+  writeHead: (code: number, headers?: Record<string, string>) => unknown;
+  end: (body?: string) => unknown;
+  headersSent?: boolean;
+}
 
-  let received = 0;
-  let killed = false;
-  req.on('data', (chunk: unknown) => {
-    if (killed) {
+/**
+ * Outcome of reading a request body:
+ *  - ok=true  → the full body was buffered within the size limit (`body`).
+ *  - ok=false → the request was rejected (413) or aborted; the caller must
+ *               stop processing. A 413 response has already been written.
+ */
+export interface BodyReadResult {
+  ok: boolean;
+  body: string;
+}
+
+/**
+ * Read a request body fully into memory while enforcing a maximum size.
+ *
+ * This REPLACES the old `enforceBodySizeLimit`, which only attached a `data`
+ * listener to count bytes. That listener switched the IncomingMessage into
+ * flowing mode and consumed the body before the MCP transport could read it,
+ * so with any positive COUNTLY_MAX_BODY_BYTES every request reached the SDK
+ * with an empty stream and failed as "Parse error: Invalid JSON". Because we
+ * now own the read, the caller passes the parsed body to
+ * `transport.handleRequest(req, res, parsedBody)` (the SDK's documented
+ * pre-parsed-body path) instead of letting the SDK re-read the drained stream.
+ *
+ * Enforcement:
+ *  1. Reject upfront (413) if Content-Length already exceeds the limit.
+ *  2. While buffering, destroy the socket and reject (413) as soon as the
+ *     cumulative byte count exceeds the limit — this still catches chunked
+ *     transfers and clients that under-declare Content-Length.
+ *
+ * `maxBytes <= 0` disables the size limit (body is still fully buffered).
+ */
+export function readLimitedBody(
+  req: ReadableRequest,
+  res: WritableResponse,
+  maxBytes: number
+): Promise<BodyReadResult> {
+  return new Promise((resolve) => {
+    const limited = maxBytes > 0;
+
+    const declared = parseContentLength(req.headers['content-length']);
+    if (limited && declared !== null && declared > maxBytes) {
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error: 'Payload too large',
+        max_bytes: maxBytes,
+        declared_content_length: declared,
+      }));
+      // Close the socket so a malicious client can't keep sending bytes.
+      req.destroy();
+      resolve({ ok: false, body: '' });
       return;
     }
-    // Chunks are Buffers or strings in practice.
-    const len = chunk && typeof chunk === 'object' && 'length' in chunk
-      ? (chunk as { length: number }).length
-      : typeof chunk === 'string'
-        ? (chunk as string).length
-        : 0;
-    received += len;
-    if (received > maxBytes) {
-      killed = true;
-      if (!res.headersSent) {
-        res.writeHead(413, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          error: 'Payload too large',
-          max_bytes: maxBytes,
-        }));
+
+    const chunks: Buffer[] = [];
+    let received = 0;
+    let settled = false;
+
+    const finish = (result: BodyReadResult): void => {
+      if (settled) {
+        return;
       }
-      req.destroy();
-    }
+      settled = true;
+      resolve(result);
+    };
+
+    req.on('data', (chunk: unknown) => {
+      if (settled) {
+        return;
+      }
+      const buf = Buffer.isBuffer(chunk)
+        ? chunk
+        : typeof chunk === 'string'
+          ? Buffer.from(chunk)
+          : Buffer.alloc(0);
+      received += buf.length;
+      if (limited && received > maxBytes) {
+        if (!res.headersSent) {
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Payload too large',
+            max_bytes: maxBytes,
+          }));
+        }
+        req.destroy();
+        finish({ ok: false, body: '' });
+        return;
+      }
+      chunks.push(buf);
+    });
+
+    req.on('end', () => {
+      finish({ ok: true, body: Buffer.concat(chunks).toString('utf8') });
+    });
+
+    // A destroyed/aborted socket or a transport error must not leave the
+    // request handler hanging on an unresolved promise.
+    req.on('aborted', () => finish({ ok: false, body: '' }));
+    req.on('error', () => finish({ ok: false, body: '' }));
   });
-  return true;
 }
 
 /**
