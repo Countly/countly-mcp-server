@@ -9,6 +9,7 @@ dotenv.config({ quiet: true });
 import { AsyncLocalStorage } from 'async_hooks';
 import { realpathSync } from 'fs';
 import http from 'http';
+import https from 'https';
 import { createRequire } from 'module';
 import url from 'url';
 
@@ -38,7 +39,7 @@ import axios, { AxiosInstance } from 'axios';
 import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
-import { assertSafeServerUrl, buildConfig } from './lib/config.js';
+import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
 import {
   ConcurrencyLimiter,
   enforceBodySizeLimit,
@@ -83,6 +84,14 @@ interface HttpConfig {
 interface RequestState {
   authToken?: string;
   serverUrl: string;
+  /**
+   * True when `serverUrl` came from a caller-supplied source (the
+   * X-Countly-Server-Url header or a URL parameter) rather than the operator's
+   * trusted COUNTLY_SERVER_URL config. Only the caller-controlled path gets
+   * connect-time DNS validation (safeLookup) + redirect suppression, so a
+   * legitimate on-prem COUNTLY_SERVER_URL on a private IP is never blocked.
+   */
+  serverUrlFromCaller?: boolean;
 }
 
 interface ToolCallHistory {
@@ -341,8 +350,13 @@ class CountlyMCPServer {
 
         // Build a fresh axios client for this request so concurrent tenants
         // cannot share headers / baseURL on the same object. The shared
-        // `this.httpClient` is intentionally untouched.
-        const perReqHttpClient = this.createRequestHttpClient(authToken, serverUrl);
+        // `this.httpClient` is intentionally untouched. Caller-supplied server
+        // URLs additionally get connect-time DNS validation + no-redirects.
+        const perReqHttpClient = this.createRequestHttpClient(
+          authToken,
+          serverUrl,
+          reqState?.serverUrlFromCaller === true
+        );
 
         // Per-tenant app cache. Keyed by SHA-256(authToken) inside the
         // registry so one tenant's apps cannot leak into another's
@@ -596,17 +610,30 @@ class CountlyMCPServer {
    */
   private createRequestHttpClient(
     authToken: string | undefined,
-    serverUrl: string
+    serverUrl: string,
+    untrusted = false
   ): AxiosInstance {
     const headers: Record<string, string> = {};
     if (authToken) {
       headers['countly-token'] = authToken;
     }
-    return axios.create({
+    const config: Parameters<typeof axios.create>[0] = {
       baseURL: serverUrl,
       timeout: this.config.timeout,
       headers,
-    });
+    };
+    // For caller-controlled server URLs, pin DNS resolution through
+    // safeLookup so the socket only ever connects to a public unicast IP
+    // (closes plain DNS-based SSRF *and* DNS-rebinding TOCTOU), and refuse
+    // redirects so a 30x cannot bounce the request to an internal target.
+    // The operator's trusted COUNTLY_SERVER_URL path skips this so an on-prem
+    // Countly on a private IP keeps working.
+    if (untrusted) {
+      config.httpAgent = new http.Agent({ lookup: safeLookup });
+      config.httpsAgent = new https.Agent({ lookup: safeLookup });
+      config.maxRedirects = 0;
+    }
+    return axios.create(config);
   }
 
   /**
@@ -634,7 +661,11 @@ class CountlyMCPServer {
       authToken = process.env.COUNTLY_AUTH_TOKEN;
     }
     const serverUrl = reqState?.serverUrl || this.config.serverUrl;
-    const client = this.createRequestHttpClient(authToken, serverUrl);
+    const client = this.createRequestHttpClient(
+      authToken,
+      serverUrl,
+      reqState?.serverUrlFromCaller === true
+    );
     const cache = this.appCacheRegistry.for(authToken);
     return { client, cache, authToken };
   }
@@ -986,6 +1017,20 @@ class CountlyMCPServer {
               }));
               return;
             }
+            // The configured token belongs to the configured server. A request
+            // naming a different server supplies its own, since getCredentials
+            // would otherwise fall back to the configured one. This is a separate
+            // decision from the address checks above, which say nothing about
+            // which credential is used.
+            if (cleanUrl !== this.config.serverUrl && !authToken) {
+              console.error('Rejected serverUrl override: no auth token supplied with a caller-specified server');
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                error: 'Missing auth token',
+                message: 'A caller-supplied Countly server URL requires a Countly auth token supplied with the same request. The server\'s configured token is only used with its configured server URL.',
+              }));
+              return;
+            }
             effectiveServerUrl = cleanUrl;
             const source = headerServerUrl ? 'headers' : 'URL parameters';
             console.error(`Using Countly server from ${source}:`, sanitizeForLog(effectiveServerUrl));
@@ -1007,7 +1052,14 @@ class CountlyMCPServer {
           // shared-state mutation. This closes the cross-tenant token-mixing
           // window previously present in the HTTP transport.
           await this.requestContext.run(
-            { authToken: authToken || undefined, serverUrl: effectiveServerUrl },
+            {
+              authToken: authToken || undefined,
+              serverUrl: effectiveServerUrl,
+              // `serverUrl` here is the caller-supplied header/param value (if
+              // any). When present, the effective URL is attacker-controlled
+              // and its outbound client must get connect-time SSRF validation.
+              serverUrlFromCaller: !!serverUrl,
+            },
             async () => {
               await transport.handleRequest(req, res);
             }
