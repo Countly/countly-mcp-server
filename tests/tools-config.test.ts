@@ -708,6 +708,52 @@ describe('Tool Handler Validation', () => {
     });
   });
 
+  describe('Read-only deployments expose no side-effecting tool', () => {
+    // A tool may be mapped 'R' only when it has no effect outside the response and
+    // exposes nothing the caller could not already read. Anything that executes a
+    // caller-supplied configuration for real - delivering email, calling a webhook,
+    // running custom code, sending a notification - is 'C'/'U' no matter which HTTP
+    // verb or endpoint namespace it happens to use. Rendering or recomputing an
+    // already-saved object stays 'R' (email_reports_preview takes a saved report_id
+    // and explicitly does not deliver; formulas_run only recomputes readable data).
+    const SIDE_EFFECTING_TOOLS = [
+      'hooks_test', // /i/hook/test runs the effects: real email, webhook, custom code
+      'hooks_create',
+      'hooks_update',
+      'hooks_delete',
+      'email_reports_send', // delivers the report by email
+      'content_assets_upload',
+      'apps_reset',
+      'journeys_publish',
+    ];
+
+    it('should not expose side-effecting tools under COUNTLY_TOOLS_ALL=R', () => {
+      const config = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'R' });
+
+      for (const toolName of SIDE_EFFECTING_TOOLS) {
+        expect(isToolAllowed(toolName, config), `${toolName} must not be callable in a read-only deployment`).toBe(false);
+      }
+    });
+
+    it('should still expose genuinely read-only tools under COUNTLY_TOOLS_ALL=R', () => {
+      const config = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'R' });
+
+      // regression guard: tightening the tools above must not take these with it
+      for (const toolName of ['hooks_list', 'email_reports_preview', 'email_reports_list', 'apps_list']) {
+        expect(isToolAllowed(toolName, config), `${toolName} should remain callable in a read-only deployment`).toBe(true);
+      }
+    });
+
+    it('should keep hooks_test out of the read-only tool listing', () => {
+      const config = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'R' });
+      const listed = filterTools(getAllToolDefinitions(), config).map((t) => t.name);
+
+      expect(listed).not.toContain('hooks_test');
+      expect(listed).not.toContain('hooks_create');
+      expect(listed).toContain('hooks_list');
+    });
+  });
+
   describe('Handler Mapping Structure', () => {
     it('should have handlers as objects with string keys and string values', () => {
       const toolMetadataList = getAllToolMetadata();
