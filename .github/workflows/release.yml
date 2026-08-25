@@ -267,10 +267,16 @@ jobs:
         run: |
           set -euo pipefail
           docker buildx imagetools inspect "${DOCKER_IMAGE}:${VERSION}"
+          # Parse the index as JSON rather than grepping it: `--raw` emits
+          # pretty-printed JSON, so a `"architecture":"amd64"` string match
+          # misses the space after the colon and reports a false negative on a
+          # manifest list that is actually correct.
+          raw="$(docker buildx imagetools inspect "${DOCKER_IMAGE}:${VERSION}" --raw)"
           for arch in amd64 arm64; do
-            docker buildx imagetools inspect "${DOCKER_IMAGE}:${VERSION}" --raw \
-              | grep -q "\"architecture\":\"${arch}\"" \
-              || { echo "::error::${arch} missing from manifest list"; exit 1; }
+            echo "$raw" | jq -e --arg a "$arch" \
+              'any(.manifests[]?.platform?; .architecture == $a and .os == "linux")' > /dev/null \
+              || { echo "::error::linux/${arch} missing from manifest list"; exit 1; }
+            echo "linux/${arch}: present"
           done
         env:
           VERSION: ${{ needs.meta.outputs.version }}
