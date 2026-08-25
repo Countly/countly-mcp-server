@@ -14,7 +14,7 @@ on:
         description: 'Publish to npm'
         required: false
         type: boolean
-        default: true
+        default: false
       publish-docker:
         description: 'Publish to Docker Hub'
         required: false
@@ -30,10 +30,40 @@ permissions:
   contents: read
 
 jobs:
+  meta:
+    runs-on: ubuntu-latest
+    name: Resolve version
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      is-release: ${{ steps.v.outputs.is-release }}
+    steps:
+      - name: Resolve version from tag or input
+        id: v
+        run: |
+          # A tag push is a real release and is allowed to move ":latest".
+          # A workflow_dispatch is a rehearsal: it publishes its version tag so
+          # the build can be verified end to end, but must never repoint
+          # ":latest" at a throwaway build that hosts would then deploy.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            IS_RELEASE=true
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            IS_RELEASE=false
+          else
+            VERSION="dev-${GITHUB_SHA::8}"
+            IS_RELEASE=false
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is-release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION (release: $IS_RELEASE)"
+
   test-and-build:
     runs-on: ubuntu-latest
     name: Test & Build
-    
+    timeout-minutes: 20
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -63,11 +93,27 @@ jobs:
           path: build/
           retention-days: 1
 
+  # npm publishing is opt-in and OFF by default, including on tag pushes.
+  #
+  # The trusted publisher for `countly-mcp-server` is not configured on
+  # npmjs.com, so `npm publish` fails with:
+  #   npm error code E404
+  #   npm error 404 Not Found - PUT https://registry.npmjs.org/countly-mcp-server
+  # This is npm's response when the presented OIDC credential is not authorised
+  # for the package, not a missing-package error. It failed this way for v1.4.0
+  # and 1.2.1/1.3.0/1.4.0 were all published by hand.
+  #
+  # Rather than let every release run go red on an expected failure -- which is
+  # how the six-hour Docker timeout went unnoticed alongside it -- the job now
+  # only runs when explicitly requested. To re-enable automated publishing:
+  # configure the trusted publisher on npmjs.com for this repository and
+  # workflow, then flip this back to run on tag pushes.
   publish-npm:
     runs-on: ubuntu-latest
-    needs: test-and-build
+    needs: [meta, test-and-build]
     name: Publish to npm
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish-npm)
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch' && inputs.publish-npm
 
     permissions:
       contents: read
@@ -99,34 +145,37 @@ jobs:
       - name: Publish to npm (via OIDC trusted publisher)
         run: npm publish --access public
 
-  publish-docker:
-    runs-on: ubuntu-latest
-    needs: test-and-build
-    name: Build & Push Docker Image
+  # One job per architecture on native hardware, each pushing an untagged
+  # image by digest. The previous single job built linux/amd64,linux/arm64 on
+  # an amd64 runner, so the arm64 half ran under QEMU -- and because the
+  # Dockerfile is multi-stage it emulated `npm ci` twice. That build hit the
+  # six-hour job ceiling and was cancelled, which is why no 1.3.0 or 1.4.0
+  # image was ever published. `ubuntu-24.04-arm` runners are free for public
+  # repositories, so no emulation is needed.
+  build-docker:
+    name: Build ${{ matrix.arch }} image
+    runs-on: ${{ matrix.runner }}
+    needs: [meta, test-and-build]
+    timeout-minutes: 30
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish-docker)
-    
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
-      - name: Extract version from tag or input
-        id: meta
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ inputs.version }}"
-          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION="dev-${GITHUB_SHA::8}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -134,28 +183,104 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}:${{ steps.meta.outputs.version }}
-            ${{ env.DOCKER_IMAGE }}:latest
-          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache,mode=max
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.DOCKER_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          provenance: false
+          # Per-arch cache scopes; a single shared scope thrashes between the
+          # two architectures and neither gets a warm cache.
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache-${{ matrix.arch }},mode=max
           labels: |
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.meta.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
 
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          if [[ -z "$digest" ]]; then
+            echo "::error::build produced no digest"
+            exit 1
+          fi
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Joins the per-arch digests into one manifest list, so `docker pull` still
+  # resolves the right architecture automatically.
+  publish-docker:
+    name: Publish manifest
+    runs-on: ubuntu-latest
+    needs: [meta, build-docker]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: /tmp/digests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push manifest list
+        working-directory: /tmp/digests
+        run: |
+          set -euo pipefail
+          TAGS=("-t" "${DOCKER_IMAGE}:${VERSION}")
+          if [[ "${IS_RELEASE}" == "true" ]]; then
+            TAGS+=("-t" "${DOCKER_IMAGE}:latest")
+          else
+            echo "Rehearsal build - leaving :latest untouched."
+          fi
+          # shellcheck disable=SC2046
+          docker buildx imagetools create "${TAGS[@]}" \
+            $(printf "${DOCKER_IMAGE}@sha256:%s " *)
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+          IS_RELEASE: ${{ needs.meta.outputs.is-release }}
+
+      - name: Verify both architectures are present
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${DOCKER_IMAGE}:${VERSION}"
+          for arch in amd64 arm64; do
+            docker buildx imagetools inspect "${DOCKER_IMAGE}:${VERSION}" --raw \
+              | grep -q "\"architecture\":\"${arch}\"" \
+              || { echo "::error::${arch} missing from manifest list"; exit 1; }
+          done
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+
       - name: Update Docker Hub description
+        if: needs.meta.outputs.is-release == 'true'
         uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.DOCKER_IMAGE }}
           readme-filepath: ./DOCKER.md
-          short-description: "MCP server for Countly Analytics - Access 40+ analytics tools via Model Context Protocol"
+          short-description: "MCP server for Countly Analytics - Access analytics tools via Model Context Protocol"

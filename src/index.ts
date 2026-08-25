@@ -18,7 +18,7 @@ import url from 'url';
 // truth. Previously these drifted (handshake reported "1.0.0" while the
 // manifest reported "1.0.1" and package.json said something else entirely).
 const require = createRequire(import.meta.url);
-const { version: PACKAGE_VERSION } = require('../package.json') as { version: string };
+const { version: PACKAGE_VERSION, name: PACKAGE_NAME } = require('../package.json') as { version: string; name: string };
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -40,6 +40,7 @@ import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } fro
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
+import { FAVICON_SVG } from './lib/favicon.js';
 import {
   ConcurrencyLimiter,
   extractClientIp,
@@ -50,7 +51,7 @@ import {
   resolveCorsOrigin,
   sanitizeForLog,
 } from './lib/http-security.js';
-import { loadToolsConfig, filterTools, getConfigSummary, type ToolsConfig } from './lib/tools-config.js';
+import { loadToolsConfig, filterTools, getConfigSummary, TOOL_CATEGORIES, type ToolsConfig } from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
@@ -850,6 +851,19 @@ class CountlyMCPServer {
           return;
         }
         
+        // Favicon. Served from an inlined brand mark so the welcome page
+        // renders a real icon without a CDN round-trip. Browsers request
+        // /favicon.ico unprompted, so both paths answer with the SVG.
+        if (pathname === '/favicon.svg' || pathname === '/favicon.ico') {
+          analytics.trackHttpRequest(pathname, req.method || 'GET');
+          res.writeHead(200, {
+            'Content-Type': 'image/svg+xml',
+            'Cache-Control': 'public, max-age=86400',
+          });
+          res.end(FAVICON_SVG);
+          return;
+        }
+
         // MCP manifest discovery endpoint
         if (pathname === '/.well-known/mcp-manifest.json') {
           analytics.trackHttpRequest('/.well-known/mcp-manifest.json', req.method || 'GET');
@@ -876,7 +890,16 @@ class CountlyMCPServer {
             capabilities: {
               tools: {
                 count: filteredTools.length,
-                categories: [...new Set(filteredTools.map((t: { name: string }) => t.name.split('_')[0]))].length,
+                // Count real tool categories, not tool-name prefixes. Splitting
+                // on the first underscore overcounts, because several
+                // categories own tools with differing prefixes (crash_groups_*
+                // vs crashes_*) and unrelated categories can share one.
+                categories: (() => {
+                  const enabled = new Set(filteredTools.map((t: { name: string }) => t.name));
+                  return Object.values(TOOL_CATEGORIES).filter((data) =>
+                    Object.keys(data.operations).some((n) => enabled.has(n))
+                  ).length;
+                })(),
                 listChanged: true
               },
               resources: {
@@ -1094,6 +1117,37 @@ class CountlyMCPServer {
         if (pathname === '/') {
           analytics.trackView('welcome_page');
           analytics.trackHttpRequest('/', req.method || 'GET');
+
+          // Derive the advertised tool inventory from the same source the
+          // MCP handshake uses, so the page cannot drift from what this
+          // server actually exposes. Operator restrictions applied via
+          // COUNTLY_TOOLS_* are reflected here too: a category disabled by
+          // configuration is not advertised.
+          // Absolute URL for this endpoint, so CLI examples on the page are
+          // copy-pasteable. mcpEndpoint on its own is only a path, which is
+          // fine in a request line but not as an argument to `claude mcp add`.
+          // Scheme: honour X-Forwarded-Proto only behind a trusted proxy,
+          // otherwise assume TLS for anything that isn't a local address.
+          const pageHost = (req.headers.host || `${hostname}:${port}`).trim();
+          const forwardedProto = trustProxy
+            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim()
+            : undefined;
+          const pageProto = forwardedProto
+            || (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(pageHost) ? 'http' : 'https');
+          const pageEndpointUrl = `${pageProto}://${pageHost}${mcpEndpoint}`;
+
+          const pageTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
+          const pageToolNames = new Set(pageTools.map((t: { name: string }) => t.name));
+          const pageCategories = Object.entries(TOOL_CATEGORIES)
+            .map(([category, data]) => ({
+              category,
+              label: category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+              count: Object.keys(data.operations).filter((n) => pageToolNames.has(n)).length,
+              requiresPlugin: data.requiresPlugin,
+            }))
+            .filter((c) => c.count > 0)
+            .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(`<!DOCTYPE html>
 <html lang="en">
@@ -1101,6 +1155,7 @@ class CountlyMCPServer {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Countly MCP Server</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <style>
     * {
       margin: 0;
@@ -1514,7 +1569,7 @@ class CountlyMCPServer {
     <div class="top-bar">
       <div class="top-bar-content">
         <a href="https://countly.com" class="top-bar-logo" target="_blank">
-          <span>⚡</span> Countly MCP Server
+          <img src="/favicon.svg" alt="" width="20" height="20"> Countly MCP Server
         </a>
         <nav class="top-bar-nav">
           <a href="https://countly.com/" class="top-bar-link" target="_blank">About Countly</a>
@@ -1531,15 +1586,15 @@ class CountlyMCPServer {
         <h1>Model Context Protocol Server</h1>
         <p>Connect your AI assistants to Countly's powerful analytics platform. Access real-time data, manage applications, and analyze user behavior through the Model Context Protocol.</p>
         <div class="header-cta">
-          <a href="https://github.com/Countly/countly-mcp-server" class="cta-button" target="_blank">View on GitHub</a>
-          <a href="https://support.count.ly" class="cta-button cta-button-secondary" target="_blank">Read Documentation</a>
+          <a href="https://support.countly.com/hc/en-us/articles/26998738930972-Connecting-Countly-to-your-AI-Assistant" class="cta-button" target="_blank">Connect your assistant</a>
+          <a href="https://github.com/Countly/countly-mcp-server" class="cta-button cta-button-secondary" target="_blank">View on GitHub</a>
         </div>
       </div>
     </div>
 
     <div class="content">
       <div class="status">
-        Server is running and ready to accept connections
+        Server is running and ready to accept connections — version ${PACKAGE_VERSION}
       </div>
 
       <div class="section">
@@ -1571,99 +1626,98 @@ class CountlyMCPServer {
       <div class="section-content">
         <h2>🔌 Connection Methods</h2>
 
-        <h3>VS Code Integration (Recommended)</h3>
-        <p>Add this configuration to your VS Code <code>settings.json</code>:</p>
-        <div class="example-box">
-        <pre>{
-  <span class="key">"mcp.servers"</span>: {
-    <span class="key">"countly"</span>: {
-      <span class="key">"type"</span>: <span class="string">"stdio"</span>,
-      <span class="key">"command"</span>: <span class="string">"npx"</span>,
-      <span class="key">"args"</span>: [<span class="string">"-y"</span>, <span class="string">"@countly/countly-mcp-server"</span>],
-      <span class="key">"env"</span>: {
-        <span class="key">"COUNTLY_SERVER_URL"</span>: <span class="string">"https://your-server.count.ly"</span>,
-        <span class="key">"COUNTLY_AUTH_TOKEN"</span>: <span class="string">"your-api-key"</span>
-      }
-    }
-  }
-}</pre>
-      </div>
+        <p>You need a Countly <strong>auth token</strong>, created in the Token Manager on your
+        Countly server. This is not a dashboard password and not a personal API key — create a
+        dedicated token for your assistant. For the simplest setup, configure it for all
+        endpoints, allow multiple uses, and set it to never expire.
+        <a href="https://support.countly.com/hc/en-us/articles/26998738930972-Connecting-Countly-to-your-AI-Assistant" target="_blank">Full setup guide with screenshots →</a></p>
 
-      <h3>Claude Desktop Integration</h3>
-      <p>Configure Claude Desktop to connect with Countly:</p>
-      <div class="example-box">
+        <h3>Claude Desktop</h3>
+        <p>Open <strong>Settings → Developer → Local MCP Servers → Edit Config</strong>, then add
+        <code>countly</code> inside <code>mcpServers</code>. Fully quit and reopen Claude afterwards.</p>
+        <div class="example-box">
         <pre>{
   <span class="key">"mcpServers"</span>: {
     <span class="key">"countly"</span>: {
       <span class="key">"command"</span>: <span class="string">"npx"</span>,
-      <span class="key">"args"</span>: [<span class="string">"-y"</span>, <span class="string">"@countly/countly-mcp-server"</span>],
+      <span class="key">"args"</span>: [<span class="string">"-y"</span>, <span class="string">"--prefer-online"</span>, <span class="string">"${PACKAGE_NAME}@latest"</span>],
       <span class="key">"env"</span>: {
-        <span class="key">"COUNTLY_SERVER_URL"</span>: <span class="string">"https://your-server.count.ly"</span>,
-        <span class="key">"COUNTLY_AUTH_TOKEN"</span>: <span class="string">"your-api-key"</span>
+        <span class="key">"COUNTLY_SERVER_URL"</span>: <span class="string">"https://your-countly-url.com"</span>,
+        <span class="key">"COUNTLY_AUTH_TOKEN"</span>: <span class="string">"YOUR_TOKEN"</span>
       }
     }
   }
 }</pre>
       </div>
 
-      <h3>HTTP/SSE Connection</h3>
-      <p>Connect via HTTP with custom headers (recommended):</p>
+      <h3>VS Code + GitHub Copilot</h3>
+      <p>From the Command Palette run <strong>MCP: Open User Configuration</strong> to open
+      <code>mcp.json</code>, then add <code>countly</code> inside <code>servers</code>:</p>
       <div class="example-box">
-        <pre><span class="key">POST</span> ${mcpEndpoint}
-<span class="key">X-Countly-Server-Url:</span> <span class="string">https://your-server.count.ly</span>
-<span class="key">X-Countly-Auth-Token:</span> <span class="string">your-api-key</span>
+        <pre>{
+  <span class="key">"servers"</span>: {
+    <span class="key">"countly"</span>: {
+      <span class="key">"type"</span>: <span class="string">"stdio"</span>,
+      <span class="key">"command"</span>: <span class="string">"npx"</span>,
+      <span class="key">"args"</span>: [<span class="string">"-y"</span>, <span class="string">"--prefer-online"</span>, <span class="string">"${PACKAGE_NAME}@latest"</span>],
+      <span class="key">"env"</span>: {
+        <span class="key">"COUNTLY_SERVER_URL"</span>: <span class="string">"https://your-countly-url.com"</span>,
+        <span class="key">"COUNTLY_AUTH_TOKEN"</span>: <span class="string">"YOUR_TOKEN"</span>
+      }
+    }
+  }
+}</pre>
+      </div>
+      <p>Check it with <strong>MCP: Show Installed Servers</strong>, then ask Copilot
+      <code>@countly list my apps</code>.</p>
+
+      <h3>Claude Code</h3>
+      <p>Run this in your terminal to add Countly over stdio:</p>
+      <div class="example-box">
+        <pre>claude mcp add countly \\
+  -e COUNTLY_SERVER_URL=https://your-countly-url.com \\
+  -e COUNTLY_AUTH_TOKEN=YOUR_TOKEN \\
+  -- npx -y --prefer-online ${PACKAGE_NAME}@latest</pre>
+      </div>
+      <p>Or connect to this server over HTTP instead of running your own:</p>
+      <div class="example-box">
+        <pre>claude mcp add --transport http countly ${pageEndpointUrl} \\
+  --header <span class="string">"X-Countly-Server-Url: https://your-countly-url.com"</span> \\
+  --header <span class="string">"X-Countly-Auth-Token: YOUR_TOKEN"</span></pre>
+      </div>
+
+      <h3>Any HTTP MCP client</h3>
+      <p>Credentials travel in request headers — this is the recommended way to reach a
+      shared server, since each request carries its own token and no credentials are stored
+      server-side:</p>
+      <div class="example-box">
+        <pre><span class="key">POST</span> ${pageEndpointUrl}
+<span class="key">X-Countly-Server-Url:</span> <span class="string">https://your-countly-url.com</span>
+<span class="key">X-Countly-Auth-Token:</span> <span class="string">YOUR_TOKEN</span>
 <span class="key">Content-Type:</span> <span class="string">application/json</span></pre>
       </div>
 
-      <p>Or use URL parameters:</p>
-      <div class="example-box">
-        <pre><span class="key">POST</span> ${mcpEndpoint}?server_url=https://your-server.count.ly&auth_token=your-api-key
-<span class="key">Content-Type:</span> <span class="string">application/json</span></pre>
-      </div>
+      <p><strong>Deprecated:</strong> the same values are still accepted as
+      <code>?server_url=</code> and <code>?auth_token=</code> query parameters, but tokens in URLs
+      leak into access logs, proxy logs and <code>Referer</code> headers. This server logs a
+      warning when it sees one, and support will be removed in a future release. Use the headers
+      above instead.</p>
       </div>
     </div>
 
     <div class="content">
       <div class="section">
-        <h2>🛠️ Available Analytics Tools</h2>
-        
+        <h2>🛠️ Available Tools</h2>
+        <p>This server currently exposes <strong>${pageTools.length}</strong> tools across
+        <strong>${pageCategories.length}</strong> categories. Categories marked with a plugin
+        name need that plugin installed on your Countly server, and every tool is additionally
+        bounded by what your auth token permits.</p>
+
         <div class="tools-grid">
-        <div class="tool-item">
-          <strong>📊 Analytics</strong>
-          <p>Sessions, users, events, locations, carriers, and device data</p>
-        </div>
-        <div class="tool-item">
-          <strong>💥 Crash Analytics</strong>
-          <p>Crash reports, statistics, and error tracking</p>
-        </div>
-        <div class="tool-item">
-          <strong>📱 App Management</strong>
-          <p>Create and manage applications</p>
-        </div>
-        <div class="tool-item">
-          <strong>👥 User Management</strong>
-          <p>Dashboard users and permissions</p>
-        </div>
-        <div class="tool-item">
-          <strong>🔔 Alerts</strong>
-          <p>Configure and manage alert rules</p>
-        </div>
-        <div class="tool-item">
-          <strong>🎯 Events</strong>
-          <p>Query and analyze custom events</p>
-        </div>
-        <div class="tool-item">
-          <strong>👁️ Views</strong>
-          <p>Page and screen analytics</p>
-        </div>
-        <div class="tool-item">
-          <strong>📝 Notes</strong>
-          <p>Create and manage annotations</p>
-        </div>
-        <div class="tool-item">
-          <strong>🗄️ Database</strong>
-          <p>Execute database queries</p>
-        </div>
+        ${pageCategories.map((c) => `<div class="tool-item">
+          <strong>${c.label}</strong>
+          <p>${c.count} tool${c.count === 1 ? '' : 's'}${c.requiresPlugin ? ` · requires <code>${c.requiresPlugin}</code> plugin` : ''}</p>
+        </div>`).join('\n        ')}
       </div>
       </div>
 
@@ -1672,21 +1726,40 @@ class CountlyMCPServer {
         
         <div class="config-list">
         <ul>
-          <li><strong>Environment Variables:</strong> <code>COUNTLY_SERVER_URL</code>, <code>COUNTLY_AUTH_TOKEN</code></li>
-          <li><strong>HTTP Headers:</strong> <code>X-Countly-Server-Url</code>, <code>X-Countly-Auth-Token</code></li>
-          <li><strong>URL Parameters:</strong> <code>?server_url=...&auth_token=...</code></li>
-          <li><strong>Configuration File:</strong> <code>countly_token.txt</code> for authentication</li>
+          <li><strong>HTTP headers:</strong> <code>X-Countly-Server-Url</code>, <code>X-Countly-Auth-Token</code> — recommended for HTTP transport</li>
+          <li><strong>Environment variables:</strong> <code>COUNTLY_SERVER_URL</code>, <code>COUNTLY_AUTH_TOKEN</code> — recommended for stdio</li>
+          <li><strong>Token file:</strong> <code>COUNTLY_AUTH_TOKEN_FILE</code> — path to a file holding the token, for Docker and Kubernetes secrets</li>
+          <li><strong>Per-call argument:</strong> <code>countly_auth_token</code> — overrides all of the above for a single tool call</li>
+          <li><strong>URL parameters:</strong> <code>?server_url=...&auth_token=...</code> — deprecated, see above</li>
         </ul>
-      </div>
+        <p>When more than one is present, the per-call argument wins, then the environment
+        variable, then the token file. On the HTTP transport, request headers take priority over
+        URL parameters.</p>
+        </div>
+
+        <h3>Restricting what the assistant can do</h3>
+        <p>Set <code>COUNTLY_TOOLS_ALL</code> to a CRUD string to cap every category at once, and
+        <code>COUNTLY_TOOLS_&lt;CATEGORY&gt;</code> to override one of them. Accepted values are
+        <code>NONE</code>, <code>R</code>, <code>CR</code>, <code>CRU</code>, <code>CRUD</code>
+        (or <code>ALL</code>). For read-only access to everything, set
+        <code>COUNTLY_TOOLS_ALL=R</code>.</p>
+        <div class="example-box">
+        <pre><span class="key">COUNTLY_TOOLS_ALL</span>=<span class="string">R</span>
+<span class="key">COUNTLY_TOOLS_DATABASE</span>=<span class="string">NONE</span>
+<span class="key">COUNTLY_TOOLS_NOTES</span>=<span class="string">CR</span></pre>
+        </div>
+        <p>These restrictions never widen your token's permissions — the effective access is
+        whichever of the two is more restrictive.</p>
       </div>
 
       <div class="section">
         <h2>📚 Documentation & Resources</h2>
         
         <div class="docs-links">
+        <a class="doc-link" href="https://support.countly.com/hc/en-us/articles/26998738930972-Connecting-Countly-to-your-AI-Assistant" target="_blank">📖 Setup Guide</a>
         <a class="doc-link" href="https://github.com/Countly/countly-mcp-server" target="_blank">📦 GitHub</a>
-        <a class="doc-link" href="https://www.npmjs.com/package/@countly/countly-mcp-server" target="_blank">📦 npm Package</a>
-        <a class="doc-link" href="https://support.count.ly" target="_blank">📖 Documentation</a>
+        <a class="doc-link" href="https://www.npmjs.com/package/${PACKAGE_NAME}" target="_blank">📦 npm Package</a>
+        <a class="doc-link" href="https://support.countly.com/hc/en-us" target="_blank">📚 Knowledge Base</a>
         <a class="doc-link" href="https://countly.com" target="_blank">🌐 Countly.com</a>
       </div>
       </div>
