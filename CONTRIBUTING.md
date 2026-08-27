@@ -415,6 +415,13 @@ Include:
 - Proposed implementation approach
 - Examples of similar features
 
+## Releasing
+
+Cutting a release is documented separately in **[RELEASING.md](RELEASING.md)**.
+Worth reading before your first one: the Docker image is published
+automatically on a tag push, but the npm publish is manual and the release run
+goes green without it.
+
 ## Getting Help
 
 - Check existing issues and documentation first

@@ -93,21 +93,33 @@ jobs:
           path: build/
           retention-days: 1
 
-  # npm publishing is opt-in and OFF by default, including on tag pushes.
+  # npm publishing is MANUAL. This job is opt-in and never runs on a tag push.
+  # See RELEASING.md for the publish procedure.
   #
-  # The trusted publisher for `countly-mcp-server` is not configured on
-  # npmjs.com, so `npm publish` fails with:
+  # OIDC trusted publishing is not an option here: `countly-mcp-server` is
+  # unscoped and owned by individual maintainer accounts rather than the
+  # `countly` org, and npm only offers trusted-publisher configuration for
+  # org-owned (`@countly/...`) packages. So the `id-token: write` permission
+  # and the OIDC publish path below cannot currently succeed, and every release
+  # from 1.2.1 onward has been published by hand.
+  #
+  # This job is left in place rather than deleted because it is one secret away
+  # from working: a classic npm *automation token* (which does not expire and
+  # bypasses 2FA) authorises publishing for unscoped packages. To automate,
+  # add the token as an `NPM_TOKEN` repo secret, set
+  # `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` on the publish step, and change
+  # the `if:` below to also run on tag pushes.
+  #
+  # Note on diagnosing failures: `npm publish` answers an unauthorised PUT with
   #   npm error code E404
   #   npm error 404 Not Found - PUT https://registry.npmjs.org/countly-mcp-server
-  # This is npm's response when the presented OIDC credential is not authorised
-  # for the package, not a missing-package error. It failed this way for v1.4.0
-  # and 1.2.1/1.3.0/1.4.0 were all published by hand.
+  # npm returns 404 rather than 403 so it does not confirm that a package
+  # exists to a caller who cannot access it. E404 on publish is almost always
+  # an auth problem, NOT a missing package -- check `npm whoami` first.
   #
-  # Rather than let every release run go red on an expected failure -- which is
-  # how the six-hour Docker timeout went unnoticed alongside it -- the job now
-  # only runs when explicitly requested. To re-enable automated publishing:
-  # configure the trusted publisher on npmjs.com for this repository and
-  # workflow, then flip this back to run on tag pushes.
+  # Keeping this off tag pushes is deliberate: an expected red job in every
+  # release run is how the six-hour Docker build timeout went unnoticed.
+  # The npm-drift workflow catches a forgotten manual publish instead.
   publish-npm:
     runs-on: ubuntu-latest
     needs: [meta, test-and-build]
@@ -290,3 +302,57 @@ jobs:
           repository: ${{ env.DOCKER_IMAGE }}
           readme-filepath: ./DOCKER.md
           short-description: "MCP server for Countly Analytics - Access analytics tools via Model Context Protocol"
+
+  # The Docker half of a release is automated; the npm half is not (see the
+  # publish-npm comment above). This job turns "someone has to remember" into a
+  # visible instruction on the run itself, with the exact commands. It does not
+  # fail the release -- the Docker publish genuinely succeeded, and a red job
+  # here would recreate the noise that hid the six-hour build timeout.
+  npm-publish-reminder:
+    name: npm publish reminder
+    runs-on: ubuntu-latest
+    needs: [meta, publish-docker]
+    timeout-minutes: 5
+    if: needs.meta.outputs.is-release == 'true'
+
+    steps:
+      - name: Check npm and write instructions
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+          REPO: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          NPM_LATEST="$(curl -fsSL https://registry.npmjs.org/countly-mcp-server \
+            | jq -r '."dist-tags".latest // "unknown"')"
+          echo "npm latest: ${NPM_LATEST} | releasing: ${VERSION}"
+
+          if [[ "${NPM_LATEST}" == "${VERSION}" ]]; then
+            echo "npm is already on ${VERSION} - nothing to do."
+            {
+              echo "### npm: already published"
+              echo
+              echo "\`countly-mcp-server@${VERSION}\` is live on npm."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "::warning title=npm publish still required::npm latest is ${NPM_LATEST}, this release is ${VERSION}. Publish by hand - see the run summary."
+          {
+            echo "### :warning: npm publish still required"
+            echo
+            echo "Docker is published. npm is on **${NPM_LATEST}**, this release is **${VERSION}**."
+            echo
+            echo "The welcome page and the support article both tell users to run"
+            echo "\`npx countly-mcp-server@latest\`, so until this is done they get the older version."
+            echo
+            echo '```bash'
+            echo "npm whoami   # must succeed first; E401 means the stored token expired"
+            echo '```'
+            echo
+            echo '```bash'
+            echo "rm -rf /tmp/cly-pub && git clone --depth 1 --branch v${VERSION} ${REPO}.git /tmp/cly-pub && cd /tmp/cly-pub && npm ci && npm publish --access public"
+            echo '```'
+            echo
+            echo "Publish from the tag, not \`main\` -- \`main\` may already carry post-release commits."
+            echo "See [RELEASING.md](${REPO}/blob/main/RELEASING.md) for the full procedure."
+          } >> "$GITHUB_STEP_SUMMARY"

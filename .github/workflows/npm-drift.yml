@@ -1,0 +1,93 @@
+name: npm drift check
+
+# npm publishing is manual (see RELEASING.md), so a release can ship to Docker
+# Hub and mcp.count.ly while npm stays on the previous version -- which is
+# exactly what happened between 1.4.0 and 1.5.0. The welcome page and the
+# support article both tell users to run `npx countly-mcp-server@latest`, so
+# that gap is user-visible.
+#
+# This runs weekly and fails when npm's `latest` is behind the newest release
+# tag. A release run's own reminder job asks for the publish; this catches the
+# case where nobody acted on it.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Mondays, 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: npm vs newest tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout with tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Compare npm latest against the newest release tag
+        run: |
+          set -euo pipefail
+
+          # Newest v*.*.* tag by semver, not by creation date -- a backport tag
+          # pushed later must not look like the newest release.
+          TAG="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | sort -V | tail -1)"
+          if [[ -z "${TAG}" ]]; then
+            echo "::notice::no release tags yet, nothing to compare"
+            exit 0
+          fi
+
+          NPM="$(curl -fsSL https://registry.npmjs.org/countly-mcp-server \
+            | jq -r '."dist-tags".latest // empty')"
+          if [[ -z "${NPM}" ]]; then
+            echo "::error::could not read dist-tags.latest from the npm registry"
+            exit 1
+          fi
+
+          echo "newest tag: ${TAG}"
+          echo "npm latest: ${NPM}"
+
+          if [[ "${TAG}" == "${NPM}" ]]; then
+            echo "In sync."
+            echo "### npm in sync at \`${NPM}\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # npm ahead of the newest tag means someone published without
+          # tagging -- also drift, and worth knowing about.
+          NEWER="$(printf '%s\n%s\n' "${TAG}" "${NPM}" | sort -V | tail -1)"
+          if [[ "${NEWER}" == "${NPM}" ]]; then
+            echo "::error title=npm ahead of git::npm has ${NPM} but the newest tag is v${TAG} - a version was published without a matching tag."
+            {
+              echo "### :warning: npm is ahead of git"
+              echo
+              echo "npm: **${NPM}** · newest tag: **v${TAG}**"
+              echo
+              echo "A version was published without a matching release tag."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "::error title=npm behind::npm is on ${NPM} but v${TAG} is released. Publish it - see RELEASING.md."
+          {
+            echo "### :warning: npm is behind the newest release"
+            echo
+            echo "npm: **${NPM}** · newest tag: **v${TAG}**"
+            echo
+            echo "Users following the documented \`npx countly-mcp-server@latest\` instructions"
+            echo "are getting **${NPM}**, not **${TAG}**."
+            echo
+            echo '```bash'
+            echo "npm whoami   # must succeed first; E401 means the stored token expired"
+            echo '```'
+            echo
+            echo '```bash'
+            echo "rm -rf /tmp/cly-pub && git clone --depth 1 --branch v${TAG} ${{ github.server_url }}/${{ github.repository }}.git /tmp/cly-pub && cd /tmp/cly-pub && npm ci && npm publish --access public"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
