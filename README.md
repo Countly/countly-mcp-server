@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (151 available)
+### Tools (154 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -766,6 +766,11 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`content_assets_update`** - Update an asset's name and/or tags.
 - **`content_assets_delete`** - Delete an uploaded content asset.
 - **`content_langs_list`** - List languages eligible for content translations.
+
+### Support Tickets (requires `tickets` plugin)
+- **`tickets_list`** - List/filter tickets (status, assignee, team, tag, priority, requester, requester name, audience segments, subject search, sort/paging) with assignee and team ids resolved to names.
+- **`tickets_get`** - Get one ticket by number: full detail plus optionally the conversation transcript.
+- **`tickets_stats`** - Support performance metrics: volume, backlog, first-response/resolution percentiles, SLA attainment, agent leaderboard, CSAT.
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
