@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **151 Tools** across 33 categories for comprehensive Countly operations
+- **153 Tools** across 34 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -42,7 +42,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 This server implements the full MCP specification with support for:
 
-### Tools (151 available)
+### Tools (153 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc.
 
 ### Resources
@@ -282,7 +282,7 @@ COUNTLY_TOOLS_ALERTS=NONE      # Alerts: Completely disabled
 COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
-**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 33):
+**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 34):
 - `CORE` - Core tools (ping, get_version, get_plugins) (3 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
@@ -555,7 +555,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 151 tools across 33 categories for comprehensive Countly integration:
+The server provides 153 tools across 34 categories for comprehensive Countly integration:
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -766,6 +766,10 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`content_assets_update`** - Update an asset's name and/or tags.
 - **`content_assets_delete`** - Delete an uploaded content asset.
 - **`content_langs_list`** - List languages eligible for content translations.
+
+### Knowledge Base (requires `knowledge-base` plugin)
+- **`knowledge_base_spaces`** - List knowledge base spaces the user can read (discover space ids first).
+- **`knowledge_base_write`** - Write a page from Markdown; pass a stable `external_ref` for idempotent upserts (ideal for AI agents logging decisions).
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

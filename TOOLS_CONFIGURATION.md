@@ -39,6 +39,7 @@ The following categories are **only available if their corresponding plugin is i
 - **funnels** → requires `funnels` plugin
 - **journeys** → requires `journey_engine` plugin (Countly Enterprise)
 - **content** → requires `content` plugin (Countly Enterprise)
+- **knowledge_base** → requires `knowledge-base` plugin
 
 ### Categories Available by Default
 
@@ -640,6 +641,29 @@ async function contentExamples() {
   await tools.content_blocks_delete({
     app_name: 'MyApp',
     content_id: '507f1f77bcf86cd799439011'
+  });
+}
+```
+
+### knowledge_base
+**Tools**: `knowledge_base_spaces`, `knowledge_base_write`
+
+**Requires plugin**: `knowledge-base`
+
+Discover documentation spaces and author pages in the server's built-in knowledge base. Searching documentation is not here — retrieval across all knowledge sources is owned by the `build` plugin. Reads are permission-scoped to the spaces the authenticated user can see; writes require create rights on the target space and accept Markdown.
+
+**Examples:**
+```typescript
+async function knowledgeBaseExamples() {
+  // Discover space ids first
+  const spaces = await tools.knowledge_base_spaces({});
+
+  // Record a decision; same external_ref updates the same page next time
+  await tools.knowledge_base_write({
+    space_id: '507f1f77bcf86cd799439011',
+    title: 'Feature X decisions',
+    markdown: '# Feature X\n\n- Chose approach A because ...',
+    external_ref: 'feature-x'
   });
 }
 ```
