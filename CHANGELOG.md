@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.1] - 2026-09-21
 
+### Added
+- **`limit` on `query_data` drill queries** — Countly caps a segmentation breakdown at 10 rows unless the request says otherwise, and nothing in the response indicates the truncation. A projection over a high-cardinality key (`did`, or any key combined with `ts`) therefore came back quietly incomplete, and the tool had no way to raise the cap because the handler built its parameter list from a fixed set that did not include `limit`. It is now an optional number, 1 to 10000, sent only for `query_type: "drill"` and only when supplied, so every existing call keeps the server default. Verified live: the same query returns 10 rows without it, 500 with `limit: 500`, and all 1176 events with `limit: 5000`. Responses run roughly 1KB per row, which the parameter description states.
+
 ### Fixed
 - **`query_data` (`query_type: "drill"`) silently ignored `projection_key`** — the handler forwarded the parameter to axios as a raw JS array, which serializes as `projectionKey[]=did`. Countly reads `qstring.projectionKey`, so it never saw the parameter and answered with bare period totals and no per-value section, identical to a call with no breakdown at all. The value is now JSON-encoded into a single query-string field (`projectionKey=["did"]`), matching the encoding this codebase already used for `by_val` in `drill_bookmarks_create` and for `projectionKey` in `user_profiles_breakdown`. With this, a per-user breakdown of a custom event (`projection_key: ["did"]`) works, which is the supported route for event-level user data: on Countly 26.01 and later, raw drill events are streamed through Kafka into ClickHouse rather than stored in MongoDB, so the dbviewer-backed `databases_*` tools cannot reach them.
 

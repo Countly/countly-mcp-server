@@ -1,6 +1,6 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
-import { serializeListParam } from '../lib/validation.js';
+import { serializeListParam, parseNumericParam } from '../lib/validation.js';
 
 // ============================================================================
 // QUERY_DATA TOOL (COMBINED)
@@ -356,6 +356,12 @@ export const queryDataToolDefinition = {
         description: 'Segment keys to break the drill result down by. Used when query_type is "drill".',
         items: { type: 'string' }
       },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of breakdown rows to return (1-10000). Used when query_type is "drill". Countly returns only the first 10 rows when this is omitted, so a projection over a high-cardinality key (e.g. "did", or any key combined with "ts") is silently truncated unless you raise it. Responses run roughly 1KB per row, so a few thousand rows is a very large payload.',
+        minimum: 1,
+        maximum: 10000
+      },
       // Common
       period: {
         type: 'string',
@@ -370,7 +376,7 @@ export const queryDataToolDefinition = {
 
 export async function handleQueryData(context: ToolContext, args: any): Promise<ToolResult> {
   const appId = await context.resolveAppId(args);
-  const { query_type, method, period, event, segmentation, query_object, bucket, projection_key } = args;
+  const { query_type, method, period, event, segmentation, query_object, bucket, projection_key, limit } = args;
 
   if (query_type === 'drill') {
     // Check drill availability
@@ -428,6 +434,13 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     const projectionKey = serializeListParam(projection_key, 'projection_key');
     if (projectionKey) {
       params.projectionKey = projectionKey;
+    }
+    // Countly caps a breakdown at 10 rows unless `limit` says otherwise, so a
+    // projection over a high-cardinality key comes back truncated with nothing
+    // in the response to say so. Only sent when the caller asks for it, which
+    // keeps the server default in place for every existing call.
+    if (limit !== undefined) {
+      params.limit = parseNumericParam(limit, 'limit', 1, 10000);
     }
     resultPrefix = 'Drill query results';
   }
