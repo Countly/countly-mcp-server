@@ -411,3 +411,123 @@ describe('dbviewer tools explain where drill events actually live', () => {
     );
   });
 });
+
+/**
+ * Both cases below were found by running the tools against a live Countly
+ * 26.x server (trina flex instance, app 6a9c3c6d8fcc943fdeaa1adb). The unit
+ * tests above passed while these two were broken, so the payload shapes here
+ * are copied from real responses rather than invented.
+ */
+describe('breakdown detection matches real server payloads', () => {
+  // Real shape: `meta` comes back as an EMPTY ARRAY even on a successful
+  // breakdown; the per-value data lives in `segments` and inline in
+  // `data.<bucket>.<period>.<value>.keys`. Checking only `meta` flagged a
+  // perfectly good breakdown as missing.
+  const realDidBreakdown = {
+    data: {
+      monthly: {
+        '2026.m9': {
+          'cb8b6a6e-e4dd-4662-a982-ddd21dbe7608': {
+            u: 1, t: 1, s: 0, dur: 0,
+            keys: { did: 'cb8b6a6e-e4dd-4662-a982-ddd21dbe7608' },
+          },
+          'cefaf8b5-55c4-48cb-b20e-ac307b96a61c': {
+            u: 1, t: 4, s: 0, dur: 0,
+            keys: { did: 'cefaf8b5-55c4-48cb-b20e-ac307b96a61c' },
+          },
+        },
+      },
+    },
+    meta: [],
+    totals: { u: 7, t: 14, s: 0, dur: 0 },
+    buckets: ['monthly'],
+  };
+
+  const realSegmentBreakdown = {
+    data: { monthly: { '2026.m9': { steam: { u: 7, t: 14, keys: { 'sg.via': 'steam' } } } } },
+    meta: [],
+    segments: { steam: { u: 7, t: 14, keys: { 'sg.via': 'steam' }, segment: 'steam' } },
+    totals: { u: 7, t: 14 },
+  };
+
+  // Real shape of a genuinely empty result: no segments, and the period entry
+  // holds plain totals with no `keys`.
+  const realNoBreakdown = {
+    data: { monthly: { '2026.m9': { u: 7, t: 14, s: 0, dur: 0 } } },
+    meta: {},
+    snapshots: {},
+    totals: { u: 7, t: 14, s: 0, dur: 0 },
+    buckets: ['monthly'],
+  };
+
+  it('does not warn when the breakdown arrived inline under data', async () => {
+    const context = makeContext(realDidBreakdown);
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'pvp_match_started', projection_key: ['did'],
+    });
+
+    expect(result.content).toHaveLength(1);
+  });
+
+  it('does not warn when the breakdown arrived as segments', async () => {
+    const context = makeContext(realSegmentBreakdown);
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'pvp_match_started', projection_key: ['sg.via'],
+    });
+
+    expect(result.content).toHaveLength(1);
+  });
+
+  it('treats an empty array meta as no breakdown, not as a populated one', async () => {
+    const context = makeContext({ ...realNoBreakdown, meta: [] });
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'pvp_match_started', projection_key: ['nope'],
+    });
+
+    expect(result.content).toHaveLength(2);
+    expect(result.content[1].text).toContain('queriable_fields_list');
+  });
+
+  it('still warns on a real no-breakdown payload', async () => {
+    const context = makeContext(realNoBreakdown);
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'pvp_match_started', projection_key: ['nope'],
+    });
+
+    expect(result.content).toHaveLength(2);
+  });
+
+  it('honours a legacy populated meta', async () => {
+    const context = makeContext({ u: 7, t: 14, meta: { did: { a: 1 } } });
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'pvp_match_started', projection_key: ['did'],
+    });
+
+    expect(result.content).toHaveLength(1);
+  });
+});
+
+describe('drill_users_list sends the bucket Countly requires', () => {
+  // Without it the live server answers HTTP 400
+  // "Missing request parameter: bucket", so every call failed.
+  it('defaults bucket to daily', async () => {
+    const context = makeContext(['uid1']);
+
+    await handleListDrillUsers(context, { event: 'pvp_match_started' });
+
+    expect(paramsOfCall(context).bucket).toBe('daily');
+  });
+
+  it('forwards an explicit bucket', async () => {
+    const context = makeContext(['uid1']);
+
+    await handleListDrillUsers(context, { event: 'pvp_match_started', bucket: 'monthly' });
+
+    expect(paramsOfCall(context).bucket).toBe('monthly');
+  });
+});

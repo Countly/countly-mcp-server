@@ -474,16 +474,13 @@ function buildEmptyBreakdownHint(
     return undefined;
   }
 
-  const meta = data && typeof data === 'object' ? data.meta : undefined;
-  const hasBreakdown =
-    meta && typeof meta === 'object' && Object.keys(meta).length > 0;
-  if (hasBreakdown) {
+  if (responseHasBreakdown(data)) {
     return undefined;
   }
 
   return (
-    `Note: projectionKey=${projectionKeyParam} was sent, but the response contains no "meta" breakdown — ` +
-    'only period totals. Common causes:\n' +
+    `Note: projectionKey=${projectionKeyParam} was sent, but the response contains no per-value ` +
+    'breakdown — only period totals. Common causes:\n' +
     '  - The key does not exist on this event. Check the exact spelling with ' +
     'queriable_fields_list (event segments are listed without an "sg." prefix; ' +
     'user properties need the "up." prefix).\n' +
@@ -492,6 +489,56 @@ function buildEmptyBreakdownHint(
     'refuse per-device breakdowns; use drill_users_list to get the matching user ' +
     'ids instead.'
   );
+}
+
+/**
+ * Detect a per-value breakdown in a drill response.
+ *
+ * Where the breakdown lands depends on the server version, so all three known
+ * shapes are checked. Older builds populate `meta`. Current builds leave `meta`
+ * empty (as `[]`, not `{}`) and return the breakdown as a `segments` map plus,
+ * inside `data.<bucket>.<period>`, one entry per value carrying a `keys` object
+ * that names the projection. Checking only `meta` would flag a perfectly good
+ * breakdown as missing.
+ */
+function responseHasBreakdown(data: any): boolean {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+
+  if (isNonEmptyCollection(data.meta) || isNonEmptyCollection(data.segments)) {
+    return true;
+  }
+
+  // data.<bucket>.<period>.<value>.keys
+  const buckets = data.data;
+  if (!buckets || typeof buckets !== 'object') {
+    return false;
+  }
+  for (const periods of Object.values(buckets)) {
+    if (!periods || typeof periods !== 'object') {
+      continue;
+    }
+    for (const values of Object.values(periods as Record<string, unknown>)) {
+      if (!values || typeof values !== 'object') {
+        continue;
+      }
+      for (const entry of Object.values(values as Record<string, unknown>)) {
+        if (entry && typeof entry === 'object' && 'keys' in (entry as object)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+function isNonEmptyCollection(value: unknown): boolean {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  return Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0;
 }
 
 async function checkDrillAvailability(context: ToolContext, appId: string): Promise<boolean> {

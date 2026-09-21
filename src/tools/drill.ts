@@ -177,6 +177,11 @@ export const listDrillUsersToolDefinition = {
         type: 'string',
         description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Server default applies when omitted.',
       },
+      bucket: {
+        type: 'string',
+        description: 'Time bucket granularity. Countly requires this parameter on segmentation queries; defaults to "daily".',
+        enum: ['hourly', 'daily', 'weekly', 'monthly'],
+      },
     },
     required: [],
   },
@@ -192,6 +197,10 @@ export async function handleListDrillUsers(context: ToolContext, args: any): Pro
     method: 'segmentation_users',
     event,
     queryObject: serializeQueryParam(args.query_object, 'query_object'),
+    // Countly rejects segmentation_users with HTTP 400
+    // "Missing request parameter: bucket" when this is absent, even though the
+    // endpoint returns a flat uid list rather than a bucketed series.
+    bucket: withDefault(args.bucket, 'daily'),
   };
 
   if (args.period) {
