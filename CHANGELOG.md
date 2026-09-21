@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.1] - 2026-09-21
+## [1.6.0] - 2026-09-21
 
 ### Added
 - **`limit` on `query_data` drill queries** — Countly caps a segmentation breakdown at 10 rows unless the request says otherwise, and nothing in the response indicates the truncation. A projection over a high-cardinality key (`did`, or any key combined with `ts`) therefore came back quietly incomplete, and the tool had no way to raise the cap because the handler built its parameter list from a fixed set that did not include `limit`. It is now an optional number, 1 to 10000, sent only for `query_type: "drill"` and only when supplied, so every existing call keeps the server default. Verified live: the same query returns 10 rows without it, 500 with `limit: 500`, and all 1176 events with `limit: 5000`. Responses run roughly 1KB per row, which the parameter description states.
