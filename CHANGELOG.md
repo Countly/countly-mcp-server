@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-09-21
+
+### Fixed
+- **`query_data` (`query_type: "drill"`) silently ignored `projection_key`** — the handler forwarded the parameter to axios as a raw JS array, which serializes as `projectionKey[]=did`. Countly reads `qstring.projectionKey`, so it never saw the parameter and answered with bare period totals and no per-value section, identical to a call with no breakdown at all. The value is now JSON-encoded into a single query-string field (`projectionKey=["did"]`), matching the encoding this codebase already used for `by_val` in `drill_bookmarks_create` and for `projectionKey` in `user_profiles_breakdown`. With this, a per-user breakdown of a custom event (`projection_key: ["did"]`) works, which is the supported route for event-level user data: on Countly 26.01 and later, raw drill events are streamed through Kafka into ClickHouse rather than stored in MongoDB, so the dbviewer-backed `databases_*` tools cannot reach them.
+
+  Backward compatibility is unaffected. No tool, parameter, type or required-ness changes; `projection_key` stays `type: "array"`. An array, a JSON-array string, a bare key such as `"did"`, and an empty array (parameter omitted, as before) are all accepted, and every other `query_data` mode and response shape is untouched.
+
 ## [1.5.0] - 2026-08-25
 
 ### Security

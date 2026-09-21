@@ -66,6 +66,92 @@ export function parseJsonParam(
 }
 
 /**
+ * Serialize a list-valued Countly query-string parameter.
+ *
+ * Countly reads list parameters (`projectionKey`, `byVal`, ...) as a
+ * JSON-encoded array in a single query-string field. Handing axios a raw JS
+ * array instead produces `key[]=a&key[]=b`, which Countly's `qstring.<key>`
+ * lookup never matches: the parameter silently disappears and the server
+ * answers as though it had never been sent.
+ *
+ * Accepts every form a caller realistically sends and normalizes all of them:
+ *   - `["did"]`           -> `'["did"]'`
+ *   - `'["did"]'`         -> `'["did"]'`
+ *   - `'did'`             -> `'["did"]'`  (bare key treated as a one-item list)
+ *   - `[]`, `''`, nullish -> `undefined`  (parameter omitted entirely, which
+ *                            is what the previous code effectively did)
+ *
+ * Returns `undefined` when the parameter should not be sent, so callers keep
+ * the existing `if (value) { params.key = value }` shape.
+ */
+export function serializeListParam(
+  value: unknown,
+  paramName: string
+): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    return encodeList(value, paramName);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') {
+      return undefined;
+    }
+
+    if (trimmed.startsWith('[')) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Parameter ${paramName} looks like a JSON array but could not be parsed: ${value}`
+        );
+      }
+      if (!Array.isArray(parsed)) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Parameter ${paramName} must be an array of strings, got: ${value}`
+        );
+      }
+      return encodeList(parsed, paramName);
+    }
+
+    return JSON.stringify([trimmed]);
+  }
+
+  throw new McpError(
+    ErrorCode.InvalidParams,
+    `Parameter ${paramName} must be an array of strings or a JSON array string, got: ${typeof value}`
+  );
+}
+
+function encodeList(values: unknown[], paramName: string): string | undefined {
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  const normalized = values.map((entry) => {
+    if (typeof entry === 'string') {
+      return entry;
+    }
+    if (typeof entry === 'number' || typeof entry === 'boolean') {
+      return String(entry);
+    }
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Parameter ${paramName} must contain only strings, got an entry of type ${entry === null ? 'null' : typeof entry}`
+    );
+  });
+
+  return JSON.stringify(normalized);
+}
+
+/**
  * Validate and parse numeric parameter
  */
 export function parseNumericParam(

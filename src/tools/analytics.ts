@@ -1,5 +1,6 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { serializeListParam } from '../lib/validation.js';
 
 // ============================================================================
 // QUERY_DATA TOOL (COMBINED)
@@ -420,8 +421,13 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     if (event) {
       params.event = event;
     }
-    if (projection_key) {
-      params.projectionKey = projection_key;
+    // Countly reads projectionKey as a JSON-encoded array in one query-string
+    // field. Forwarding the raw JS array made axios emit `projectionKey[]=did`,
+    // which `qstring.projectionKey` never matched, so every breakdown request
+    // came back as bare period totals with no per-value section at all.
+    const projectionKey = serializeListParam(projection_key, 'projection_key');
+    if (projectionKey) {
+      params.projectionKey = projectionKey;
     }
     resultPrefix = 'Drill query results';
   }
