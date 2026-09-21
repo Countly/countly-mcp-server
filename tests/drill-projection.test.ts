@@ -531,3 +531,82 @@ describe('drill_users_list sends the bucket Countly requires', () => {
     expect(paramsOfCall(context).bucket).toBe('monthly');
   });
 });
+
+describe('a lone "(Not set)" bucket is not a breakdown', () => {
+  // Real response for projectionKey=["sg.no_such_key_xyz"]: the server does not
+  // error, it groups every matching event under a single "(Not set)" segment
+  // and leaves data.<bucket> empty. Totals stay correct, so the only signal
+  // that the key is wrong is the placeholder value.
+  const notSetPayload = {
+    data: { monthly: {} },
+    meta: [],
+    segments: {
+      '(Not set)': {
+        u: 7, t: 14, s: 0, dur: 0,
+        s0: '(Not set)',
+        keys: { 'sg.no_such_key_xyz': '(Not set)' },
+        segment: '(Not set)',
+      },
+    },
+    totals: { u: 7, t: 14, s: 0, dur: 0 },
+    buckets: ['monthly'],
+  };
+
+  it('warns when every event landed in "(Not set)"', async () => {
+    const context = makeContext(notSetPayload);
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'pvp_match_started',
+      projection_key: ['sg.no_such_key_xyz'],
+    });
+
+    expect(result.content).toHaveLength(2);
+    expect(result.content[1].text).toContain('(Not set)');
+    expect(result.content[1].text).toContain('queriable_fields_list');
+  });
+
+  it('keeps the raw payload intact in the first block', async () => {
+    const context = makeContext(notSetPayload);
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'e', projection_key: ['sg.no_such_key_xyz'],
+    });
+
+    expect(result.content[0].text).toBe(
+      `Drill query results:\n${JSON.stringify(notSetPayload, null, 2)}`
+    );
+  });
+
+  it('does not warn when "(Not set)" sits alongside real values', async () => {
+    const context = makeContext({
+      data: { monthly: {} },
+      meta: [],
+      segments: {
+        '(Not set)': { u: 1, t: 1, keys: { 'sg.via': '(Not set)' } },
+        steam: { u: 6, t: 13, keys: { 'sg.via': 'steam' } },
+      },
+      totals: { u: 7, t: 14 },
+    });
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'e', projection_key: ['sg.via'],
+    });
+
+    expect(result.content).toHaveLength(1);
+  });
+
+  it('matches the placeholder regardless of case and padding', async () => {
+    const context = makeContext({
+      data: { monthly: {} },
+      meta: [],
+      segments: { '  (not set) ': { u: 7, t: 14, keys: { x: '(not set)' } } },
+      totals: { u: 7, t: 14 },
+    });
+
+    const result = await handleQueryData(context, {
+      query_type: 'drill', event: 'e', projection_key: ['x'],
+    });
+
+    expect(result.content).toHaveLength(2);
+  });
+});

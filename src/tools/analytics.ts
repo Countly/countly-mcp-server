@@ -463,7 +463,7 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
 
 /**
  * Build the advisory note shown when a drill breakdown was requested but the
- * server returned no per-value section. Returns undefined when no note applies.
+ * server returned nothing usable. Returns undefined when no note applies.
  */
 function buildEmptyBreakdownHint(
   queryType: string,
@@ -474,71 +474,111 @@ function buildEmptyBreakdownHint(
     return undefined;
   }
 
-  if (responseHasBreakdown(data)) {
+  const values = collectBreakdownValues(data);
+  const real = values.filter((v) => !isUnsetPlaceholder(v));
+  if (real.length > 0) {
     return undefined;
   }
 
-  return (
-    `Note: projectionKey=${projectionKeyParam} was sent, but the response contains no per-value ` +
-    'breakdown — only period totals. Common causes:\n' +
+  const common =
     '  - The key does not exist on this event. Check the exact spelling with ' +
     'queriable_fields_list (event segments are listed without an "sg." prefix; ' +
     'user properties need the "up." prefix).\n' +
     '  - No events in the period carry that key.\n' +
     '  - The key is very high-cardinality (e.g. "did"). Some deployments cap or ' +
     'refuse per-device breakdowns; use drill_users_list to get the matching user ' +
-    'ids instead.'
+    'ids instead.';
+
+  // The server answers an unknown key by grouping every matching event under a
+  // single "(Not set)" bucket rather than by erroring, so this case is worth
+  // naming explicitly — the totals look right but the breakdown is vacuous.
+  if (values.length > 0) {
+    return (
+      `Note: projectionKey=${projectionKeyParam} was sent, and the server grouped every matching ` +
+      'event under "(Not set)" — no event in this period carries a value for that key, so the ' +
+      'breakdown is empty even though the totals are correct. Common causes:\n' +
+      common
+    );
+  }
+
+  return (
+    `Note: projectionKey=${projectionKeyParam} was sent, but the response contains no per-value ` +
+    'breakdown — only period totals. Common causes:\n' +
+    common
   );
 }
 
 /**
- * Detect a per-value breakdown in a drill response.
+ * Collect the value names of a drill breakdown.
  *
- * Where the breakdown lands depends on the server version, so all three known
- * shapes are checked. Older builds populate `meta`. Current builds leave `meta`
- * empty (as `[]`, not `{}`) and return the breakdown as a `segments` map plus,
- * inside `data.<bucket>.<period>`, one entry per value carrying a `keys` object
- * that names the projection. Checking only `meta` would flag a perfectly good
- * breakdown as missing.
+ * Where the breakdown lands depends on the server version, so all known shapes
+ * are gathered. Older builds populate `meta`. Current builds leave `meta` empty
+ * (as `[]`, not `{}`) and return the breakdown as a `segments` map plus, inside
+ * `data.<bucket>.<period>`, one entry per value carrying a `keys` object naming
+ * the projection. Looking at `meta` alone reported a working breakdown as
+ * missing.
  */
-function responseHasBreakdown(data: any): boolean {
+function collectBreakdownValues(data: any): string[] {
   if (!data || typeof data !== 'object') {
-    return false;
+    return [];
   }
 
-  if (isNonEmptyCollection(data.meta) || isNonEmptyCollection(data.segments)) {
-    return true;
-  }
+  const values = new Set<string>();
 
-  // data.<bucket>.<period>.<value>.keys
-  const buckets = data.data;
-  if (!buckets || typeof buckets !== 'object') {
-    return false;
-  }
-  for (const periods of Object.values(buckets)) {
-    if (!periods || typeof periods !== 'object') {
-      continue;
+  if (data.segments && typeof data.segments === 'object' && !Array.isArray(data.segments)) {
+    for (const key of Object.keys(data.segments)) {
+      values.add(key);
     }
-    for (const values of Object.values(periods as Record<string, unknown>)) {
-      if (!values || typeof values !== 'object') {
-        continue;
-      }
-      for (const entry of Object.values(values as Record<string, unknown>)) {
-        if (entry && typeof entry === 'object' && 'keys' in (entry as object)) {
-          return true;
+  }
+
+  if (data.meta && typeof data.meta === 'object') {
+    const meta = Array.isArray(data.meta) ? data.meta : Object.values(data.meta);
+    for (const entry of meta) {
+      if (typeof entry === 'string') {
+        values.add(entry);
+      } else if (Array.isArray(entry)) {
+        for (const v of entry) {
+          if (typeof v === 'string') {
+            values.add(v);
+          }
+        }
+      } else if (entry && typeof entry === 'object') {
+        for (const k of Object.keys(entry)) {
+          values.add(k);
         }
       }
     }
   }
 
-  return false;
+  // data.<bucket>.<period>.<value>.keys
+  const buckets = data.data;
+  if (buckets && typeof buckets === 'object') {
+    for (const periods of Object.values(buckets)) {
+      if (!periods || typeof periods !== 'object') {
+        continue;
+      }
+      for (const entries of Object.values(periods as Record<string, unknown>)) {
+        if (!entries || typeof entries !== 'object') {
+          continue;
+        }
+        for (const [name, entry] of Object.entries(entries as Record<string, unknown>)) {
+          if (entry && typeof entry === 'object' && 'keys' in (entry as object)) {
+            values.add(name);
+          }
+        }
+      }
+    }
+  }
+
+  return [...values];
 }
 
-function isNonEmptyCollection(value: unknown): boolean {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  return Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0;
+/**
+ * Countly's placeholder for "this document has no value for the projected
+ * key". A breakdown consisting only of this is not a breakdown.
+ */
+function isUnsetPlaceholder(value: string): boolean {
+  return value.trim().toLowerCase() === '(not set)';
 }
 
 async function checkDrillAvailability(context: ToolContext, appId: string): Promise<boolean> {
