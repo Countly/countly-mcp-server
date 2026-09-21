@@ -139,19 +139,23 @@ These categories are always available without plugin checks:
 **Note**: Returns management/admin users who access the Countly dashboard. These are the users who log into Countly to analyze data, configure settings, and manage applications.
 
 ### drill
-**Tools**: `queriable_fields_list`, `run_query`, `drill_bookmarks_list`, `drill_bookmarks_create`, `drill_bookmarks_delete`
+**Tools**: `queriable_fields_list`, `drill_users_list`, `drill_bookmarks_list`, `drill_bookmarks_create`, `drill_bookmarks_delete`
 
 **Operations**:
-- R: queriable_fields_list, run_query, drill_bookmarks_list
+- R: queriable_fields_list, drill_users_list, drill_bookmarks_list
 - C: drill_bookmarks_create
 - D: drill_bookmarks_delete
 
 **Notes**:
 - `queriable_fields_list`: Get all user properties and event segments with their types. User properties must be prepended with "up." in queries. Types: d=date, n=number, s=string, l=list
-- `run_query`: Run drill segmentation queries with MongoDB query objects. Can break down by projection key (segment or user property). Supports buckets: hourly, daily, weekly, monthly
+- `drill_users_list`: Get the Countly internal user ids (uid) matching a drill segmentation query, via `/o?method=segmentation_users`. This is the supported route for per-user analysis of an event, and it scales where a `projection_key` breakdown on the high-cardinality `did` field does not. Feed the uids to `user_profiles_get` / `user_profiles_query` to resolve full profiles.
 - `drill_bookmarks_list`: List all saved drill bookmarks for a specific event
 - `drill_bookmarks_create`: Create a new bookmark to save a query for later reuse in the dashboard
 - `drill_bookmarks_delete`: Delete an existing drill bookmark
+
+Drill segmentation queries themselves run through `query_data` with `query_type: "drill"` (in the **analytics** category, no plugin gate): MongoDB-style `query_object` filter, `bucket` of hourly/daily/weekly/monthly, and a `projection_key` array that produces the per-value breakdown in the response's `meta` field.
+
+**Where raw drill events live**: on Countly 26.01 and later, raw drill event documents are streamed through Kafka into ClickHouse; MongoDB keeps only metadata, configuration, and pre-aggregated views. The `database` category tools read MongoDB through the dbviewer plugin, so `countly_drill` lists no `drill_events*` collection on those deployments and a query against one returns an empty result rather than an error. Use `query_data` (`query_type: "drill"`) or `drill_users_list` instead; both tools emit an advisory note when they detect this situation.
 
 **⚠️ Requires Plugin**: `drill` plugin must be installed on Countly server
 
@@ -298,13 +302,23 @@ if (plugins.includes('drill')) {
     event: 'Account Created' 
   });
   
-  // Run segmentation query
-  const results = await tools.run_query({
+  // Run a segmentation query, broken down by a segment
+  const results = await tools.query_data({
     app_name: 'MyApp',
+    query_type: 'drill',
     event: 'Account Created',
     query_object: '{"up.country":"US"}',
     period: '30days',
-    bucket: 'daily'
+    bucket: 'daily',
+    projection_key: ['up.city']
+  });
+
+  // Get the user ids behind that query, for per-user analysis
+  const users = await tools.drill_users_list({
+    app_name: 'MyApp',
+    event: 'Account Created',
+    query_object: '{"up.country":"US"}',
+    period: '30days'
   });
   
   // List existing bookmarks

@@ -130,6 +130,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   },
   drill: {
     operations: {
+      'drill_users_list': 'R',
       'drill_bookmarks_list': 'R',
       'drill_bookmarks_create': 'C',
       'drill_bookmarks_delete': 'D',

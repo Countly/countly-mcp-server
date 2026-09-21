@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-09-21
+
+### Fixed
+- **`query_data` (`query_type: "drill"`) silently ignored `projection_key`** — the handler forwarded the parameter to axios as a raw JS array, which serializes as `projectionKey[]=did`. Countly reads `qstring.projectionKey`, so it never saw the parameter and answered with bare period totals and an empty `meta`, identical to a call with no breakdown at all. Every drill breakdown the server has ever returned was a non-breakdown. The value is now JSON-encoded into a single query-string field (`projectionKey=["did"]`), matching the encoding this codebase already used for `by_val` in `drill_bookmarks_create` and for `projectionKey` in `user_profiles_breakdown`. The parameter's schema is unchanged (`type: "array"`), and a JSON-array string, a bare key such as `"did"`, and an empty array (parameter omitted, as before) are all accepted. An audit of every other `type: "array"` parameter in the registry found no second instance of the bug: all of them were already encoded, either explicitly or by being nested inside a `JSON.stringify`'d object.
+- **`query_object` was flattened when passed as an object** — the schema declares a string, but a caller sending a real object got `queryObject[up.country]=US`, which Countly cannot parse. Objects are now encoded; strings pass through byte-for-byte, so existing callers are unaffected.
+
+### Added
+- **`drill_users_list` tool** — wraps `/o?method=segmentation_users` and returns the Countly internal user ids (uid) matching a drill segmentation query. This is the supported route for per-user analysis of an event, and it scales where a `projection_key` breakdown on the high-cardinality `did` field does not. Read-only, in the `drill` category, so it is gated on the drill plugin and available under `COUNTLY_TOOLS_DRILL=R`.
+- **Advisory notes explaining where raw drill events live** — on Countly 26.01 and later, raw drill event documents are streamed through Kafka into ClickHouse and MongoDB keeps only metadata, configuration and pre-aggregated views. The dbviewer plugin reads MongoDB alone, so `countly_drill` legitimately exposes no `drill_events*` collection and a query against one returns an empty result rather than an error — indistinguishable, from the tool output, from a permissions problem or a wrong collection name. `databases_list` now says so when it sees a `countly_drill` without `drill_events`, and `databases_query`/`collections_aggregate` say so on an empty `drill_events*` result, each pointing at `query_data` and `drill_users_list`. `query_data` likewise explains an empty `meta` when a breakdown was requested. Every note is appended as a **separate** content block, so the first block remains the byte-for-byte raw payload that existing callers parse.
+
+### Changed
+- **Tool descriptions and docs name the real tools** — `README.md` and `TOOLS_CONFIGURATION.md` documented a `run_query` tool and a `get_analytics_data`/`get_events_data` pair that have not existed under those names; all three are `query_data` modes. The drill and database sections now also carry the ClickHouse storage caveat, and `projection_key`'s description gained concrete examples and a pointer to `queriable_fields_list` for exact key spellings.
+
 ## [1.5.0] - 2026-08-25
 
 ### Security

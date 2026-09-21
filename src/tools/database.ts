@@ -2,12 +2,81 @@ import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
+// DRILL STORAGE ADVISORY
+// ============================================================================
+
+/**
+ * On Countly deployments from 26.01 onward, raw drill event documents are no
+ * longer stored in MongoDB: the ingestion path writes them through Kafka into
+ * ClickHouse, and MongoDB keeps only metadata, configuration and
+ * pre-aggregated views. The dbviewer plugin reads MongoDB alone, so
+ * `countly_drill` legitimately contains no `drill_events*` collection there and
+ * a query against one returns an empty result rather than an error.
+ *
+ * The advisory is appended as a separate content block so the raw API payload
+ * in the first block stays byte-for-byte what callers already parse.
+ */
+const DRILL_STORAGE_NOTE =
+  'Note: no drill_events* collection is visible in countly_drill. On Countly 26.01 and later, ' +
+  'raw drill event documents are not stored in MongoDB — they are streamed through Kafka into ' +
+  'ClickHouse, and MongoDB keeps only metadata, configuration and pre-aggregated views. The ' +
+  'dbviewer plugin behind these tools reads MongoDB only, so those documents are not reachable ' +
+  'here and are not being hidden from you. The presence of kafka_consumer_*/kafka_producer_* ' +
+  'collections is a strong indicator of such a deployment.\n' +
+  'Use these instead:\n' +
+  '  - query_data with query_type="drill" and projection_key for segment breakdowns.\n' +
+  '  - drill_users_list for the user ids (uid) matching a drill query.\n' +
+  '  - user_profiles_query / user_profiles_get to resolve those users.';
+
+/**
+ * True when the payload describes a countly_drill database that exposes no
+ * drill_events collection. Shape-agnostic on purpose: the dbviewer response
+ * format has varied across versions, so this inspects the serialized payload
+ * rather than assuming a structure.
+ */
+function drillEventsMissing(data: unknown): boolean {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(data);
+  } catch {
+    return false;
+  }
+  if (!serialized || !serialized.includes('countly_drill')) {
+    return false;
+  }
+  return !serialized.includes('drill_events');
+}
+
+/** True when a dbviewer find/aggregate response carries no documents. */
+function resultIsEmpty(data: any): boolean {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+  if (Array.isArray(data)) {
+    return data.length === 0;
+  }
+  if (Array.isArray(data.aaData)) {
+    return data.aaData.length === 0;
+  }
+  return false;
+}
+
+/** True for the collections that hold raw drill events. */
+function isDrillEventsCollection(database: string, collection: string): boolean {
+  return (
+    database === 'countly_drill' &&
+    typeof collection === 'string' &&
+    collection.startsWith('drill_events')
+  );
+}
+
+// ============================================================================
 // LIST_DATABASES TOOL
 // ============================================================================
 
 export const listDatabasesToolDefinition = {
   name: 'databases_list',
-  description: 'List MongoDB databases and collections exposed by the Countly dbviewer (typically countly, countly_drill, countly_out, countly_fs) via /o/db. Requires the dbviewer plugin. Takes no arguments.',
+  description: 'List MongoDB databases and collections exposed by the Countly dbviewer (typically countly, countly_drill, countly_out, countly_fs) via /o/db. Requires the dbviewer plugin. Takes no arguments. Note: on Countly 26.01 and later, raw drill event documents live in ClickHouse rather than MongoDB, so countly_drill will list only drill metadata collections and no drill_events* collection — for event-level data use query_data with query_type="drill" or drill_users_list.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -31,14 +100,18 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
 
   );
   
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Available databases and collections:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
+  const content: ToolResult['content'] = [
+    {
+      type: 'text',
+      text: `Available databases and collections:\n${JSON.stringify(response.data, null, 2)}`,
+    },
+  ];
+
+  if (drillEventsMissing(response.data)) {
+    content.push({ type: 'text', text: DRILL_STORAGE_NOTE });
+  }
+
+  return { content };
 }
 
 // ============================================================================
@@ -47,7 +120,7 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
 
 export const queryDatabaseToolDefinition = {
   name: 'databases_query',
-  description: 'Run a raw MongoDB find() query on a Countly collection with filter, projection, sort, and pagination via /o/db. Requires the dbviewer plugin. For a single document by _id use databases_document; for aggregation pipelines use collections_aggregate.',
+  description: 'Run a raw MongoDB find() query on a Countly collection with filter, projection, sort, and pagination via /o/db. Requires the dbviewer plugin. For a single document by _id use databases_document; for aggregation pipelines use collections_aggregate. Note: this reads MongoDB only — on Countly 26.01 and later raw drill events are stored in ClickHouse, so countly_drill.drill_events* queries return empty; use query_data with query_type="drill" or drill_users_list instead.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -115,14 +188,18 @@ params.sSearch = search;
 
   );
   
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Query results from ${database}.${collection}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
+  const content: ToolResult['content'] = [
+    {
+      type: 'text',
+      text: `Query results from ${database}.${collection}:\n${JSON.stringify(response.data, null, 2)}`,
+    },
+  ];
+
+  if (isDrillEventsCollection(database, collection) && resultIsEmpty(response.data)) {
+    content.push({ type: 'text', text: DRILL_STORAGE_NOTE });
+  }
+
+  return { content };
 }
 
 // ============================================================================
@@ -196,7 +273,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 
 export const aggregateCollectionToolDefinition = {
   name: 'collections_aggregate',
-  description: 'Run a MongoDB aggregation pipeline on a collection via /o/db. Requires the dbviewer plugin. For simple find queries use databases_query.',
+  description: 'Run a MongoDB aggregation pipeline on a collection via /o/db. Requires the dbviewer plugin. For simple find queries use databases_query. Note: this reads MongoDB only — on Countly 26.01 and later raw drill events are stored in ClickHouse, so a pipeline over countly_drill.drill_events* returns an empty result rather than an error; use query_data with query_type="drill" or drill_users_list instead.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -245,14 +322,18 @@ export async function handleAggregateCollection(context: ToolContext, args: any)
 
   );
   
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Aggregation results from ${database}.${collection}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
+  const content: ToolResult['content'] = [
+    {
+      type: 'text',
+      text: `Aggregation results from ${database}.${collection}:\n${JSON.stringify(response.data, null, 2)}`,
+    },
+  ];
+
+  if (isDrillEventsCollection(database, collection) && resultIsEmpty(response.data)) {
+    content.push({ type: 'text', text: DRILL_STORAGE_NOTE });
+  }
+
+  return { content };
 }
 
 // ============================================================================

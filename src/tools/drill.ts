@@ -1,5 +1,5 @@
 import { ToolContext, ToolResult } from './types.js';
-import { withDefault } from '../lib/validation.js';
+import { withDefault, serializeQueryParam } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
 // ============================================================================
@@ -146,6 +146,98 @@ function getTypeDescription(type: string): string {
 
 
 
+
+// ============================================================================
+// DRILL USERS LIST TOOL
+// ============================================================================
+
+export const listDrillUsersToolDefinition = {
+  name: 'drill_users_list',
+  description: 'List the user ids (uid) of users matching a drill segmentation query, via /o?method=segmentation_users. Requires the drill plugin. Use this for per-user analysis of an event — it is the supported way to get a user-level breakdown, and it scales where a query_data drill breakdown on "did" does not. Raw drill event documents are NOT readable through the dbviewer tools on modern Countly deployments. To turn the returned uids into full profiles use user_profiles_query; for aggregate segment breakdowns use query_data with query_type="drill".',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      app_id: {
+        type: 'string',
+        description: 'Application ID. Either app_id or app_name must be provided; call apps_list first if you do not know it.'
+      },
+      app_name: {
+        type: 'string',
+        description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.'
+      },
+      event: {
+        type: 'string',
+        description: 'Event key to query (e.g. "[CLY]_session", "[CLY]_view", or a custom event). Defaults to "[CLY]_session" when omitted.',
+      },
+      query_object: {
+        type: 'string',
+        description: 'MongoDB-style filter as a JSON string (e.g. \'{"sg.via":"lobby"}\'). Defaults to "{}" (all events for the period). Use field prefixes listed by queriable_fields_list.',
+      },
+      period: {
+        type: 'string',
+        description: 'Time period. One of "month", "60days", "30days", "7days", "yesterday", "hour", or a custom range as [startMilliseconds,endMilliseconds] (e.g. "[1417730400000,1420149600000]"). Server default applies when omitted.',
+      },
+    },
+    required: [],
+  },
+};
+
+export async function handleListDrillUsers(context: ToolContext, args: any): Promise<ToolResult> {
+  const appId = await context.resolveAppId(args);
+  const event = withDefault(args.event, '[CLY]_session');
+
+  const params: any = {
+    ...context.getAuthParams(),
+    app_id: appId,
+    method: 'segmentation_users',
+    event,
+    queryObject: serializeQueryParam(args.query_object, 'query_object'),
+  };
+
+  if (args.period) {
+    params.period = args.period;
+  }
+
+  const response = await safeApiCall(
+    () => context.httpClient.get('/o', { params }),
+    'Failed to list drill users'
+  );
+
+  const data = response.data;
+  const uids = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.uids)
+      ? data.uids
+      : Array.isArray(data?.aaData)
+        ? data.aaData
+        : undefined;
+
+  let resultText = 'Drill users:\n\n';
+  resultText += `**Event:** ${event}\n`;
+  resultText += `**Query:** ${params.queryObject}\n`;
+  if (args.period) {
+    resultText += `**Period:** ${args.period}\n`;
+  }
+  resultText += '\n';
+
+  if (uids) {
+    resultText += `**Matching users (${uids.length}):**\n`;
+    resultText += JSON.stringify(uids, null, 2);
+    resultText += '\n\nThese are Countly internal user ids (uid). Pass one to ';
+    resultText += 'user_profiles_get, or filter user_profiles_query by uid, to resolve full profiles.';
+  } else {
+    resultText += JSON.stringify(data, null, 2);
+  }
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: resultText,
+      },
+    ],
+  };
+}
 
 // ============================================================================
 // LIST DRILL BOOKMARKS TOOL
@@ -655,6 +747,7 @@ export async function handleGetMetadata(context: ToolContext, args: any): Promis
 
 export const drillToolDefinitions = [
   getAvailableFieldsToolDefinition,
+  listDrillUsersToolDefinition,
   listDrillBookmarksToolDefinition,
   createDrillBookmarkToolDefinition,
   deleteDrillBookmarkToolDefinition,
@@ -663,6 +756,7 @@ export const drillToolDefinitions = [
 
 export const drillToolHandlers = {
   'queriable_fields_list': 'queriable_fields_list',
+  'drill_users_list': 'drill_users_list',
   'drill_bookmarks_list': 'drill_bookmarks_list',
   'drill_bookmarks_create': 'drill_bookmarks_create',
   'drill_bookmarks_delete': 'drill_bookmarks_delete',
@@ -674,6 +768,10 @@ export class DrillTools {
 
   async queriable_fields_list(args: any): Promise<ToolResult> {
     return handleGetAvailableFields(this.context, args);
+  }
+
+  async drill_users_list(args: any): Promise<ToolResult> {
+    return handleListDrillUsers(this.context, args);
   }
 
   async drill_bookmarks_list(args: any): Promise<ToolResult> {

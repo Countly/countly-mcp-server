@@ -571,7 +571,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`apps_reset`** - Reset app data
 
 ### Analytics & Dashboards
-- **`get_analytics_data`** - Analytics data breakdown by predefined methods (locations, carriers, devices, etc.). For multi-segment breakdowns, use drill tools
+- **`query_data`** - Analytics data in three modes: `query_type: "analytics"` for predefined breakdowns (locations, carriers, devices, etc.), `"events"` for event totals, and `"drill"` for custom segment filtering with a `projection_key` breakdown
 - **`app_analytics_summary`** - General app summary and analytics overview
 - **`slipping_users`** - Identify inactive app users
 - **`session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
@@ -581,7 +581,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 ### Events
 - **`events_create`** - Define event with metadata and configuration
 - **`events_list`** - List all events and their segments, including internal Countly events with exact database structure
-- **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
+- **`query_data`** (`query_type: "events"`) - Basic events data. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. To segment an event by its segments, use `query_type: "drill"` with `projection_key`.
 
 ### Dashboard User Management
 - **`dashboard_users`** - List all dashboard users (admin/management users who access the Countly dashboard)
@@ -602,6 +602,10 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`notes_delete`** - Delete note
 
 ### Database Operations
+
+> These tools read MongoDB only. They cannot reach raw drill events on Countly
+> 26.01 and later — see [Drill Segmentation](#drill-segmentation-requires-drill-plugin).
+
 - **`databases_list`** - List available databases
 - **`databases_query`** - Query database collections
 - **`databases_document`** - Get specific document
@@ -623,10 +627,19 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 
 ### Drill Segmentation (requires `drill` plugin)
 - **`queriable_fields_list`** - Get available properties for segmentation
-- **`run_query`** - Run drill query with filters and time buckets
+- **`query_data`** (`query_type: "drill"`) - Run a drill query with filters, time buckets, and a `projection_key` breakdown
+- **`drill_users_list`** - List the user ids (uid) matching a drill query, for per-user analysis
 - **`drill_bookmarks_list`** - List saved segmentation queries
 - **`drill_bookmarks_create`** - Save a segmentation query
 - **`drill_bookmarks_delete`** - Delete a saved query
+
+> **Where raw drill events live.** On Countly 26.01 and later, raw drill event
+> documents are streamed through Kafka into ClickHouse; MongoDB keeps only
+> metadata, configuration, and pre-aggregated views. The `databases_*` tools read
+> MongoDB through the dbviewer plugin, so `countly_drill` lists no `drill_events*`
+> collection on those deployments and a query against one returns an empty result
+> rather than an error. Use `query_data` with `query_type: "drill"` for segment
+> breakdowns and `drill_users_list` for user-level analysis.
 
 ### User Profiles (requires `users` plugin)
 - **`user_profiles_query`** - Query users with MongoDB filters

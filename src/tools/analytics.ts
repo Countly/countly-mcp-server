@@ -1,5 +1,6 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { serializeListParam, serializeQueryParam } from '../lib/validation.js';
 
 // ============================================================================
 // QUERY_DATA TOOL (COMBINED)
@@ -352,7 +353,7 @@ export const queryDataToolDefinition = {
       },
       projection_key: {
         type: 'array',
-        description: 'Segment keys to break the drill result down by. Used when query_type is "drill".',
+        description: 'Segment keys to break the drill result down by, e.g. ["did"] for a per-device-id breakdown, ["country"] or ["up.country"] for a user property. Used when query_type is "drill". Event segment keys are written without an "sg." prefix; confirm exact names with queriable_fields_list. The per-value breakdown comes back in the response\'s "meta" field. High-cardinality keys such as "did" may be capped by the server — drill_users_list returns the matching user ids instead.',
         items: { type: 'string' }
       },
       // Common
@@ -397,6 +398,7 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
 
   let endpoint = '/o';
   let resultPrefix = '';
+  let projectionKeyParam: string | undefined;
 
   if (query_type === 'analytics') {
     params.method = method;
@@ -415,13 +417,18 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     resultPrefix = `Events data for app ${appId}`;
   } else if (query_type === 'drill') {
     params.method = 'segmentation';
-    params.queryObject = query_object || '{}';
+    params.queryObject = serializeQueryParam(query_object, 'query_object');
     params.bucket = bucket || 'daily';
     if (event) {
       params.event = event;
     }
-    if (projection_key) {
-      params.projectionKey = projection_key;
+    // Countly reads projectionKey as a JSON-encoded array in one query-string
+    // field. Forwarding the raw JS array made axios emit `projectionKey[]=did`,
+    // which `qstring.projectionKey` never matched, so every breakdown request
+    // silently came back as bare totals with an empty `meta`.
+    projectionKeyParam = serializeListParam(projection_key, 'projection_key');
+    if (projectionKeyParam) {
+      params.projectionKey = projectionKeyParam;
     }
     resultPrefix = 'Drill query results';
   }
@@ -431,14 +438,60 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     `Failed to execute ${query_type} query`
   );
 
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `${resultPrefix}:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
+  const content: ToolResult['content'] = [
+    {
+      type: 'text',
+      text: `${resultPrefix}:\n${JSON.stringify(response.data, null, 2)}`,
+    },
+  ];
+
+  // A breakdown that comes back without a populated `meta` is the server
+  // saying it had nothing to break down by. Surface the likely causes in a
+  // separate block so the raw payload above stays untouched for callers that
+  // parse it.
+  const emptyBreakdownHint = buildEmptyBreakdownHint(
+    query_type,
+    projectionKeyParam,
+    response.data
+  );
+  if (emptyBreakdownHint) {
+    content.push({ type: 'text', text: emptyBreakdownHint });
+  }
+
+  return { content };
+}
+
+/**
+ * Build the advisory note shown when a drill breakdown was requested but the
+ * server returned no per-value section. Returns undefined when no note applies.
+ */
+function buildEmptyBreakdownHint(
+  queryType: string,
+  projectionKeyParam: string | undefined,
+  data: any
+): string | undefined {
+  if (queryType !== 'drill' || !projectionKeyParam) {
+    return undefined;
+  }
+
+  const meta = data && typeof data === 'object' ? data.meta : undefined;
+  const hasBreakdown =
+    meta && typeof meta === 'object' && Object.keys(meta).length > 0;
+  if (hasBreakdown) {
+    return undefined;
+  }
+
+  return (
+    `Note: projectionKey=${projectionKeyParam} was sent, but the response contains no "meta" breakdown — ` +
+    'only period totals. Common causes:\n' +
+    '  - The key does not exist on this event. Check the exact spelling with ' +
+    'queriable_fields_list (event segments are listed without an "sg." prefix; ' +
+    'user properties need the "up." prefix).\n' +
+    '  - No events in the period carry that key.\n' +
+    '  - The key is very high-cardinality (e.g. "did"). Some deployments cap or ' +
+    'refuse per-device breakdowns; use drill_users_list to get the matching user ' +
+    'ids instead.'
+  );
 }
 
 async function checkDrillAvailability(context: ToolContext, appId: string): Promise<boolean> {
