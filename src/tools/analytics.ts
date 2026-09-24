@@ -1,5 +1,12 @@
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { serializeListParam, parseNumericParam } from '../lib/validation.js';
+
+// Every extra projection key multiplies the breakdown grid Countly has to
+// build, so a drill query slows to a crawl past a handful of them. Advisory
+// only: past this count the query still runs, with a warning attached.
+const MAX_PROJECTION_KEYS = 3;
 
 // ============================================================================
 // QUERY_DATA TOOL (COMBINED)
@@ -352,8 +359,14 @@ export const queryDataToolDefinition = {
       },
       projection_key: {
         type: 'array',
-        description: 'Segment keys to break the drill result down by. Used when query_type is "drill".',
+        description: 'Segment keys to break the drill result down by. Used when query_type is "drill". Keep this to 3 keys or fewer: more than 3 projection keys degrades query performance severely, and the response will carry a warning saying so.',
         items: { type: 'string' }
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of breakdown rows to return (1-10000). Used when query_type is "drill". Countly returns only the first 10 rows when this is omitted, so a projection over a high-cardinality key (e.g. "did", or any key combined with "ts") is silently truncated unless you raise it. Responses run roughly 1KB per row, so a few thousand rows is a very large payload.',
+        minimum: 1,
+        maximum: 10000
       },
       // Common
       period: {
@@ -369,7 +382,7 @@ export const queryDataToolDefinition = {
 
 export async function handleQueryData(context: ToolContext, args: any): Promise<ToolResult> {
   const appId = await context.resolveAppId(args);
-  const { query_type, method, period, event, segmentation, query_object, bucket, projection_key } = args;
+  const { query_type, method, period, event, segmentation, query_object, bucket, projection_key, limit } = args;
 
   if (query_type === 'drill') {
     // Check drill availability
@@ -397,6 +410,7 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
 
   let endpoint = '/o';
   let resultPrefix = '';
+  let warning = '';
 
   if (query_type === 'analytics') {
     params.method = method;
@@ -420,8 +434,34 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     if (event) {
       params.event = event;
     }
-    if (projection_key) {
-      params.projectionKey = projection_key;
+    // Countly reads projectionKey as a JSON-encoded array in one query-string
+    // field. Forwarding the raw JS array made axios emit `projectionKey[]=did`,
+    // which `qstring.projectionKey` never matched, so every breakdown request
+    // came back as bare period totals with no per-value section at all.
+    const projectionKey = serializeListParam(projection_key, 'projection_key');
+    if (projectionKey) {
+      // The query still runs: an over-wide breakdown is slow, not invalid. The
+      // warning rides along with the result so the caller can explain a slow or
+      // timed-out query to the user instead of guessing at the cause.
+      const keyCount = JSON.parse(projectionKey).length;
+      if (keyCount > MAX_PROJECTION_KEYS) {
+        warning =
+          `**Warning:** this query used ${keyCount} projection keys. More than ${MAX_PROJECTION_KEYS} degrades drill performance severely, ` +
+          'and is the likely cause if the query was slow, timed out, or returned truncated data. ' +
+          `Tell the user this, and suggest narrowing the breakdown to ${MAX_PROJECTION_KEYS} keys or fewer.\n\n`;
+      }
+      params.projectionKey = projectionKey;
+    }
+    // Countly caps a breakdown at 10 rows unless `limit` says otherwise, so a
+    // projection over a high-cardinality key comes back truncated with nothing
+    // in the response to say so. Only sent when the caller asks for it, which
+    // keeps the server default in place for every existing call.
+    if (limit !== undefined) {
+      const parsedLimit = parseNumericParam(limit, 'limit', 1, 10000);
+      if (!Number.isInteger(parsedLimit)) {
+        throw new McpError(ErrorCode.InvalidParams, `Parameter limit must be an integer, got: ${limit}`);
+      }
+      params.limit = parsedLimit;
     }
     resultPrefix = 'Drill query results';
   }
@@ -435,7 +475,7 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     content: [
       {
         type: 'text',
-        text: `${resultPrefix}:\n${JSON.stringify(response.data, null, 2)}`,
+        text: `${warning}${resultPrefix}:\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
   };
