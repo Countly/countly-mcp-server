@@ -2,6 +2,11 @@ import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 import { serializeListParam, parseNumericParam } from '../lib/validation.js';
 
+// Every extra projection key multiplies the breakdown grid Countly has to
+// build, so a drill query slows to a crawl past a handful of them. Advisory
+// only: past this count the query still runs, with a warning attached.
+const MAX_PROJECTION_KEYS = 3;
+
 // ============================================================================
 // QUERY_DATA TOOL (COMBINED)
 // ============================================================================
@@ -353,7 +358,7 @@ export const queryDataToolDefinition = {
       },
       projection_key: {
         type: 'array',
-        description: 'Segment keys to break the drill result down by. Used when query_type is "drill".',
+        description: 'Segment keys to break the drill result down by. Used when query_type is "drill". Keep this to 3 keys or fewer: more than 3 projection keys degrades query performance severely, and the response will carry a warning saying so.',
         items: { type: 'string' }
       },
       limit: {
@@ -404,6 +409,7 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
 
   let endpoint = '/o';
   let resultPrefix = '';
+  let warning = '';
 
   if (query_type === 'analytics') {
     params.method = method;
@@ -433,6 +439,16 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     // came back as bare period totals with no per-value section at all.
     const projectionKey = serializeListParam(projection_key, 'projection_key');
     if (projectionKey) {
+      // The query still runs: an over-wide breakdown is slow, not invalid. The
+      // warning rides along with the result so the caller can explain a slow or
+      // timed-out query to the user instead of guessing at the cause.
+      const keyCount = JSON.parse(projectionKey).length;
+      if (keyCount > MAX_PROJECTION_KEYS) {
+        warning =
+          `**Warning:** this query used ${keyCount} projection keys. More than ${MAX_PROJECTION_KEYS} degrades drill performance severely, ` +
+          'and is the likely cause if the query was slow, timed out, or returned truncated data. ' +
+          `Tell the user this, and suggest narrowing the breakdown to ${MAX_PROJECTION_KEYS} keys or fewer.\n\n`;
+      }
       params.projectionKey = projectionKey;
     }
     // Countly caps a breakdown at 10 rows unless `limit` says otherwise, so a
@@ -454,7 +470,7 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     content: [
       {
         type: 'text',
-        text: `${resultPrefix}:\n${JSON.stringify(response.data, null, 2)}`,
+        text: `${warning}${resultPrefix}:\n${JSON.stringify(response.data, null, 2)}`,
       },
     ],
   };
