@@ -31,16 +31,16 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "countly-sdk-nodejs": "^24.10.4",
     "dotenv": "^17.4.2",
     "ipaddr.js": "^1.9.1"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
-    "@typescript-eslint/eslint-plugin": "^8.67.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.46.3",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.5",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
