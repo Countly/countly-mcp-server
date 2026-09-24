@@ -1,3 +1,4 @@
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 import { serializeListParam, parseNumericParam } from '../lib/validation.js';
@@ -456,7 +457,11 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
     // in the response to say so. Only sent when the caller asks for it, which
     // keeps the server default in place for every existing call.
     if (limit !== undefined) {
-      params.limit = parseNumericParam(limit, 'limit', 1, 10000);
+      const parsedLimit = parseNumericParam(limit, 'limit', 1, 10000);
+      if (!Number.isInteger(parsedLimit)) {
+        throw new McpError(ErrorCode.InvalidParams, `Parameter limit must be an integer, got: ${limit}`);
+      }
+      params.limit = parsedLimit;
     }
     resultPrefix = 'Drill query results';
   }
