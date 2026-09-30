@@ -163,6 +163,11 @@ import { contentToolDefinitions, contentToolHandlers, contentToolMetadata, Conte
 
 export { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools };
 
+// Knowledge Base
+import { knowledgeBaseToolDefinitions, knowledgeBaseToolHandlers, knowledgeBaseToolMetadata, KnowledgeBaseTools } from './knowledge-base.js';
+
+export { knowledgeBaseToolDefinitions, knowledgeBaseToolHandlers, knowledgeBaseToolMetadata, KnowledgeBaseTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -204,6 +209,7 @@ export function getAllToolDefinitions() {
     ...hooksToolDefinitions,
     ...journeysToolDefinitions,
     ...contentToolDefinitions,
+    ...knowledgeBaseToolDefinitions,
   ];
 }
 
@@ -245,6 +251,7 @@ export function getAllToolHandlers() {
     ...hooksToolHandlers,
     ...journeysToolHandlers,
     ...contentToolHandlers,
+    ...knowledgeBaseToolHandlers,
   };
 }
 
@@ -286,5 +293,6 @@ export function getAllToolMetadata() {
     hooksToolMetadata,
     journeysToolMetadata,
     contentToolMetadata,
+    knowledgeBaseToolMetadata,
   ];
 }
