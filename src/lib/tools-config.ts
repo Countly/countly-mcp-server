@@ -375,6 +375,15 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'content',
     availableByDefault: false,
   },
+  tickets: {
+    operations: {
+      'tickets_list': 'R',
+      'tickets_get': 'R',
+      'tickets_stats': 'R',
+    },
+    requiresPlugin: 'tickets',
+    availableByDefault: false,
+  },
 };
 
 /**

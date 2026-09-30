@@ -160,8 +160,12 @@ export { journeysToolDefinitions, journeysToolHandlers, journeysToolMetadata, Jo
 
 // Content Blocks
 import { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools } from './content.js';
+import { ticketsToolDefinitions, ticketsToolHandlers, ticketsToolMetadata, TicketsTools } from './tickets.js';
 
 export { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools };
+
+// Tickets (support)
+export { ticketsToolDefinitions, ticketsToolHandlers, ticketsToolMetadata, TicketsTools };
 
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
@@ -204,6 +208,7 @@ export function getAllToolDefinitions() {
     ...hooksToolDefinitions,
     ...journeysToolDefinitions,
     ...contentToolDefinitions,
+    ...ticketsToolDefinitions,
   ];
 }
 
@@ -245,6 +250,7 @@ export function getAllToolHandlers() {
     ...hooksToolHandlers,
     ...journeysToolHandlers,
     ...contentToolHandlers,
+    ...ticketsToolHandlers,
   };
 }
 
@@ -286,5 +292,6 @@ export function getAllToolMetadata() {
     hooksToolMetadata,
     journeysToolMetadata,
     contentToolMetadata,
+    ticketsToolMetadata,
   ];
 }
