@@ -9,7 +9,38 @@ export interface ToolsConfig {
   [category: string]: Set<CrudOperation>;
 }
 
+/**
+ * User-facing grouping of tool categories. Hosts that embed the server (see
+ * src/library.ts) show these to people granting access and use them to group
+ * usage stats, so they name product areas rather than internal categories.
+ */
+export type ToolArea =
+  | 'Events'
+  | 'Funnels'
+  | 'Retention'
+  | 'Users'
+  | 'Crashes'
+  | 'Dashboards'
+  | 'Remote config'
+  | 'Content'
+  | 'Settings'
+  | 'Other';
+
+export const TOOL_AREAS: readonly ToolArea[] = [
+  'Events',
+  'Funnels',
+  'Retention',
+  'Users',
+  'Crashes',
+  'Dashboards',
+  'Remote config',
+  'Content',
+  'Settings',
+  'Other',
+];
+
 export interface ToolCategoryConfig {
+  area: ToolArea; // User-facing grouping, see ToolArea
   operations: Record<string, CrudOperation>;
   requiresPlugin?: string; // Optional plugin name required for this category
   availableByDefault?: boolean; // If false, requires plugin check (default: true)
@@ -24,6 +55,7 @@ export interface ToolCategoryConfig {
  */
 export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   core: {
+    area: 'Other',
     operations: {
       'ping': 'R',
       'get_version': 'R',
@@ -32,6 +64,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   apps: {
+    area: 'Settings',
     operations: {
       'apps_list': 'R',
       'apps_get_by_name': 'R',
@@ -43,6 +76,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   analytics: {
+    area: 'Users',
     operations: {
       'query_data': 'R',
       'app_analytics_summary': 'R',
@@ -54,6 +88,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   crashes: {
+    area: 'Crashes',
     operations: {
       'crash_groups_list': 'R',
       'crashes_stats_get': 'R',
@@ -70,6 +105,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   notes: {
+    area: 'Other',
     operations: {
       'notes_list': 'R',
       'notes_create': 'C',
@@ -78,6 +114,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   events: {
+    area: 'Events',
     operations: {
       'events_create': 'C',
       'events_list': 'R',
@@ -86,6 +123,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   alerts: {
+    area: 'Other',
     operations: {
       'alerts_list': 'R',
       'alerts_create': 'C', // Also handles updates
@@ -95,6 +133,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   views: {
+    area: 'Events',
     operations: {
       'views_table': 'R',
       'views_data': 'R',
@@ -103,6 +142,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   database: {
+    area: 'Settings',
     operations: {
       'databases_query': 'R',
       'databases_list': 'R',
@@ -115,12 +155,14 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   dashboard_users: {
+    area: 'Settings',
     operations: {
       'dashboard_users': 'R',
     },
     availableByDefault: true,
   },
   app_users: {
+    area: 'Users',
     operations: {
       'app_users_create': 'C',
       'app_users_update': 'U',
@@ -129,6 +171,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   drill: {
+    area: 'Events',
     operations: {
       'drill_bookmarks_list': 'R',
       'drill_bookmarks_create': 'C',
@@ -139,6 +182,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   metadata: {
+    area: 'Events',
     operations: {
       // metadata_get returns event definitions, built-in event segments,
       // and system fields even without the drill plugin (drill just adds
@@ -150,6 +194,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   user_profiles: {
+    area: 'Users',
     operations: {
       'user_profiles_query': 'R',
       'user_profiles_breakdown': 'R',
@@ -159,6 +204,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   cohorts: {
+    area: 'Users',
     operations: {
       'cohorts_list': 'R',
       'cohorts_data': 'R',
@@ -170,6 +216,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   funnels: {
+    area: 'Funnels',
     operations: {
       'funnels_list': 'R',
       'funnels_data': 'R',
@@ -183,6 +230,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   formulas: {
+    area: 'Events',
     operations: {
       'formulas_run': 'R',
       'formulas_list': 'R',
@@ -193,6 +241,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   live: {
+    area: 'Users',
     operations: {
       'live_users': 'R',
       'live_metrics': 'R',
@@ -205,6 +254,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   retention: {
+    area: 'Retention',
     operations: {
       'retention': 'R',
     },
@@ -212,6 +262,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   remote_config: {
+    area: 'Remote config',
     operations: {
       'remote_configs_list': 'R',
       'remote_config_conditions_add': 'C',
@@ -225,6 +276,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   ab_testing: {
+    area: 'Remote config',
     operations: {
       'ab_experiments_list': 'R',
       'ab_experiments_details': 'R',
@@ -237,6 +289,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   logger: {
+    area: 'Settings',
     operations: {
       'sdk_logs_list': 'R',
     },
@@ -244,6 +297,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   sdks: {
+    area: 'Settings',
     operations: {
       'sdk_stats_get': 'R',
       'sdk_config_get': 'R',
@@ -252,6 +306,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   compliance_hub: {
+    area: 'Users',
     operations: {
       'consents_stats': 'R',
       'consents_list': 'R',
@@ -261,6 +316,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   filtering_rules: {
+    area: 'Settings',
     operations: {
       'filtering_rules_list': 'R',
       'filtering_rules_create': 'C',
@@ -272,6 +328,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   datapoint: {
+    area: 'Settings',
     operations: {
       'datapoints_stats': 'R',
       'datapoints_top_apps': 'R',
@@ -281,6 +338,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   server_logs: {
+    area: 'Settings',
     operations: {
       'server_logs_files_list': 'R',
       'server_logs_contents': 'R',
@@ -289,6 +347,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   email_reports: {
+    area: 'Dashboards',
     operations: {
       'email_reports_list': 'R',
       'email_reports_core_create': 'C',
@@ -302,6 +361,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   dashboards: {
+    area: 'Dashboards',
     operations: {
       'dashboards_list': 'R',
       'dashboards_data': 'R',
@@ -316,6 +376,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   times_of_day: {
+    area: 'Users',
     operations: {
       'times_of_day': 'R',
     },
@@ -323,6 +384,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   hooks: {
+    area: 'Settings',
     operations: {
       'hooks_list': 'R',
       // 'C', not 'R': /i/hook/test does not simulate the effects, it runs them.
@@ -340,6 +402,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   journeys: {
+    area: 'Content',
     operations: {
       'journeys_list': 'R',
       'journeys_get': 'R',
@@ -359,6 +422,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   content: {
+    area: 'Content',
     operations: {
       'content_blocks_list': 'R',
       'content_blocks_get': 'R',
@@ -376,6 +440,49 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
 };
+
+/**
+ * Tools that need Countly global-admin rights (or act server-wide rather than
+ * on one app). Used only by the embedded library entry point (src/library.ts),
+ * which hides them unless the caller's grant allows admin tools. Stdio and
+ * standalone HTTP modes do not read this; Countly itself still enforces the
+ * rights on every call.
+ *
+ * Decided from what each Countly endpoint requires:
+ * - apps_create, apps_delete, apps_reset: /i/apps/create|delete|reset are
+ *   validateUserForGlobalAdmin.
+ * - apps_update: /i/apps/update needs app-admin with an app_id and global
+ *   admin without one; it changes app settings (name, timezone, country) for
+ *   everyone using the app, so it is treated as administration.
+ * - get_plugins: /o/system/plugins is validateUserForGlobalAdmin (the list of
+ *   installed modules is treated as sensitive).
+ * - dashboard_users: /o/users/all is validateUserForGlobalAdmin.
+ * - databases_* and collections_* (dbviewer /o/db): raw database and
+ *   collection browsing, outside any per-app scope a host may apply.
+ * - server_logs_* (errorlogs /o/errorlogs): global admin only.
+ * - datapoints_* (server-stats): server-wide usage and billing metrics; a
+ *   non-admin sees their own apps, but the data is not limited to the apps a
+ *   host grant names, so it is kept with the other server administration.
+ */
+export const ADMIN_ONLY_TOOLS: ReadonlySet<string> = new Set<string>([
+  'apps_create',
+  'apps_update',
+  'apps_delete',
+  'apps_reset',
+  'get_plugins',
+  'dashboard_users',
+  'databases_query',
+  'databases_list',
+  'databases_document',
+  'collections_aggregate',
+  'collections_indexes',
+  'databases_stats',
+  'server_logs_files_list',
+  'server_logs_contents',
+  'datapoints_stats',
+  'datapoints_top_apps',
+  'datapoints_punch_card',
+]);
 
 /**
  * Parse CRUD permissions from environment variable
