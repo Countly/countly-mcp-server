@@ -3,6 +3,19 @@
   "version": "1.6.0",
   "description": "MCP server for Countly Analytics Platform",
   "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "default": "./build/index.js"
+    },
+    "./library": {
+      "types": "./build/library.d.ts",
+      "default": "./build/library.js"
+    },
+    "./package.json": "./package.json",
+    "./build/*": "./build/*"
+  },
   "type": "module",
   "bin": {
     "countly-mcp-server": "build/index.js"

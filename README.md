@@ -769,6 +769,32 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
+## Embedding in another process
+
+The package also ships a library entry point for hosts that authenticate callers themselves and want to serve the tools in-process (Countly mounts it at `/v2/mcp`). It never reads credentials from the environment, headers, query parameters or tool arguments: the host supplies them per request.
+
+```ts
+import { createMcpHandler, toolsCalledIn, getToolCatalog } from 'countly-mcp-server/library';
+
+const mcp = createMcpHandler({
+  countlyUrl: 'http://127.0.0.1:3001',            // trusted, used as-is
+  onToolCall: (report) => recordStats(report),     // optional; errors are swallowed
+});
+
+// Express route, body already parsed:
+app.post('/v2/mcp', async (req, res) => {
+  await mcp.handle(req, res, req.body, {
+    upstreamToken,                // sent as the countly-token header
+    grantId,                      // keys the per-connection app cache
+    operations: ['R'],            // CRUD operations the grant allows
+    admin: false,                 // hides adminOnly tools
+    apps: ['5f...'],              // optional app allow-list
+  });
+});
+```
+
+`getToolCatalog()` returns each tool's category, CRUD operation, area and `adminOnly` flag, and `toolsCalledIn(body)` names the tools a JSON-RPC body calls, so the host can refuse a request before handing it over. Tools outside the grant are not listed, and calling one returns a JSON-RPC error without contacting Countly.
+
 ## Health Check
 
 The server includes a health check endpoint at `/health` (HTTP mode only):

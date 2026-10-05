@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Library entry point, `countly-mcp-server/library`** — lets a host (Countly itself) serve the tools in-process over stateless streamable HTTP. The host authenticates and passes, per request, the Countly token, a grant id, the allowed CRUD operations, whether admin tools are allowed and an optional app allow-list. Credentials come only from that context: environment variables, the `X-Countly-*` headers, the `auth_token`/`server_url` query parameters and the `countly_auth_token` tool argument are ignored. Exports `createMcpHandler`, `getToolCatalog` and `toolsCalledIn`, and reports every tool call (outcome and duration) to an optional `onToolCall` callback. Stdio and standalone HTTP modes are unchanged.
+- **Tool classification** — every tool category now has a user-facing `area`, and global-admin tools are listed in `ADMIN_ONLY_TOOLS`. A unit test fails if a registered tool is missing a category, operation or area.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added
