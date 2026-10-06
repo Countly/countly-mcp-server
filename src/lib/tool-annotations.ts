@@ -62,7 +62,8 @@ const OVERRIDES: Record<string, ToolAnnotations> = {
   app_users_delete: { idempotentHint: false },
   // Not a dry run: the configured effects really execute (emails, webhooks, custom code)
   hooks_test: { destructiveHint: true, ...SENDS_OUTSIDE },
-  hooks_create: SENDS_OUTSIDE,
+  // Enabled by default, and its effects can call any URL or run custom code
+  hooks_create: { destructiveHint: true, ...SENDS_OUTSIDE },
   hooks_update: SENDS_OUTSIDE,
   email_reports_send: SENDS_OUTSIDE,
   email_reports_core_create: SENDS_OUTSIDE,

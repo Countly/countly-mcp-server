@@ -48,6 +48,8 @@ describe('tool annotations', () => {
     expect(getToolAnnotations('alerts_create')).toMatchObject({ destructiveHint: true });
     // events_create overwrites an existing event key's metadata
     expect(getToolAnnotations('events_create')).toMatchObject({ destructiveHint: true });
+    // a new hook is live by default and its effects can call any URL or run code
+    expect(getToolAnnotations('hooks_create')).toMatchObject({ destructiveHint: true });
     // formulas_save replaces a saved formula with the same key
     expect(getToolAnnotations('formulas_save')).toMatchObject({ destructiveHint: true });
     // a new filtering rule is enabled by default and drops incoming data
