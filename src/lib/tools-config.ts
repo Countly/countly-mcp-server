@@ -466,6 +466,35 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'crashes-jira',
     availableByDefault: false,
   },
+  stage: {
+    operations: {
+      'stage_reference': 'R',
+      'stage_status': 'R',
+      'stage_pieces_list': 'R',
+      'stage_pieces_get': 'R',
+      'stage_templates_list': 'R',
+      'stage_templates_get': 'R',
+      'stage_scenarios_list': 'R',
+      'stage_scenarios_get': 'R',
+      'stage_scenes_validate': 'R',
+      'stage_scenes_edit': 'U',
+      'stage_scenes_list': 'R',
+      'stage_scenes_get': 'R',
+      'stage_scenes_create': 'C',
+      'stage_scenes_update': 'U',
+      'stage_scenes_delete': 'D',
+      'stage_scenes_publish': 'C',
+      'stage_scenes_set_latest': 'U',
+      'stage_scenes_unpublish': 'U',
+      'stage_scenes_restore': 'U',
+      'stage_companies_list': 'R',
+      'stage_companies_get': 'R',
+      'stage_companies_create': 'C',
+      'stage_companies_update': 'U',
+    },
+    requiresPlugin: 'stage',
+    availableByDefault: false,
+  },
 };
 
 /**
@@ -780,6 +809,12 @@ export const V2_ONLY_TOOLS = new Set([
   'crash_jira_issues',
   'hooks_get',
   'drill_saved_query_run', 'drill_property_values',
+  'stage_reference', 'stage_status', 'stage_pieces_list', 'stage_pieces_get',
+  'stage_templates_list', 'stage_templates_get', 'stage_scenarios_list', 'stage_scenarios_get',
+  'stage_scenes_validate', 'stage_scenes_edit',
+  'stage_scenes_list', 'stage_scenes_get', 'stage_scenes_create', 'stage_scenes_update', 'stage_scenes_delete',
+  'stage_scenes_publish', 'stage_scenes_set_latest', 'stage_scenes_unpublish', 'stage_scenes_restore',
+  'stage_companies_list', 'stage_companies_get', 'stage_companies_create', 'stage_companies_update',
 ]);
 
 /**

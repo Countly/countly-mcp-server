@@ -15,6 +15,9 @@ const globalAdmin: ToolGuard = { kind: 'global-admin' };
 const appAdmin: ToolGuard = { kind: 'app-admin' };
 const appWrite: ToolGuard = { kind: 'app-write' };
 const appRead: ToolGuard = { kind: 'app-read' };
+/** Stage's server-wide level (permission.stage), not a per-app feature */
+const stageView: ToolGuard = { kind: 'stage', level: 'view' };
+const stageEdit: ToolGuard = { kind: 'stage', level: 'edit' };
 const f = (feature: string | string[], access: AccessType): ToolGuard => ({ kind: 'feature', feature, access });
 
 /** Any of these features lets a user read drill metadata (drill api.js segmentation_meta) */
@@ -270,6 +273,31 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   crash_jira_issues: f('crashes', 'r'),
   drill_saved_query_run: f('drill', 'r'),
   drill_property_values: f('drill', 'r'),
+
+  // Stage (plugins/stage/api/v2/routes/guard.ts: viewGuard / editGuard)
+  stage_reference: stageView, // reads the server's piece catalog
+  stage_status: stageView,
+  stage_pieces_list: stageView,
+  stage_pieces_get: stageView,
+  stage_templates_list: stageView,
+  stage_templates_get: stageView,
+  stage_scenarios_list: stageView,
+  stage_scenarios_get: stageView,
+  stage_scenes_validate: stageView, // POST /validate writes nothing
+  stage_scenes_edit: stageEdit,
+  stage_scenes_list: stageView,
+  stage_scenes_get: stageView,
+  stage_scenes_create: stageEdit,
+  stage_scenes_update: stageEdit,
+  stage_scenes_delete: stageEdit,
+  stage_scenes_publish: stageEdit,
+  stage_scenes_set_latest: stageEdit,
+  stage_scenes_unpublish: stageEdit,
+  stage_scenes_restore: stageEdit,
+  stage_companies_list: stageView,
+  stage_companies_get: stageView,
+  stage_companies_create: stageEdit,
+  stage_companies_update: stageEdit,
 };
 
 /**
@@ -311,6 +339,8 @@ export function describeGuard(toolName: string, v2 = false): string {
     return 'admin rights on at least one app';
   case 'app-read':
     return 'access to at least one app';
+  case 'stage':
+    return guard.level === 'edit' ? 'Edit access to Stage' : 'access to Stage (View or Edit)';
   default:
     return 'additional permissions';
   }

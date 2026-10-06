@@ -18,6 +18,7 @@ export type AccessType = 'c' | 'r' | 'u' | 'd';
  * - app-write:    write access to an app (validateUserForWrite and friends)
  * - app-admin:    admin of an app (validateAppAdmin)
  * - global-admin: global admin only
+ * - stage:        the member's server-wide Stage level (permission.stage)
  * - any:          any authenticated user
  */
 export type ToolGuard =
@@ -26,7 +27,11 @@ export type ToolGuard =
   | { kind: 'app-write' }
   | { kind: 'app-admin' }
   | { kind: 'global-admin' }
+  | { kind: 'stage'; level: StageLevel }
   | { kind: 'any' };
+
+/** Stage access (ui/src/shared/stage/access.ts in countly-platform): edit includes view */
+export type StageLevel = 'view' | 'edit';
 
 interface AppRights {
   all?: boolean;
@@ -43,6 +48,8 @@ export interface MemberPermissions {
   rights: Record<AccessType, Record<string, AppRights>>;
   /** Member predates the permission object; rights come from admin_of/user_of */
   legacy: boolean;
+  /** Server-wide Stage level: permission.stage = {view: true} or {view: true, edit: true} */
+  stage?: StageLevel | null;
 }
 
 const ACCESS_TYPES: AccessType[] = ['c', 'r', 'u', 'd'];
@@ -77,7 +84,20 @@ export function parseMember(doc: any): MemberPermissions | null {
     userApps: [...userApps],
     rights,
     legacy,
+    stage: stageLevelOf(permission.stage),
   };
+}
+
+/** Only a literal `true` flag counts; a malformed grant gives no level */
+function stageLevelOf(value: unknown): StageLevel | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const flags = value as Record<string, unknown>;
+  if (flags.edit === true) {
+    return 'edit';
+  }
+  return flags.view === true ? 'view' : null;
 }
 
 function hasFeature(rights: AppRights | undefined, features: string[]): boolean {
@@ -94,6 +114,9 @@ export function canUseGuard(member: MemberPermissions, guard: ToolGuard): boolea
   }
   const isAppAdmin = member.adminApps.length > 0;
   switch (guard.kind) {
+  case 'stage':
+    // Nothing about apps grants a Stage level, not even admin of every app
+    return member.stage === 'edit' || (guard.level === 'view' && member.stage === 'view');
   case 'global-admin':
     return false;
   case 'any':

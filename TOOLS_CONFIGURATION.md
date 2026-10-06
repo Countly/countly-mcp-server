@@ -64,6 +64,7 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `geo_locations_list` (`geo`), `revenue_iap_events` (`revenue`), `crash_jira_issues` (`crashes-jira`)
   - `drill_saved_query_run` (requires the drill plugin): runs a saved drill query (from `drill_bookmarks_list`), optionally re-windowed, and returns results like `drill_query`
   - `drill_property_values` (requires the drill plugin): distinct values of a user property, custom property, campaign property or event segment, for building exact filters
+  - `stage_*` (`stage`): Stage scenes (create, edit, publish, roll back, unpublish), demo companies, the public host's status, a format reference, the pieces the server accepts with their props, templates to start from, the scenarios app pages play, a save dry run, and `stage_scenes_edit`, which builds a scene with operations (layers, steps, delivery, responsive breakpoints) and checks it before saving. Pieces, templates, scenarios and validate come from `GET /v2/stage/pieces`, `/templates`, `/scenarios` and `POST /v2/stage/validate` (Countly/countly-platform#1990); on older servers the piece tools fall back to a built-in list of ids and the others say the server predates them. Stage access is a server-wide View or Edit level (`permission.stage`), not a per-app permission: read tools need View, write tools need Edit, global admins have Edit. Tools the connected user's level does not allow are hidden.
 - **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
   - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
   - `funnels_list`: paging with totals
@@ -765,3 +766,9 @@ All tools below are read-only (`R`) and listed only when the server serves the P
 | geo | `geo_locations_list` | `geo` |
 | revenue | `revenue_iap_events` | `revenue` |
 | crashes_jira | `crash_jira_issues` | `crashes-jira` |
+
+The `stage` category is Platform /v2 only too, but has writes (CRUD), and needs the member's Stage level rather than an app permission:
+
+| Category | Tools | Requires plugin |
+|----------|-------|-----------------|
+| stage | `stage_reference`, `stage_status`, `stage_pieces_list`, `stage_pieces_get`, `stage_templates_list`, `stage_templates_get`, `stage_scenarios_list`, `stage_scenarios_get`, `stage_scenes_list`, `stage_scenes_get`, `stage_scenes_validate` (R); `stage_scenes_create`, `stage_scenes_publish`, `stage_companies_create` (C); `stage_scenes_update`, `stage_scenes_edit`, `stage_scenes_set_latest`, `stage_scenes_unpublish`, `stage_scenes_restore`, `stage_companies_update` (U); `stage_scenes_delete` (D) | `stage` |
