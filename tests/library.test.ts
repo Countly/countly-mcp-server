@@ -83,7 +83,11 @@ beforeAll(async () => {
     const token = req.headers['countly-token'] as string;
     res.setHeader('Content-Type', 'application/json');
     if (path === '/o/apps/mine') {
-      res.end(JSON.stringify(APPS_BY_TOKEN[token] || []));
+      // Countly's real shape: administered apps under admin_of, used ones under
+      // user_of (an app can be in both). Alpha is administered, the rest only used.
+      const apps = APPS_BY_TOKEN[token] || [];
+      const byId = (list: typeof apps) => Object.fromEntries(list.map((a) => [a._id, a]));
+      res.end(JSON.stringify({ admin_of: byId(apps.filter((a) => a.name === 'Alpha')), user_of: byId(apps) }));
       return;
     }
     if (path === '/o/ping') {
@@ -489,6 +493,13 @@ describe('tool filtering', () => {
 // ---------------------------------------------------------------------------
 
 describe('app allow-list', () => {
+  it('lists and resolves apps the member only uses, not just those they administer', async () => {
+    const res = await callTool('apps_list');
+    expect(res.result.content[0].text).toContain('Beta');
+    await callTool('events_list', { app_name: 'Beta' });
+    expect(reports.at(-1)).toMatchObject({ tool: 'events_list', appId: 'aaaaaaaaaaaaaaaaaaaaaaa2', outcome: 'success' });
+  });
+
   it('limits app lists to context.apps', async () => {
     currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
     const res = await callTool('apps_list');

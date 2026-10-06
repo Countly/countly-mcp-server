@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool classification** — every tool category now has a user-facing `area`, and global-admin tools are listed in `ADMIN_ONLY_TOOLS`. A unit test fails if a registered tool is missing a category, operation, area or app scope.
 
 ### Fixed
+- **Projects a user only has user rights to are listed** — the app list (`apps_list`, `app_name` lookups, the apps resource) read only `admin_of` from `/o/apps/mine`, so a member without admin rights, or any read-only token, saw no projects. It now lists `user_of` too.
 - **`retention` saved a report when `save_report` was false** — the handler sent `save_report=0`, and Countly treats any non-empty value as "save", so asking not to save dispatched the calculation to the report manager anyway. It is now sent only when true.
 
 - **Host-driven usage analytics in library mode** — an optional `analytics: { isEnabled, deviceId, host? }` option reports tool usage to the Countly server telemetry app on stats.count.ly with the standalone event names, under the host's device id and only while the host allows it. Library mode never initializes the global Countly SDK.

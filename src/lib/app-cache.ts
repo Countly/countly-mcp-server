@@ -181,3 +181,31 @@ export function resolveAppIdentifier(
     'Example: { app_id: "abc123" } or { app_name: "MyApp" }'
   );
 }
+
+/**
+ * The apps in a `/o/apps/mine` response: those the member administers
+ * (`admin_of`) and those they only use (`user_of`), once each. A member with
+ * user rights only, or a token limited to reading, has everything under
+ * `user_of`, so reading `admin_of` alone lists nothing for them.
+ * @param data - the response body
+ * @returns the apps, or an empty list for an unrecognised shape
+ */
+export function appsFromMineResponse(data: unknown): CountlyApp[] {
+  if (Array.isArray(data)) {
+    return data as CountlyApp[];
+  }
+  if (!data || typeof data !== 'object') {
+    return [];
+  }
+  const body = data as { admin_of?: Record<string, CountlyApp>; user_of?: Record<string, CountlyApp>; apps?: CountlyApp[] };
+  if (body.admin_of || body.user_of) {
+    const byId = new Map<string, CountlyApp>();
+    for (const app of [...Object.values(body.admin_of ?? {}), ...Object.values(body.user_of ?? {})]) {
+      if (app && !byId.has(String(app._id))) {
+        byId.set(String(app._id), app);
+      }
+    }
+    return [...byId.values()];
+  }
+  return Array.isArray(body.apps) ? body.apps : [];
+}

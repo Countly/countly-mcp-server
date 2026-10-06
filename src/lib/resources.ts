@@ -6,7 +6,7 @@
  */
 
 import { AxiosInstance } from 'axios';
-import { AppCache, CountlyApp } from './app-cache.js';
+import { AppCache, appsFromMineResponse, CountlyApp } from './app-cache.js';
 
 export interface Resource {
   uri: string;
@@ -165,16 +165,7 @@ async function getAppsForCache(
     }
     const response = await httpClient.get('/o/apps/mine', { params });
     
-    let apps: CountlyApp[];
-    if (response.data && Array.isArray(response.data)) {
-      apps = response.data;
-    } else if (response.data && response.data.admin_of) {
-      apps = Object.values(response.data.admin_of) as CountlyApp[];
-    } else if (response.data && response.data.apps) {
-      apps = response.data.apps;
-    } else {
-      apps = [];
-    }
+    const apps: CountlyApp[] = appsFromMineResponse(response.data);
     
     appCache.update(apps);
     return apps;

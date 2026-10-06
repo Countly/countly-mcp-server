@@ -46,7 +46,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, appsFromMineResponse, type CountlyApp } from './lib/app-cache.js';
 import { getPrompt, listPrompts } from './lib/prompts.js';
 import {
   ADMIN_ONLY_TOOLS,
@@ -587,16 +587,7 @@ async function fetchApps(client: AxiosInstance, cache: AppCache): Promise<Countl
     return cache.getAll();
   }
   const response = await client.get('/o/apps/mine');
-  let apps: CountlyApp[];
-  if (response.data && Array.isArray(response.data)) {
-    apps = response.data;
-  } else if (response.data && response.data.admin_of) {
-    apps = Object.values(response.data.admin_of) as CountlyApp[];
-  } else if (response.data && response.data.apps) {
-    apps = response.data.apps;
-  } else {
-    apps = [];
-  }
+  const apps: CountlyApp[] = appsFromMineResponse(response.data);
   cache.update(apps);
   return apps;
 }
