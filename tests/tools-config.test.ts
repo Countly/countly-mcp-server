@@ -4,8 +4,12 @@ import {
   parseCrudPermissions,
   loadToolsConfig,
   isToolAllowed,
+  isToolCallAllowed,
   filterTools,
   getConfigSummary,
+  getEffectiveOperations,
+  getPossibleOperations,
+  TOOL_OPERATION_RULES,
 } from '../src/lib/tools-config.js';
 import { getAllToolDefinitions, getAllToolMetadata } from '../src/tools/index.js';
 import { ToolContext } from '../src/tools/types.js';
@@ -322,12 +326,92 @@ describe('Tools Configuration', () => {
       expect(isToolAllowed('apps_list', config)).toBe(false);
     });
 
+    it('offers alerts_create to an update-only config (updating an existing alert), and checks each call', () => {
+      const config = { alerts: new Set<'C' | 'R' | 'U' | 'D'>(['U']) };
+      expect(isToolAllowed('alerts_create', config)).toBe(true);
+      expect(isToolCallAllowed('alerts_create', { alert_config: { _id: 'a1' } }, config)).toBe(true);
+      expect(isToolCallAllowed('alerts_create', { alert_config: { alertName: 'x' } }, config)).toBe(false);
+      expect(filterTools([{ name: 'alerts_create' }], config)).toEqual([{ name: 'alerts_create' }]);
+    });
+
+    it('does not offer events_create, whose every call needs C and U, to an update-only config', () => {
+      const config = { events: new Set<'C' | 'R' | 'U' | 'D'>(['U']) };
+      expect(isToolAllowed('events_create', config)).toBe(false);
+    });
+
     it('should return true for unknown tools (forward compatibility)', () => {
       const config = {
         apps: new Set<'C' | 'R' | 'U' | 'D'>(['C', 'R', 'U', 'D']),
       };
       
       expect(isToolAllowed('unknown_tool', config)).toBe(true);
+    });
+  });
+
+  describe('effective operations (argument-dependent tools)', () => {
+    it('derives formulas_run from mode and report_name', () => {
+      expect(getEffectiveOperations('formulas_run', { formula: '[]' })).toEqual(['R']);
+      expect(getEffectiveOperations('formulas_run', { mode: 'unsaved' })).toEqual(['R']);
+      expect(getEffectiveOperations('formulas_run', { mode: 'saved' })).toEqual(['C', 'R']);
+      expect(getEffectiveOperations('formulas_run', { mode: 'snapshot' })).toEqual(['C', 'R']);
+      expect(getEffectiveOperations('formulas_run', { report_name: 'r' })).toEqual(['C', 'R']);
+    });
+
+    it('derives retention from save_report', () => {
+      expect(getEffectiveOperations('retention', {})).toEqual(['R']);
+      expect(getEffectiveOperations('retention', { save_report: false })).toEqual(['R']);
+      expect(getEffectiveOperations('retention', { save_report: true })).toEqual(['C', 'R']);
+      expect(getEffectiveOperations('retention', { save_report: 'yes' })).toEqual(['C', 'R']);
+    });
+
+    it('derives alerts_create from alert_config._id, object or JSON string', () => {
+      expect(getEffectiveOperations('alerts_create', { alert_config: { alertName: 'x' } })).toEqual(['C']);
+      expect(getEffectiveOperations('alerts_create', { alert_config: { _id: 'a1' } })).toEqual(['U']);
+      expect(getEffectiveOperations('alerts_create', { alert_config: '{"_id":"a1"}' })).toEqual(['U']);
+      expect(getEffectiveOperations('alerts_create', { alert_config: '{not json' })).toEqual(['C', 'U']);
+      expect(getEffectiveOperations('alerts_create', { alert_config: 5 })).toEqual(['C', 'U']);
+    });
+
+    it('needs C and U for every events_create call', () => {
+      expect(getEffectiveOperations('events_create', { key: 'k' })).toEqual(['C', 'U']);
+    });
+
+    it('uses the static operation for every other tool', () => {
+      for (const data of Object.values(TOOL_CATEGORIES)) {
+        for (const [tool, op] of Object.entries(data.operations)) {
+          if (!(tool in TOOL_OPERATION_RULES)) {
+            expect(getEffectiveOperations(tool, { anything: true }), tool).toEqual([op]);
+            expect(getPossibleOperations(tool), tool).toEqual([op]);
+          }
+        }
+      }
+      expect(getEffectiveOperations('no_such_tool', {})).toBeUndefined();
+    });
+
+    it('only names tools that exist, and keeps rules within their possible operations', () => {
+      for (const [tool, rule] of Object.entries(TOOL_OPERATION_RULES)) {
+        const possible = getPossibleOperations(tool);
+        expect(possible, tool).toBeDefined();
+        for (const args of [{}, { mode: 'saved', save_report: true, alert_config: { _id: 'x' } }]) {
+          for (const op of rule.operationsFor(args)) {
+            expect(possible, tool).toContain(op);
+          }
+        }
+      }
+    });
+
+    it('checks each call in the standalone tools configuration', () => {
+      const config = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'R' });
+      expect(isToolAllowed('formulas_run', config)).toBe(true);
+      expect(isToolCallAllowed('formulas_run', { mode: 'unsaved' }, config)).toBe(true);
+      expect(isToolCallAllowed('formulas_run', { mode: 'saved' }, config)).toBe(false);
+      expect(isToolCallAllowed('retention', { save_report: true }, config)).toBe(false);
+
+      const createOnly = loadToolsConfig({ COUNTLY_TOOLS_ALL: 'CR' });
+      expect(isToolCallAllowed('alerts_create', { alert_config: {} }, createOnly)).toBe(true);
+      expect(isToolCallAllowed('alerts_create', { alert_config: { _id: 'a' } }, createOnly)).toBe(false);
+      expect(isToolAllowed('events_create', createOnly)).toBe(false);
+      expect(isToolAllowed('events_create', loadToolsConfig({ COUNTLY_TOOLS_ALL: 'CRU' }))).toBe(true);
     });
   });
 
@@ -794,3 +878,20 @@ describe('Tool Handler Validation', () => {
     });
   });
 });
+
+describe('operation rule call shapes', () => {
+  it('every rule names its call shapes, each within what the tool can do, together covering it', async () => {
+    const { TOOL_OPERATION_RULES, getCallShapes } = await import('../src/lib/tools-config.js');
+    for (const [tool, rule] of Object.entries(TOOL_OPERATION_RULES)) {
+      expect(rule.callShapes.length, tool).toBeGreaterThan(0);
+      for (const shape of rule.callShapes) {
+        expect(shape.length, tool).toBeGreaterThan(0);
+        expect(shape.every((op) => rule.possible.includes(op)), tool).toBe(true);
+      }
+      expect(new Set(rule.callShapes.flat()), tool).toEqual(new Set(rule.possible));
+      expect(getCallShapes(tool), tool).toBeDefined();
+    }
+    expect(getCallShapes('alerts_create')).toEqual([['C'], ['U']]);
+  });
+});
+

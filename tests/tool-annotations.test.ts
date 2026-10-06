@@ -25,12 +25,20 @@ describe('tool annotations', () => {
   });
 
   it('marks exactly the read tools as read-only', () => {
-    // formulas_run is labelled 'R' but persists the formula in mode "saved"
-    const writesDespiteReadLabel = new Set(['formulas_run']);
+    // labelled 'R', but their arguments can make them write (TOOL_OPERATION_RULES):
+    // formulas_run in mode "saved", retention with save_report
+    const writesDespiteReadLabel = new Set(['formulas_run', 'retention']);
     for (const name of allToolNames) {
       expect({ name, readOnly: getToolAnnotations(name)!.readOnlyHint })
         .toEqual({ name, readOnly: operationOf(name) === 'R' && !writesDespiteReadLabel.has(name) });
     }
+  });
+
+  it('marks retention read-only only while the configuration refuses saving a report', () => {
+    const readOnly = { retention: new Set<'C' | 'R' | 'U' | 'D'>(['R']) };
+    const canSave = { retention: new Set<'C' | 'R' | 'U' | 'D'>(['R', 'C']) };
+    expect(getToolAnnotations('retention', readOnly)!.readOnlyHint).toBe(true);
+    expect(getToolAnnotations('retention', canSave)).toMatchObject({ readOnlyHint: false, idempotentHint: false });
   });
 
   it('marks every delete tool as destructive', () => {

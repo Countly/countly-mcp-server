@@ -35,7 +35,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 - **Flexible Authentication**: Environment variables, HTTP headers, URL parameters, or token files
 - **Edition-Aware**: Detects Countly Lite, Enterprise or Platform on connection and only exposes the tools that server and the connected user can use
 - **Docker Support**: Pre-built Docker images with multi-architecture support (amd64, arm64)
-- **Anonymous Analytics**: Optional usage tracking (disabled by default) to help improve the server
+- **Usage Analytics**: Usage reporting to stats.count.ly under your Countly server's domain (on by default; `ENABLE_ANALYTICS=false` opts out)
 -
 
 ## Supported Countly Editions
@@ -238,7 +238,7 @@ the server-side token is only used for a request that brings none.
 | `COUNTLY_AUTH_TOKEN` | No* | - | Authentication token (direct) |
 | `COUNTLY_AUTH_TOKEN_FILE` | No* | - | Path to file containing auth token |
 | `COUNTLY_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
-| `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics (set to `true` to opt in) |
+| `ENABLE_ANALYTICS` | No | `true` | Usage analytics to stats.count.ly under your Countly server's domain (set to `false` to opt out) |
 | `COUNTLY_AUTO_DETECT` | No | `true` | Detect Countly Lite / Enterprise / Platform and hide tools the server doesn't support (set to `false` to always show all configured tools) |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
@@ -251,39 +251,41 @@ the server-side token is only used for a request that brings none.
 
 *At least one authentication method must be configured
 
-### Analytics Tracking (Optional)
+### Analytics Tracking
 
-The MCP server includes optional anonymous usage analytics to help improve the product. Analytics are **disabled by default** and can be opted into via the `ENABLE_ANALYTICS=true` environment variable.
+The MCP server reports usage analytics to `stats.count.ly` to help improve the product, the same way the Countly platform reports its own server telemetry. Analytics are **enabled by default**; opt out with `ENABLE_ANALYTICS=false`.
+
+**Device ID: your Countly server's domain.** Events are reported under the domain of the Countly server the MCP server talks to (`COUNTLY_SERVER_URL`, or the per-request server URL in multi-tenant HTTP mode), with the scheme and trailing slashes removed, e.g. `countly.example.com` or `countly.example.com:8443/countly`. This is the same device ID the Countly platform uses for its own telemetry, so both line up on the stats server. Usage goes to the Countly server telemetry app on stats.count.ly (the app the Countly platform itself reports to), so MCP usage and the server's own telemetry sit under one device.
+
+When there is no usable domain (no server URL, or `localhost`), nothing is reported. In multi-tenant HTTP mode with no `COUNTLY_SERVER_URL`, that means visits to the welcome page, health checks, favicon and manifest requests, server start and the session are not reported; only MCP requests, which carry their server URL, are.
 
 **What is tracked:**
+- Your Countly server's domain (as the device ID, above)
 - Transport type used (stdio vs HTTP)
 - Tool execution metrics (success/failure, duration, tool names)
 - Authentication methods used (headers, env, file, args)
 - HTTP endpoint access patterns
-- Error occurrences (type and message, NO sensitive data)
-- Server start/stop events
-- A **truncated opaque hash** of your Countly server URL (64-bit SHA-256 prefix), attached as the `server` segment on every event — used for distinct-server aggregation. The raw URL is never sent.
+- Error occurrences (the error type and tool name only, no message)
+- Server start events
+- A truncated hash of the server URL, attached as the `server` segment on every event
 
 **What is NOT tracked:**
 - Authentication tokens or credentials
-- Raw Countly server URLs or domains (only the opaque `server` hash above)
 - User data or analytics content
 - Personal information
-- IP addresses or client identifiers
 - Tool arguments or request/response bodies
 
-**Privacy & Device ID:**
-All analytics are aggregated under a single device ID `"mcp"` — Countly cannot distinguish individual operators from the device ID alone. The only per-deployment signal is the `server` hash on events, which is a truncated SHA-256 of the normalized server URL. The hash is intentionally coarse (64 bits) and the server URL is low-entropy, so do not assume the hash is unguessable for cloud patterns; it is meant for aggregation, not secrecy.
-
-**To opt in:**
+**To opt out:**
 ```bash
-export ENABLE_ANALYTICS=true
+export ENABLE_ANALYTICS=false
 ```
 
 Or in your `.env` file:
 ```
-ENABLE_ANALYTICS=true
+ENABLE_ANALYTICS=false
 ```
+
+When the tools are embedded in another process through `countly-mcp-server/library`, the host decides whether and under which device ID usage is reported (see "Embedding in another process").
 
 ### Tools Configuration
 
@@ -440,10 +442,10 @@ see [Server-side token in HTTP mode](#server-side-token-in-http-mode).
 
 ### Telemetry
 
-Analytics are **disabled by default**. Opt in with `ENABLE_ANALYTICS=true`.
-No authentication tokens, server URLs, or tool arguments are ever sent
-to `stats.count.ly`; error messages shipped to the analytics SDK are
-redacted for token-shaped substrings.
+Analytics are **enabled by default** and report under your Countly server's
+domain; opt out with `ENABLE_ANALYTICS=false`. No authentication tokens,
+tool arguments or error messages are ever sent to `stats.count.ly`; an error
+is reported as its type and the tool it came from.
 
 ## Docker Deployment
 
@@ -873,8 +875,6 @@ On Countly Platform these tools manage the new content messages (popup, banner, 
 - **`geo_locations_list`** (Platform, requires `geo` plugin) - Saved geo locations (geofences)
 - **`revenue_iap_events`** (Platform, requires `revenue` plugin) - Events configured as in-app purchases
 
-All tools support flexible app identification via either `app_id` or `app_name` parameter.
-
 ### Stage (requires `stage` plugin and a Stage View or Edit level)
 - **`stage_reference`** (Platform) - Scene and demo company format: looks, themes, steps, delivery modes, layers, paper sizes, accepted piece ids
 - **`stage_status`** (Platform) - Whether the server serves Stage's public host, on which name, and why not
@@ -899,6 +899,52 @@ All tools support flexible app identification via either `app_id` or `app_name` 
 - **`stage_companies_get`** (Platform) - One demo company: base project, colours, renames, volume scale
 - **`stage_companies_create`** (Platform) - Create a demo company that dresses a mock project for a prospect
 - **`stage_companies_update`** (Platform) - Change a demo company (refused once a published version names it)
+
+All tools support flexible app identification via either `app_id` or `app_name` parameter.
+
+## Embedding in another process
+
+The package also ships a library entry point for hosts that authenticate callers themselves and want to serve the tools in-process (Countly mounts it at `/v2/mcp`). It never reads credentials from the environment, headers, query parameters or tool arguments: the host supplies them per request.
+
+```ts
+import { createMcpHandler, requiredOperations, getToolCatalog } from 'countly-mcp-server/library';
+
+const mcp = createMcpHandler({
+  countlyUrl: 'http://127.0.0.1:3001',            // trusted, used as-is
+  onToolCall: (report) => recordStats(report),     // optional; errors are swallowed
+});
+
+// Express route, body already parsed:
+app.post('/v2/mcp', async (req, res) => {
+  await mcp.handle(req, res, req.body, {
+    upstreamToken,                // sent as the countly-token header
+    grantId,                      // keys the per-connection app cache
+    operations: ['R'],            // CRUD operations the grant allows
+    admin: false,                 // hides adminOnly tools
+  });
+});
+```
+
+`getToolCatalog()` returns each tool's category, CRUD operation, `possibleOperations`, area, and `adminOnly` flag. Library mode lists and calls tools through the same pipeline as the standalone modes: the server is detected once per grant, so on Countly Platform tools use the `/v2` API and tools the server cannot serve are hidden. Tools outside the grant are not listed; calling one is an unknown-tool error, and a call the grant does not allow comes back as an `isError` result the assistant can read, without contacting Countly. Per-grant caches are bounded, so a long-running host keeps a fixed amount of memory.
+
+Some tools write depending on their arguments: `formulas_run` with a `mode` other than `"unsaved"` and `retention` with `save_report` also need `C`, `alerts_create` with an `alert_config._id` is an update (`U`), and `events_create` can overwrite an existing event so it needs `C` and `U`. Each call is checked against the operations its own arguments need. `requiredOperations(body)` returns them for every `tools/call` in a JSON-RPC body (`{ tool, operation, adminOnly }[]`), so the host can answer `403 insufficient_scope` before handing the request over; `toolsCalledIn(body)` still returns just the tool names.
+
+The tools act with the upstream token's own rights: which apps a call can reach is decided by Countly, as for any other API request.
+
+Usage analytics in library mode are driven by the host. Pass `analytics` to report tool usage to the Countly server telemetry app on stats.count.ly, with the same events the standalone modes send (`server_started`, `transport_used`, `tool_executed`, `tool_execution_time`, `tool_category_used`, `error_occurred`):
+
+```ts
+createMcpHandler({
+  countlyUrl,
+  analytics: {
+    isEnabled: () => hostTrackingIsOn(),  // read before every event and every send
+    deviceId: () => hostDeviceId(),       // report under the host's own identity
+    host: 'countly',                      // optional label, sent as a segment
+  },
+});
+```
+
+The host decides when reporting is allowed and under which device id; nothing is sent without both. Library mode never initializes the global Countly SDK (a host may already use it for its own telemetry) and never loads the standalone modes' analytics module. No URLs, tokens, arguments or error messages are sent, only tool names, categories, outcomes and durations.
 
 ## Health Check
 
