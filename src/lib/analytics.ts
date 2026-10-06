@@ -89,35 +89,33 @@ export function normalizeServerUrlForHash(url: string): string {
 }
 
 /**
- * The device id a Countly server reports telemetry under: its domain with the
- * scheme and trailing slashes stripped, exactly as the Countly platform's
- * tracker derives it from `api.domain` (api/parts/mgmt/tracker.js), so the
- * same server gets the same device id from both. Nothing is sent when it is
- * empty or exactly "localhost", the platform's own check. Anything else is
- * reported as is, local addresses included: it only has to tell servers
- * apart. Credentials (`user:pass@`), a query and a fragment are dropped so a
- * secret written into the server URL never leaves the process.
+ * The device id a Countly server reports telemetry under: its host (with any
+ * non-default port) and path, without scheme or trailing slashes, the way the
+ * Countly platform's tracker derives it from `api.domain`
+ * (api/parts/mgmt/tracker.js), so the same server gets the same device id
+ * from both. Nothing is sent when it is empty or exactly "localhost", the
+ * platform's own check. Anything else is reported, local addresses included:
+ * it only has to tell servers apart. Credentials, query and fragment are
+ * never part of it, so a secret written into the server URL stays here.
  * @param url - the Countly server URL
  * @returns the device id, or undefined when there is none
  */
 export function deviceIdFromServerUrl(url: string | undefined | null): string | undefined {
-  if (typeof url !== 'string') {
+  if (typeof url !== 'string' || !url.trim()) {
     return undefined;
   }
-  // The query and fragment go first, before the scheme: a query can itself
-  // hold a URL (?auth_token=https://...), which the scheme split would pick.
-  let id = url.trim();
-  const cut = id.search(/[?#]/);
-  if (cut >= 0) {
-    id = id.slice(0, cut);
+  // The standard URL parser, not string splitting: it separates the scheme,
+  // credentials, host, path, query and fragment correctly whatever they hold.
+  // Only host (with port) and path are kept, so no credential, query or
+  // fragment ever leaves the process. A bare host gets a scheme to parse.
+  const raw = url.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+  } catch {
+    return undefined;
   }
-  id = id.split('://').pop() ?? '';
-  const slash = id.indexOf('/');
-  const at = id.lastIndexOf('@', slash < 0 ? id.length : slash);
-  if (at >= 0) {
-    id = id.slice(at + 1);
-  }
-  id = stripTrailingSlashes(id);
+  const id = stripTrailingSlashes(parsed.host + parsed.pathname);
   if (!id || id === 'localhost') {
     return undefined;
   }

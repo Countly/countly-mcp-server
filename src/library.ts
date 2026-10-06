@@ -478,8 +478,10 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
   const buildServer = (context: McpRequestContext): Server => {
     const state = getCatalogState();
     const grant = context.grantId;
-    // Keyed by grant and token: a refreshed token (or changed rights) starts
-    // a fresh app list instead of serving the previous token's.
+    // Keyed by grant and token: a refreshed token starts a fresh app list
+    // instead of serving the previous token's. Rights changed under the same
+    // token show within the list's 5-minute life; data requests are always
+    // checked by Countly against the current rights.
     const cacheKey = `${grant}\n${createHash('sha256').update(context.upstreamToken).digest('hex')}`;
     const appCache = (() => {
       let cache = appCaches.get(cacheKey);

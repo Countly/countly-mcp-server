@@ -903,7 +903,7 @@ describe('Analytics', () => {
     it('derives the device id the way the Countly platform does', () => {
       expect(deviceIdFromServerUrl('https://countly.example.com/')).toBe('countly.example.com');
       expect(deviceIdFromServerUrl('http://countly.example.com:8443/countly//')).toBe('countly.example.com:8443/countly');
-      expect(deviceIdFromServerUrl('Countly.Example.com')).toBe('Countly.Example.com');
+      expect(deviceIdFromServerUrl('Countly.Example.com')).toBe('countly.example.com');
       expect(deviceIdFromServerUrl('http://localhost')).toBeUndefined();
       // the platform's rule: only an empty id or exactly "localhost" sends nothing
       expect(deviceIdFromServerUrl('https://user:secret@localhost')).toBeUndefined();
@@ -919,6 +919,10 @@ describe('Analytics', () => {
       expect(deviceIdFromServerUrl('https://countly.example.com/?auth_token=secret#x')).toBe('countly.example.com');
       expect(deviceIdFromServerUrl('https://countly.example.com#token')).toBe('countly.example.com');
       expect(deviceIdFromServerUrl('https://countly.example.com:8443?k=v')).toBe('countly.example.com:8443');
+      // a '://' in the path stays part of the path: the host is still the server's
+      expect(deviceIdFromServerUrl('https://countly.example.com/api/token://s3cr3t')).toBe('countly.example.com/api/token://s3cr3t');
+      expect(deviceIdFromServerUrl('https://countly.example.com:443/')).toBe('countly.example.com');
+      expect(deviceIdFromServerUrl('not a url ::')).toBeUndefined();
       expect(deviceIdFromServerUrl('')).toBeUndefined();
       expect(deviceIdFromServerUrl(undefined)).toBeUndefined();
     });
