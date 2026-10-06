@@ -173,6 +173,11 @@ import { platformExtrasToolDefinitions, platformExtrasToolHandlers, platformExtr
 
 export { platformExtrasToolDefinitions, platformExtrasToolHandlers, platformExtrasToolMetadata, PlatformExtrasTools };
 
+// Stage: scenes, publishing and demo companies (Countly Platform /v2 only)
+import { stageToolDefinitions, stageToolHandlers, stageToolMetadata, StageTools } from './stage.js';
+
+export { stageToolDefinitions, stageToolHandlers, stageToolMetadata, StageTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -216,6 +221,7 @@ export function getAllToolDefinitions() {
     ...contentToolDefinitions,
     ...platformInsightsToolDefinitions,
     ...platformExtrasToolDefinitions,
+    ...stageToolDefinitions,
   ];
 }
 
@@ -259,6 +265,7 @@ export function getAllToolHandlers() {
     ...contentToolHandlers,
     ...platformInsightsToolHandlers,
     ...platformExtrasToolHandlers,
+    ...stageToolHandlers,
   };
 }
 
@@ -302,6 +309,7 @@ export function getAllToolMetadata() {
     contentToolMetadata,
     platformInsightsToolMetadata,
     platformExtrasToolMetadata,
+    stageToolMetadata,
   ];
 }
 

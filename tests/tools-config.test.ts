@@ -64,6 +64,7 @@ describe('Tools Configuration', () => {
       'geo',
       'revenue',
       'crashes_jira',
+      'stage',
     ];
     const actualCategories = Object.keys(TOOL_CATEGORIES);
     expect(actualCategories.sort()).toEqual(expectedCategories.sort());
@@ -113,6 +114,7 @@ describe('Tools Configuration', () => {
       geo: 1,
       revenue: 1,
       crashes_jira: 1,
+      stage: 23,
     };
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
@@ -130,12 +132,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 186 tools', () => {
+    it('should have total of 209 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(186);
+      expect(totalTools).toBe(209);
     });
   });
 

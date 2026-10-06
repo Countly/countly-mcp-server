@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **186 Tools** across 42 categories for comprehensive Countly operations
+- **209 Tools** across 43 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (186 available)
+### Tools (209 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -606,7 +606,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 186 tools across 42 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 209 tools across 43 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -874,6 +874,31 @@ On Countly Platform these tools manage the new content messages (popup, banner, 
 ### Geo, Revenue
 - **`geo_locations_list`** (Platform, requires `geo` plugin) - Saved geo locations (geofences)
 - **`revenue_iap_events`** (Platform, requires `revenue` plugin) - Events configured as in-app purchases
+
+### Stage (requires `stage` plugin and a Stage View or Edit level)
+- **`stage_reference`** (Platform) - Scene and demo company format: looks, themes, steps, delivery modes, layers, paper sizes, accepted piece ids
+- **`stage_status`** (Platform) - Whether the server serves Stage's public host, on which name, and why not
+- **`stage_pieces_list`** (Platform) - Pieces the server accepts in scene layers, with what each renders and when to use it
+- **`stage_pieces_get`** (Platform) - One piece's props (kinds, options, defaults), example start props and data grid
+- **`stage_templates_list`** (Platform) - Starters and Library examples to start from: decks, one-pagers, responsive sections, patterns
+- **`stage_templates_get`** (Platform) - One template's outline or full scene
+- **`stage_scenarios_list`** (Platform) - Recorded product walkthroughs an app page plays, with their chapters
+- **`stage_scenarios_get`** (Platform) - One scenario's chapters and, optionally, its script steps
+- **`stage_scenes_list`** (Platform) - Scenes with canvas size, revision, authors and publishing state
+- **`stage_scenes_get`** (Platform) - One scene: outline (look, delivery, steps, layers) or full JSON, versions, public URLs and embed snippet
+- **`stage_scenes_create`** (Platform) - Create a scene draft from a template, from JSON, or empty with name, look, theme, delivery and size (A4 / Letter)
+- **`stage_scenes_update`** (Platform) - Save a scene draft: replace its JSON or change single fields; concurrent saves are refused
+- **`stage_scenes_edit`** (Platform) - Build or change a scene with operations: layers, steps, scenarios played, delivery, responsive fit and breakpoints; checked before saving
+- **`stage_scenes_validate`** (Platform) - Dry-run a scene: would it save and publish, what the server drops, which props pieces ignore
+- **`stage_scenes_delete`** (Platform) - Delete a never-published scene
+- **`stage_scenes_publish`** (Platform) - Publish the saved scene as a new immutable version; returns URLs and embed snippets per delivery (presentation, player, single page)
+- **`stage_scenes_set_latest`** (Platform) - Roll the published scene back or forward to a stored version
+- **`stage_scenes_unpublish`** (Platform) - Hide a published scene (pinned version URLs keep working)
+- **`stage_scenes_restore`** (Platform) - Show an unpublished scene again
+- **`stage_companies_list`** (Platform) - Demo companies with public / referenced state
+- **`stage_companies_get`** (Platform) - One demo company: base project, colours, renames, volume scale
+- **`stage_companies_create`** (Platform) - Create a demo company that dresses a mock project for a prospect
+- **`stage_companies_update`** (Platform) - Change a demo company (refused once a published version names it)
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

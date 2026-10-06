@@ -74,6 +74,12 @@ const OVERRIDES: Record<string, ToolAnnotations> = {
   notes_create: SENDS_OUTSIDE,
   // send_email_invitation emails the users the dashboard is shared with
   dashboards_create: SENDS_OUTSIDE,
+  // Labelled 'C' (a new version), but it changes what every embedding website
+  // shows, and the first publish fixes the slug for good
+  stage_scenes_publish: { destructiveHint: true },
+  stage_scenes_set_latest: SETS_STATUS,
+  stage_scenes_unpublish: SETS_STATUS,
+  stage_scenes_restore: SETS_STATUS,
 };
 
 function getToolOperation(toolName: string): CrudOperation | undefined {
