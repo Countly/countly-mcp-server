@@ -219,6 +219,24 @@ describe('scene tools', () => {
     expect(json(res).host).toContain('no host build');
   });
 
+  it('a failed host lookup is a warning on a read and after a publish, not a quiet gap', async () => {
+    const { context } = platformContext((method, url) => {
+      if (url === '/v2/stage/status') {
+        return { status: 500, data: { error: { code: 'INTERNAL_ERROR', message: 'boom' } } };
+      }
+      return method === 'get'
+        ? ok({ id: SCENE_ID, name: 'X', rev: 2, slug: 'x', latest: 1, scene: {}, versionDetails: [] })
+        : ok({ slug: 'x', version: 2 });
+    });
+    const read: any = await new StageTools(context).stage_scenes_get({ scene_id: SCENE_ID });
+    expect(read.isError).toBeUndefined();
+    expect(json(read).public_links_error).toContain('boom');
+    const published: any = await new StageTools(context).stage_scenes_publish({ scene_id: SCENE_ID });
+    expect(published.isError).toBeUndefined();
+    expect(json(published)).toMatchObject({ slug: 'x', version: 2 });
+    expect(json(published).public_links_error).toContain('boom');
+  });
+
   it('rollback, unpublish and restore patch the publish state', async () => {
     const { context, request } = platformContext(() => ok({ slug: 'x', latest: 1, unpublished: false }));
     const tools = new StageTools(context);

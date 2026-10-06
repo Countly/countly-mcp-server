@@ -725,12 +725,13 @@ function companyOut(company: any, includeLogo: boolean): any {
 export class StageTools {
   constructor(private context: ToolContext) {}
 
-  private async hostStatus(): Promise<any> {
+  /** The public host's status; a failed lookup is kept as `error`, not read as "off" */
+  private async hostStatus(): Promise<{ host: any; error?: string }> {
     try {
       const data = await v2Request<any>(this.context, 'get', '/v2/stage/status');
-      return data?.host ?? null;
-    } catch {
-      return null;
+      return { host: data?.host ?? null };
+    } catch (error) {
+      return { host: null, error: `could not read the public host's status (${error instanceof Error ? error.message : String(error)}); public URLs and embed snippets are left out, try again` };
     }
   }
 
@@ -899,7 +900,8 @@ export class StageTools {
       const id = sceneIdOf(args);
       const data = await this.getScene(id);
       const full = args.view === 'full';
-      const host = data.slug ? await this.hostStatus() : null;
+      const status = data.slug ? await this.hostStatus() : { host: null };
+      const host = status.host;
       const latestVersion = (data.versionDetails || []).find((v: any) => v.version === data.latest);
       // The draft describes the published version only if nothing was saved after it
       const draftIsLatest = !!latestVersion?.publishedAt && !!data.updatedAt
@@ -908,6 +910,7 @@ export class StageTools {
         ...sceneRowOut(data),
         preview_url: this.previewUrl(id),
         public: publicLinks(host, data.slug, data.latest, { scene: draftIsLatest ? data.scene : undefined, unpublished: data.unpublished === true }),
+        public_links_error: status.error,
         draft_note: data.latest && !draftIsLatest
           ? `The draft was saved after version ${data.latest} was published: websites show version ${data.latest} until stage_scenes_publish.`
           : undefined,
@@ -994,7 +997,8 @@ export class StageTools {
       const published = await v2Request<any>(this.context, 'post', `/v2/stage/scenes/${enc(id)}/versions`, {
         body: clean({ rev: Number(rev), slug }),
       });
-      const host = await this.hostStatus();
+      const status = await this.hostStatus();
+      const host = status.host;
       const note = current.unpublished
         ? ' The scene is unpublished: the version is stored and pinnable, but hidden until stage_scenes_restore.'
         : '';
@@ -1003,6 +1007,8 @@ export class StageTools {
         version: published.version,
         public: publicLinks(host, published.slug, published.version, { scene: current.scene, unpublished: current.unpublished === true }),
         host: host && !host.serving ? `public host is off${host.reason ? `: ${host.reason}` : ''}` : undefined,
+        // The publish succeeded; only its links are missing
+        public_links_error: status.error,
       }));
     });
   }
