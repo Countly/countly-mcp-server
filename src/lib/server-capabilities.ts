@@ -17,6 +17,7 @@ import { createHash } from 'crypto';
 
 import { AxiosInstance, AxiosResponse } from 'axios';
 
+import { parseAppsMineResponse } from './app-cache.js';
 import { fetchMemberPermissions, type MemberPermissions } from './user-permissions.js';
 import { ENTERPRISE_DEFAULT_PLUGINS, LITE_DEFAULT_PLUGINS, PLATFORM_DEFAULT_PLUGINS } from './default-plugins.js';
 
@@ -219,8 +220,7 @@ async function probeDrill(
 ): Promise<boolean | undefined> {
   try {
     const apps = await client.get('/o/apps/mine', { params, timeout: timeoutMs });
-    const data = apps.data || {};
-    const appId = Object.keys({ ...(data.admin_of || {}), ...(data.user_of || {}) })[0];
+    const appId = parseAppsMineResponse(apps.data).map((app) => app?._id).find(Boolean);
     if (!appId) {
       return undefined;
     }
@@ -268,7 +268,7 @@ export class ServerCapabilitiesCache {
     }
     const promise = detect().then((caps) => {
       // Don't keep inconclusive results for the full TTL; retry soon.
-      if (caps.architecture === 'unknown') {
+      if (caps.architecture === 'unknown' || caps.flavor === 'unknown' || caps.plugins === null) {
         const entry = this.entries.get(key);
         if (entry) {
           entry.expiresAt = Math.min(entry.expiresAt, Date.now() + 30_000);

@@ -674,7 +674,18 @@ export function getPluginRequirements(): Record<string, string> {
 /**
  * Plugin required by a tool, or undefined when the tool works on any server
  */
+/**
+ * Tools whose endpoint belongs to a plugin even though their category is
+ * otherwise core (available by default).
+ */
+export const TOOL_PLUGIN_REQUIREMENTS: Record<string, string> = {
+  slipping_users: 'slipping-away-users',
+};
+
 export function getToolRequiredPlugin(toolName: string): string | undefined {
+  if (TOOL_PLUGIN_REQUIREMENTS[toolName]) {
+    return TOOL_PLUGIN_REQUIREMENTS[toolName];
+  }
   for (const categoryData of Object.values(TOOL_CATEGORIES)) {
     if (toolName in categoryData.operations) {
       return categoryData.availableByDefault === false ? categoryData.requiresPlugin : undefined;
