@@ -217,7 +217,6 @@ describe('getToolCatalog', () => {
       expect(['C', 'R', 'U', 'D'], tool.name).toContain(tool.operation);
       expect(TOOL_AREAS, tool.name).toContain(tool.area);
       expect(typeof tool.adminOnly, tool.name).toBe('boolean');
-      expect(['app', 'safe', 'unscoped'], tool.name).toContain(tool.appScope);
       expect(tool.possibleOperations, tool.name).toContain(tool.operation);
     }
   });
@@ -243,7 +242,7 @@ describe('getToolCatalog', () => {
     const catalog = getToolCatalog()
       .map((t) => `${t.name} ${t.category} ${t.operation}` +
         `${t.possibleOperations.join('') !== t.operation ? ` ops=${t.possibleOperations.join('')}` : ''}` +
-        ` ${t.area} scope=${t.appScope}${t.adminOnly ? ' admin' : ''}${t.requiresPlugin ? ` plugin=${t.requiresPlugin}` : ''}`)
+        ` ${t.area}${t.adminOnly ? ' admin' : ''}${t.requiresPlugin ? ` plugin=${t.requiresPlugin}` : ''}`)
       .sort();
     expect(catalog).toMatchSnapshot();
   });
@@ -506,10 +505,10 @@ describe('tool filtering', () => {
 });
 
 // ---------------------------------------------------------------------------
-// App allow-list
+// Apps
 // ---------------------------------------------------------------------------
 
-describe('app allow-list', () => {
+describe('apps', () => {
   it('lists and resolves apps the member only uses, not just those they administer', async () => {
     const res = await callTool('apps_list');
     expect(res.result.content[0].text).toContain('Beta');
@@ -517,128 +516,10 @@ describe('app allow-list', () => {
     expect(reports.at(-1)).toMatchObject({ tool: 'events_list', appId: 'aaaaaaaaaaaaaaaaaaaaaaa2', outcome: 'success' });
   });
 
-  it('limits app lists to context.apps', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const res = await callTool('apps_list');
-    const text = res.result.content[0].text;
-    expect(text).toContain('aaaaaaaaaaaaaaaaaaaaaaa1');
-    expect(text).not.toContain('aaaaaaaaaaaaaaaaaaaaaaa2');
-  });
-
-  it('refuses an app outside context.apps without calling Countly', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const res = await callTool('events_list', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa2' });
-    expect(res.error).toBeDefined();
-    expect(countlyRequests).toHaveLength(0);
-    expect(reports[0]).toMatchObject({ outcome: 'no_access', appId: 'aaaaaaaaaaaaaaaaaaaaaaa2' });
-  });
-
-  it('refuses out-of-scope app ids nested anywhere in the arguments, with no Countly request', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const report = { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
-    const cases: Array<[string, Record<string, unknown>]> = [
-      ['email_reports_core_create', { ...report, apps: ['aaaaaaaaaaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaaaaaaaaaa2'] }],
-      ['email_reports_core_create', { ...report, apps: 'aaaaaaaaaaaaaaaaaaaaaaa1,aaaaaaaaaaaaaaaaaaaaaaa2' }],
-      ['email_reports_core_create', { ...report, apps: '["aaaaaaaaaaaaaaaaaaaaaaa2"]' }],
-      ['email_reports_core_create', { ...report, apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'], selectedEvents: ['0123456789abcdef01234567***purchase'] }],
-      ['app_users_update', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', query: { deep: [{ nested: { appId: 'aaaaaaaaaaaaaaaaaaaaaaa2' } }] }, update: { $set: { a: 1 } } }],
-      ['cohorts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', name: 'c', steps: '[]', user_segmentation: JSON.stringify({ selectedApps: ['aaaaaaaaaaaaaaaaaaaaaaa2'] }) }],
-      ['funnels_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', name: 'f', steps: ['a'], queries: [JSON.stringify({ app_ids: ['aaaaaaaaaaaaaaaaaaaaaaa2'] })] }],
-    ];
-    for (const [tool, args] of cases) {
-      reports = [];
-      const res = await callTool(tool, args);
-      expect(res.error, `${tool} ${JSON.stringify(args)}`).toBeDefined();
-      expect(reports[0], tool).toMatchObject({ tool, outcome: 'no_access' });
-    }
-    expect(countlyRequests).toHaveLength(0);
-  });
-
-  it('refuses every-app wildcards and out-of-scope ids inside objects under an allow-list', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const report = { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
-    for (const apps of [['*'], ['all'], 'all', [{ id: 'aaaaaaaaaaaaaaaaaaaaaaa2' }], { $in: ['aaaaaaaaaaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaaaaaaaaaa2'] }]) {
-      const res = await callTool('email_reports_core_create', { ...report, apps });
-      expect(res.error, JSON.stringify(apps)).toBeDefined();
-    }
-    expect(countlyRequests).toHaveLength(0);
-  });
-
-  it('checks <appId>***key only in fields that hold such references', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    // an event that merely looks like a composite key is data in a plain field
-    const plain = await callTool('query_data', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', query_type: 'events', event: '0123456789abcdef01234567***purchase' });
-    expect(plain.result, JSON.stringify(plain)).toBeDefined();
-    // (selectedEvents naming another app is refused: see the nested app ids test above)
-  });
-
-  it('accepts nested app ids that are all in scope', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const res = await callTool('email_reports_core_create', {
-      app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily',
-      apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'], selectedEvents: ['aaaaaaaaaaaaaaaaaaaaaaa1***purchase'],
-    });
-    expect(res.result).toBeDefined();
-    expect(countlyRequests).toHaveLength(1);
-  });
-
-  it('does not check nested app ids without an allow-list', async () => {
-    const res = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config: { selectedApps: ['aaaaaaaaaaaaaaaaaaaaaaa2', '*'] } });
-    expect(res.result).toBeDefined();
-    expect(countlyRequests).toHaveLength(1);
-  });
-
-  it('hides and refuses app-agnostic tools under an allow-list, and keeps them without one', async () => {
-    const unscoped = ['dashboards_list', 'dashboards_data', 'dashboards_create', 'dashboards_widget_add',
-      'get_plugins', 'dashboard_users', 'databases_query', 'datapoints_top_apps', 'notes_delete', 'apps_create',
-      'alerts_list', 'alerts_create', 'hooks_list', 'email_reports_list', 'email_reports_update', 'journeys_stats_table'];
-    const names = await listToolNames();
-    for (const tool of unscoped) {
-      expect(names, tool).toContain(tool);
-    }
-
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const scopedNames = await listToolNames();
-    for (const tool of unscoped) {
-      expect(scopedNames, tool).not.toContain(tool);
-    }
-    for (const tool of ['ping', 'get_version', 'apps_list', 'apps_get_by_name', 'events_list', 'journeys_block_reference']) {
-      expect(scopedNames, tool).toContain(tool);
-    }
-    const byName = new Map(getToolCatalog().map((t) => [t.name, t]));
-    for (const tool of scopedNames) {
-      expect(byName.get(tool)?.appScope, tool).not.toBe('unscoped');
-    }
-
-    const res = await callTool('dashboards_list');
-    expect(res.error).toBeDefined();
-    const widget = await callTool('dashboards_widget_add', { dashboard_id: 'd1', widget: { apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] } });
-    expect(widget.error).toBeDefined();
-    expect(countlyRequests).toHaveLength(0);
-  });
-
-  it('refuses an app name outside context.apps as no access', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const res = await callTool('events_list', { app_name: 'Beta' });
-    expect(res.error).toBeDefined();
-    expect(countlyRequests.map((r) => r.url)).toEqual(['/o/apps/mine']);
-    expect(reports[0]).toMatchObject({ outcome: 'no_access', appId: 'aaaaaaaaaaaaaaaaaaaaaaa2' });
-  });
-
-  it('reports an unknown app name as a failure, not a refusal', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
+  it('reports an unknown app name as a failure', async () => {
     const res = await callTool('events_list', { app_name: 'Nope' });
     expect(res.error).toBeDefined();
     expect(reports[0]).toMatchObject({ outcome: 'failed' });
-  });
-
-  it('treats values that are not app ids under app-named keys as data', async () => {
-    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
-    const res = await callTool('app_users_update', {
-      app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', query: { uid: 'u1' }, update: { $set: { custom: { app: 'ios', apps: ['web', 'tv'], app_id: true } } },
-    });
-    expect(res.result, JSON.stringify(res)).toBeDefined();
-    expect(countlyRequests).toHaveLength(1);
   });
 });
 

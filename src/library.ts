@@ -18,13 +18,11 @@
  *   (optionally) enabled plugins, and an unclassified tool is never exposed.
  *   Each call is checked against the operations its arguments need
  *   (TOOL_OPERATION_RULES), not only the tool's static operation.
- * - With an app allow-list, every app id in the arguments is validated at any
- *   depth, and tools not provably confined to the named app (TOOL_APP_SCOPE
- *   "unscoped") are hidden.
+ * - Apps are not limited here: the upstream token carries the caller's own
+ *   rights, and Countly enforces them on every request.
  * - Stateless: every request gets its own MCP server and transport, and the
  *   app cache is keyed by grant id.
- * - Resources are not exposed (they would read apps outside `context.apps`);
- *   tools and the static prompts are.
+ * - Resources are not exposed; tools and the static prompts are.
  *
  * Importing this module has no side effects: it does not load .env, start
  * analytics or read process.env.
@@ -53,16 +51,14 @@ import {
   getCallShapes,
   getEffectiveOperations,
   getPossibleOperations,
-  TOOL_APP_SCOPE,
   TOOL_AREAS,
   TOOL_CATEGORIES,
   type CrudOperation,
-  type ToolAppScope,
 } from './lib/tools-config.js';
 import { getAllToolDefinitions, getAllToolMetadata } from './tools/index.js';
 import type { ToolContext } from './tools/types.js';
 
-export type { CrudOperation, ToolAppScope } from './lib/tools-config.js';
+export type { CrudOperation } from './lib/tools-config.js';
 export type { HostAnalyticsOptions } from './lib/host-analytics.js';
 export { DEFAULT_ANALYTICS_APP_KEY, DEFAULT_ANALYTICS_URL } from './lib/host-analytics.js';
 
@@ -86,13 +82,6 @@ export interface McpRequestContext {
   operations: CrudOperation[];
   /** When false, tools marked adminOnly are not listed and cannot be called. */
   admin: boolean;
-  /**
-   * Optional app id allow-list. When set, every app id in a call's arguments
-   * (at any depth) must be in it, app lists and app-name resolution are
-   * limited to it, and tools that are not provably limited to the named app
-   * (ToolInfo.appScope "unscoped") are not listed and cannot be called.
-   */
-  apps?: string[];
 }
 
 export interface ToolCallReport {
@@ -105,8 +94,8 @@ export interface ToolCallReport {
   area: string;
   /**
    * `no_access` when Countly answered 401/403, or when the call was refused
-   * here because the grant does not allow the tool or names an app outside
-   * `context.apps`. `failed` for any other error.
+   * here because the grant does not allow the tool or the call.
+   * `failed` for any other error.
    */
   outcome: 'success' | 'failed' | 'no_access';
   durationMs: number;
@@ -160,13 +149,6 @@ export interface ToolInfo {
   possibleOperations: CrudOperation[];
   area: string;
   adminOnly: boolean;
-  /**
-   * How the tool relates to an app allow-list (context.apps): "app" - limited
-   * to the app its validated app argument names; "safe" - exposes no app data
-   * or filters its output to the allowed apps; "unscoped" - can reach other
-   * apps' data, so it is hidden whenever context.apps is set.
-   */
-  appScope: ToolAppScope;
   requiresPlugin?: string;
 }
 
@@ -183,12 +165,10 @@ export interface RequiredOperation {
 
 const CRUD_OPERATIONS: ReadonlySet<string> = new Set(['C', 'R', 'U', 'D']);
 const KNOWN_AREAS: ReadonlySet<string> = new Set<string>(TOOL_AREAS);
-const APP_SCOPES: ReadonlySet<string> = new Set<string>(['app', 'safe', 'unscoped']);
 
 /**
- * Classify one tool from TOOL_CATEGORIES and TOOL_APP_SCOPE. Returns undefined
- * when the tool has no category, no valid operation, no valid area or no app
- * scope; such a tool is never listed or callable in library mode (fail closed).
+ * Classify one tool from TOOL_CATEGORIES. Returns undefined when the tool has
+ * no category, no valid operation or no valid area; such a tool is never listed or callable in library mode (fail closed).
  */
 function classify(name: string): ToolInfo | undefined {
   for (const [category, data] of Object.entries(TOOL_CATEGORIES)) {
@@ -197,13 +177,10 @@ function classify(name: string): ToolInfo | undefined {
     }
     const operation = data.operations[name];
     const possibleOperations = getPossibleOperations(name);
-    const appScope = Object.prototype.hasOwnProperty.call(TOOL_APP_SCOPE, name) ? TOOL_APP_SCOPE[name] : undefined;
     if (
       !CRUD_OPERATIONS.has(operation) ||
       !KNOWN_AREAS.has(data.area) ||
-      !possibleOperations ||
-      !appScope ||
-      !APP_SCOPES.has(appScope)
+      !possibleOperations
     ) {
       return undefined;
     }
@@ -214,7 +191,6 @@ function classify(name: string): ToolInfo | undefined {
       possibleOperations,
       area: data.area,
       adminOnly: ADMIN_ONLY_TOOLS.has(name),
-      appScope,
     };
     if (data.availableByDefault === false && data.requiresPlugin) {
       info.requiresPlugin = data.requiresPlugin;
@@ -370,9 +346,6 @@ function isToolAllowedFor(
   if (!shapes.some((shape) => shape.every((op) => context.operations.includes(op)))) {
     return false;
   }
-  if (context.apps && info.appScope === 'unscoped') {
-    return false;
-  }
   if (info.adminOnly && context.admin !== true) {
     return false;
   }
@@ -403,179 +376,7 @@ function sanitizeArgs(args: unknown): Record<string, unknown> {
   return out;
 }
 
-class AppScopeError extends McpError {
-  constructor(appId: string) {
-    super(ErrorCode.InvalidParams, `App ${appId} is not available to this connection`);
-  }
-}
 
-/**
- * Argument keys that carry app ids, compared after lower-casing and dropping
- * `_` and `-`: app_id, appId, app, apps, app_ids, appIds, selectedApps,
- * selected_app, selected_apps.
- *
- * Audit of every input schema in src/tools/*.ts (2026-10) for app-bearing
- * fields, at any depth and inside JSON-string arguments:
- * - top level `app_id`: nearly every tool (`app_name` is resolved through
- *   resolveAppId, which is limited separately).
- * - `apps`: email_reports_core_create, hooks_create, hooks_update.
- * - `selected_app` (comma-separated): datapoints_stats.
- * - nested `widget.apps`: dashboards_widget_add.
- * - nested `alert_config.selectedApps`: alerts_create (object or JSON string).
- * - inside JSON strings: hooks_test `hook_config.apps`, and any raw-field
- *   escape hatch such as email_reports_update `report_data` (`apps`).
- * - `<appId>***<eventKey>` composite keys: email_reports_core_create
- *   `selectedEvents`, dashboards_widget_add `widget.events`, hook trigger
- *   event lists. These are matched by value pattern, not by key.
- * No tool uses another spelling, so no per-tool list is needed beyond this.
- */
-const APP_KEYS: ReadonlySet<string> = new Set([
-  'app',
-  'apps',
-  'appid',
-  'appids',
-  'selectedapp',
-  'selectedapps',
-]);
-
-/** Values in an app field that mean "every app"; refused under an allow-list. */
-const APP_WILDCARDS: ReadonlySet<string> = new Set(['*', 'all', 'all_apps', 'allapps']);
-
-/** A Countly app id. */
-const APP_ID = /^[0-9a-fA-F]{24}$/;
-
-/** An event or segment key prefixed with its app id: `<24-hex id>***key`. */
-const APP_PREFIXED_KEY = /^([0-9a-fA-F]{24})\*\*\*/;
-
-/**
- * Fields whose values are `<appId>***key` references, so the app in them is
- * checked: dashboard widget `events` and `funnel_type`, email report
- * `selectedEvents`, hook trigger `event`. A string of that shape anywhere else
- * (an event that happens to be named so) is data.
- */
-const COMPOSITE_KEYS: ReadonlySet<string> = new Set(['events', 'selectedevents', 'funneltype']);
-/** Composite only when nested (a hook trigger's `event`): a top-level `event`
- *  argument is a plain event key (query_data). */
-const NESTED_COMPOSITE_KEYS: ReadonlySet<string> = new Set(['event']);
-
-function isCompositeKey(key: string, nested: boolean): boolean {
-  const name = key.toLowerCase().replace(/[_-]/g, '');
-  return COMPOSITE_KEYS.has(name) || (nested && NESTED_COMPOSITE_KEYS.has(name));
-}
-
-/** Nesting deeper than this is refused rather than left unchecked. */
-const MAX_ARG_DEPTH = 32;
-
-function isAppKey(key: string): boolean {
-  return APP_KEYS.has(key.toLowerCase().replace(/[_-]/g, ''));
-}
-
-function parseJsonString(value: string): { ok: true; value: unknown } | { ok: false } {
-  const trimmed = value.trim();
-  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) {
-    return { ok: false };
-  }
-  try {
-    return { ok: true, value: JSON.parse(trimmed) };
-  } catch {
-    return { ok: false };
-  }
-}
-
-/**
- * Reject a call whose arguments name an app outside `context.apps`, wherever
- * the app appears: any app-bearing key (see APP_KEYS) at any depth, inside
- * arrays, operator objects (`{"$in": [...]}`) and arguments that are JSON
- * strings, comma-separated lists, and `<appId>***key` composite keys. A
- * wildcard ("*", "all") is refused, and so is nesting too deep to check.
- *
- * Countly app ids are always 24-hex ObjectIds, so only such a value names an
- * app. Anything else under an app-named key (`{"custom": {"app": "ios"}}` in
- * an app-user update) is data and passes; the tool's own app is resolved,
- * and checked, separately. Countly still applies the token's own rights on
- * every call.
- */
-function assertAppsInScope(args: Record<string, unknown>, allowed: ReadonlySet<string> | undefined): void {
-  if (!allowed) {
-    return;
-  }
-  const checkId = (raw: string) => {
-    const id = raw.trim();
-    if (id === '') {
-      return;
-    }
-    if (APP_WILDCARDS.has(id.toLowerCase())) {
-      throw new McpError(ErrorCode.InvalidParams, 'Every-app wildcards are not available to this connection');
-    }
-    if (!APP_ID.test(id)) {
-      return; // not an app id: data that happens to sit under an app-named key
-    }
-    if (!allowed.has(id)) {
-      throw new AppScopeError(id);
-    }
-  };
-  const checkAppValue = (value: unknown, depth: number): void => {
-    if (depth > MAX_ARG_DEPTH) {
-      throw new McpError(ErrorCode.InvalidParams, 'Arguments are nested too deeply to check');
-    }
-    if (value === undefined || value === null) {
-      return;
-    }
-    if (typeof value === 'string') {
-      const parsed = parseJsonString(value);
-      if (parsed.ok) {
-        checkAppValue(parsed.value, depth + 1);
-        return;
-      }
-      value.split(',').forEach(checkId);
-      return;
-    }
-    if (typeof value === 'number') {
-      checkId(String(value));
-      return;
-    }
-    if (Array.isArray(value)) {
-      value.forEach((item) => checkAppValue(item, depth + 1));
-      return;
-    }
-    if (typeof value === 'object') {
-      // An operator object ({"$in": [...]}) or a nested record: every id in it counts.
-      Object.values(value as Record<string, unknown>).forEach((item) => checkAppValue(item, depth + 1));
-    }
-    // booleans and the like cannot name an app
-  };
-  // `composite`: the value sits under a field that holds `<appId>***key`
-  // references (see COMPOSITE_KEYS); anywhere else such a string is data.
-  const walk = (value: unknown, depth: number, composite: boolean): void => {
-    if (depth > MAX_ARG_DEPTH) {
-      throw new McpError(ErrorCode.InvalidParams, 'Arguments are nested too deeply to check');
-    }
-    if (typeof value === 'string') {
-      const prefixed = composite ? APP_PREFIXED_KEY.exec(value) : null;
-      if (prefixed) {
-        checkId(prefixed[1]);
-      }
-      const parsed = parseJsonString(value);
-      if (parsed.ok) {
-        walk(parsed.value, depth + 1, composite);
-      }
-      return;
-    }
-    if (Array.isArray(value)) {
-      value.forEach((item) => walk(item, depth + 1, composite));
-      return;
-    }
-    if (value && typeof value === 'object') {
-      for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-        if (isAppKey(key)) {
-          checkAppValue(child, depth + 1);
-        }
-        walk(child, depth + 1, isCompositeKey(key, depth > 0));
-      }
-    }
-  };
-  walk(args, 0, false);
-}
 
 // ============================================================================
 // APP CACHE (keyed by grant id)
@@ -638,9 +439,6 @@ function validateContext(context: McpRequestContext): void {
   if (!Array.isArray(context.operations)) {
     throw new TypeError('countly-mcp-server: context.operations must be an array');
   }
-  if (context.apps !== undefined && !Array.isArray(context.apps)) {
-    throw new TypeError('countly-mcp-server: context.apps must be an array when set');
-  }
 }
 
 export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
@@ -698,7 +496,6 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
 
   const buildServer = (context: McpRequestContext): Server => {
     const state = getCatalogState();
-    const allowedApps = context.apps ? new Set(context.apps.map(String)) : undefined;
     const allowed = (name: string): ToolInfo | undefined => {
       const info = state.byName.get(name);
       return info && isToolAllowedFor(info, context, isPluginEnabled) ? info : undefined;
@@ -765,22 +562,12 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
         );
       }
 
-      try {
-        assertAppsInScope(args, allowedApps);
-      } catch (error) {
-        finish('no_access', appId);
-        throw error;
-      }
-
       let noAccess = false;
       const client = createClient(context.upstreamToken, () => {
         noAccess = true;
       });
       const cache = appCaches.for(context.grantId);
-      const getApps = async (): Promise<CountlyApp[]> => {
-        const apps = await fetchApps(client, cache);
-        return allowedApps ? apps.filter((a) => allowedApps.has(String(a._id))) : apps;
-      };
+      const getApps = (): Promise<CountlyApp[]> => fetchApps(client, cache);
       const toolContext: ToolContext = {
         httpClient: client,
         appCache: cache,
@@ -789,21 +576,12 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
         resolveAppId: async (a: any) => {
           const requestedId = a?.app_id;
           if (requestedId) {
-            if (allowedApps && !allowedApps.has(String(requestedId))) {
-              throw new AppScopeError(String(requestedId));
-            }
             appId = String(requestedId);
             return appId;
           }
           if (a?.app_name) {
             const app = (await getApps()).find((x) => x.name === a.app_name);
             if (!app) {
-              // An app that exists but is outside this connection is a refusal, not a typo.
-              const hidden = allowedApps && (await fetchApps(client, cache)).find((x) => x.name === a.app_name);
-              if (hidden) {
-                appId = String(hidden._id);
-                throw new AppScopeError(appId);
-              }
               throw new McpError(ErrorCode.InvalidParams, `App not found: ${a.app_name}`);
             }
             appId = String(app._id);
@@ -825,8 +603,7 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
         finish(failedResult ? (noAccess ? 'no_access' : 'failed') : 'success', appId);
         return result;
       } catch (error) {
-        const scopeError = error instanceof AppScopeError;
-        finish(noAccess || scopeError ? 'no_access' : 'failed', appId);
+        finish(noAccess ? 'no_access' : 'failed', appId);
         if (error instanceof McpError) {
           throw error;
         }
