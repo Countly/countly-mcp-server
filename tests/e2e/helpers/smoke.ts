@@ -57,10 +57,12 @@ const SKIPPED: Record<string, string> = {
   user_profiles_get: 'finding a uid needs a broad profile query, too heavy for large apps',
 };
 
-const firstId = (json: unknown): string | undefined => {
-  const node = findDeep(json, (n) =>
-    !Array.isArray(n)
-    && ((typeof n._id === 'string' && n._id !== 'meta') || typeof n.id === 'string'));
+const hasId = (n: any) =>
+  !Array.isArray(n) && ((typeof n._id === 'string' && n._id !== 'meta') || typeof n.id === 'string');
+
+/** ID of the first listed item matching `accept` (any item by default) */
+const firstId = (json: unknown, accept: (n: any) => boolean = () => true): string | undefined => {
+  const node = findDeep(json, (n) => hasId(n) && accept(n));
   return node ? String(node._id ?? node.id) : undefined;
 };
 
@@ -85,13 +87,23 @@ const ID_SOURCES: Record<string, IdSource> = {
   cohorts_data: { from: 'cohorts_list', param: 'cohort_id' },
   funnels_data: { from: 'funnels_list', param: 'funnel_id' },
   ab_experiments_details: { from: 'ab_experiments_list', param: 'experiment_id' },
-  email_reports_preview: { from: 'email_reports_list', param: 'report_id' },
+  // Dashboard reports depend on the referenced dashboards still having data.
+  email_reports_preview: {
+    from: 'email_reports_list',
+    param: 'report_id',
+    pick: (json) => firstId(json, (n) => (n.report_type ?? n.type ?? 'core') === 'core'),
+  },
   journeys_get: { from: 'journeys_list', param: 'journey_id' },
   journeys_stats_summary: { from: 'journeys_list', param: 'journey_id' },
   journeys_stats_table: { from: 'journeys_list', param: 'journey_id' },
   journeys_stats_performance: { from: 'journeys_list', param: 'journey_id' },
   content_blocks_get: { from: 'content_blocks_list', param: 'content_id' },
-  content_blocks_preview: { from: 'content_blocks_list', param: 'content_id' },
+  // Push messages have no browser preview.
+  content_blocks_preview: {
+    from: 'content_blocks_list',
+    param: 'content_id',
+    pick: (json) => firstId(json, (n) => (n.format ?? n.messageFormat) !== 'push'),
+  },
   dashboards_data: { from: 'dashboards_list', param: 'dashboard_id' },
 };
 

@@ -18,6 +18,10 @@ permissions:
 jobs:
   e2e:
     uses: ./.github/workflows/e2e.yml
+    with:
+      # Missing credentials must fail, not pass as "everything skipped"
+      # (which would also close the failure issue).
+      require_secrets: true
     secrets: inherit
 
   report-failure:
@@ -67,7 +71,10 @@ jobs:
             else
               echo "No test results were produced; the job failed before or during setup. See the run log."
             fi
-          } | head -c 60000 > body.md
+          } > body-full.md
+          # Truncate after writing: piping into head would SIGPIPE the writer,
+          # which fails the step under pipefail.
+          head -c 60000 body-full.md > body.md
           cat body.md
 
       - name: Open or update the e2e-failure issue

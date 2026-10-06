@@ -221,7 +221,9 @@ export function defineLiveSuite(edition: Edition): void {
         const findNote = async (text: string) => {
           const list = await client.callTool('notes_list', { app_id: config.appId, period: '60days' });
           expect(list.isError, resultText(list)).toBeFalsy();
-          return findDeep(parseResultJson(list), (n) => n.note === text)?._id as string | undefined;
+          // Legacy notes carry `_id`, Platform /v2 notes `id`
+          const found = findDeep(parseResultJson(list), (n) => n.note === text);
+          return found ? String(found._id ?? found.id) : undefined;
         };
         const listDashboards = async () => {
           const list = await client.callTool('dashboards_list');
@@ -241,8 +243,8 @@ export function defineLiveSuite(edition: Edition): void {
             const notes = parseResultJson(await client.callTool('notes_list', { app_id: config.appId, period: '60days' }));
             const stale: string[] = [];
             findDeep(notes, (n) => {
-              if (isStale(n.note) && typeof n._id === 'string') {
-                stale.push(n._id);
+              if (isStale(n.note) && (n._id || n.id)) {
+                stale.push(String(n._id ?? n.id));
               }
               return false;
             });
@@ -273,7 +275,8 @@ export function defineLiveSuite(edition: Edition): void {
           }
         });
 
-        it('creates, reads back and deletes a note', async () => {
+        // No retries: a retry after a committed write would create a duplicate.
+        it('creates, reads back and deletes a note', { retry: 0 }, async () => {
           setup.check();
           const created = await client.callTool('notes_create', {
             app_id: config.appId,
@@ -296,7 +299,7 @@ export function defineLiveSuite(edition: Edition): void {
           noteId = undefined;
         });
 
-        it(`creates, reads back and deletes a dashboard${edition === 'platform' ? ' with a widget' : ''}`, async () => {
+        it(`creates, reads back and deletes a dashboard${edition === 'platform' ? ' with a widget' : ''}`, { retry: 0 }, async () => {
           setup.check();
           const createTool = tools.find((t) => t.name === 'dashboards_create');
           expect(createTool, 'dashboards_create should be listed').toBeDefined();
@@ -343,6 +346,15 @@ export function defineLiveSuite(edition: Edition): void {
         });
       });
     });
+
+    // The release gate needs the read-only checks too, not just the admin ones.
+    if (!config.userToken && requireSecrets && server.required) {
+      describe('as read-only user', () => {
+        it('has its e2e secrets configured', () => {
+          throw new Error(`MCP_E2E_REQUIRE_SECRETS=1 but MCP_E2E_${server.key}_USER_TOKEN is not set`);
+        });
+      });
+    }
 
     describe.skipIf(!config.userToken)('as read-only user', () => {
       const client = new McpStdioClient(config.url, config.userToken || '');
@@ -393,6 +405,12 @@ export function defineLiveSuite(edition: Edition): void {
 
       it('refuses hidden tools with a missing-permission message', async () => {
         setup.check();
+        // Both calls would really write if the token isn't read-only (e.g. a
+        // misconfigured admin token), so only make them while the tool is hidden.
+        const listed = names(tools);
+        expect(listed, 'notes_create is visible; refusing to call it').not.toContain('notes_create');
+        expect(listed, 'apps_create is visible; refusing to call it').not.toContain('apps_create');
+
         const note = await client.callTool('notes_create', {
           app_id: config.appId,
           note: `${E2E_PREFIX}${Date.now()}-must-not-exist`,
