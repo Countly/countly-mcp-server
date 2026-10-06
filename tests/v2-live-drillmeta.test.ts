@@ -291,3 +291,16 @@ describe('Platform schema overrides', () => {
     expect(overrides.live_overall).toBeUndefined();
   });
 });
+
+describe('Platform insights default period', () => {
+  // /v2/views/top rejects requests without a period ("Missing required
+  // parameter: period"); the schema documents 30days as the default.
+  it.each(['views_top', 'events_summary', 'events_top', 'events_movers'] as const)(
+    '%s sends period=30days when none is given',
+    async (tool) => {
+      const { context, request } = serverContext(() => ok([]));
+      await (new PlatformInsightsTools(context) as any)[tool]({ app_id: 'a1' });
+      expect(request.mock.calls[0][0].params.period).toBe('30days');
+    }
+  );
+});

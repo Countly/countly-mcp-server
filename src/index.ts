@@ -69,7 +69,6 @@ import {
   getToolRequiredPlugin,
   isToolSupported,
   V2_ONLY_TOOLS,
-  NOT_ON_PLATFORM_TOOLS,
   TOOL_CATEGORIES,
   type ToolsConfig,
 } from './lib/tools-config.js';
@@ -447,15 +446,6 @@ class CountlyMCPServer {
               type: 'text',
               text: `Tool "${name}" is not available: it requires ${describeGuard(name, caps.v2)}, ` +
                 'which the connected Countly user does not have.',
-            }],
-            isError: true,
-          };
-        }
-        if (caps?.architecture === 'platform' && NOT_ON_PLATFORM_TOOLS.has(name)) {
-          return {
-            content: [{
-              type: 'text',
-              text: `Tool "${name}" is not available on Countly Platform (${describeCapabilities(caps)}).`,
             }],
             isError: true,
           };

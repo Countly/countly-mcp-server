@@ -401,52 +401,6 @@ export async function handleGetCollectionIndexes(context: ToolContext, args: any
 }
 
 // ============================================================================
-// GET_DB_STATISTICS TOOL
-// ============================================================================
-
-export const getDbStatisticsToolDefinition = {
-  name: 'databases_stats',
-  description: 'Get live MongoDB process statistics ("mongotop" per-collection timings or "mongostat" server-wide counters) via /o/db/mongotop or /o/db/mongostat. Requires the dbviewer plugin.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      stat_type: {
-        type: 'string',
-        enum: ['mongotop', 'mongostat'],
-        description: 'Which statistic set to fetch: "mongotop" (per-collection read/write time) or "mongostat" (server-wide ops/second, connections, memory).'
-      },
-    },
-    required: ['stat_type'],
-  },
-};
-
-export async function handleGetDbStatistics(context: ToolContext, args: any): Promise<ToolResult> {
-  const { stat_type } = args;
-  
-  const params = {
-    ...context.getAuthParams(),
-  };
-
-  const endpoint = stat_type === 'mongotop' ? '/o/db/mongotop' : '/o/db/mongostat';
-  const response = await safeApiCall(
-
-    () => context.httpClient.get(endpoint, { params }),
-
-    'Failed to execute request to API request'
-
-  );
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `MongoDB ${stat_type} statistics:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
-
-// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -456,7 +410,6 @@ export const databaseToolDefinitions = [
   getDocumentToolDefinition,
   aggregateCollectionToolDefinition,
   getCollectionIndexesToolDefinition,
-  getDbStatisticsToolDefinition,
 ];
 
 export const databaseToolHandlers = {
@@ -465,7 +418,6 @@ export const databaseToolHandlers = {
   'databases_document': 'getDocument',
   'collections_aggregate': 'aggregateCollection',
   'collections_indexes': 'getCollectionIndexes',
-  'databases_stats': 'getDbStatistics',
 } as const;
 
 export class DatabaseTools {
@@ -489,10 +441,6 @@ export class DatabaseTools {
 
   async getCollectionIndexes(args: any): Promise<ToolResult> {
     return handleGetCollectionIndexes(this.context, args);
-  }
-
-  async getDbStatistics(args: any): Promise<ToolResult> {
-    return handleGetDbStatistics(this.context, args);
   }
 }
 

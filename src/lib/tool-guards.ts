@@ -86,7 +86,6 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   databases_document: f('dbviewer', 'r'),
   collections_aggregate: f('dbviewer', 'r'),
   collections_indexes: f('dbviewer', 'r'),
-  databases_stats: globalAdmin,
 
   // drill
   queriable_fields_list: f(DRILL_META_FEATURES, 'r'),

@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **README authentication order corrected** — tool arguments were listed third but have always overridden headers and URL parameters; the list now matches the code.
 - **Malformed `Host` header no longer turns `/mcp` requests into a 500** — the query string was parsed with `new URL(req.url, \`http://${host}\`)`, which throws on a `Host` such as `a b` or `[`. It is now parsed against a fixed base, since only the query string is read.
 
+### Removed
+- **`databases_stats` tool** — it called `/o/db/mongotop` and `/o/db/mongostat`, which spawn the MongoDB command line tools on the Countly server. Platform images do not ship those tools, the spawn failure crashed the Platform API, and the endpoints are removed from Countly (Countly/countly-platform#1971). The tool is gone on every server, and with it the Platform-only hiding rule (`NOT_ON_PLATFORM_TOOLS`) that existed only for it. The tool count is now 186.
+
 ### Changed
 - **Docs: server-side tokens in HTTP mode** — README and `DOCKER.md` now state that the HTTP transport does not authenticate its callers, so a server-side token belongs only on a trusted network, and the Docker quick-starts that pass a token publish the port on `127.0.0.1` instead of all interfaces.
 
