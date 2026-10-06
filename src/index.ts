@@ -47,6 +47,7 @@ import {
   extractClientIp,
   isPlainHostHeader,
   formatRequestLog,
+  isOriginPermitted,
   parseCorsAllowed,
   RateLimiter,
   readLimitedBody,
@@ -721,6 +722,15 @@ class CountlyMCPServer {
       // should set COUNTLY_CORS_ALLOWED_ORIGINS to a specific comma-
       // separated list (e.g. "https://my-app.example.com").
       const corsAllowed = parseCorsAllowed(process.env.COUNTLY_CORS_ALLOWED_ORIGINS);
+      // A server-side token (env or file) is used for any /mcp caller that
+      // supplies none, so browser-originated requests are refused unless
+      // their origin is allowlisted explicitly. See isOriginPermitted.
+      const serverHoldsToken = Boolean(
+        process.env.COUNTLY_AUTH_TOKEN || process.env.COUNTLY_AUTH_TOKEN_FILE
+      );
+      if (serverHoldsToken) {
+        console.error('Server-side Countly token configured: any caller that reaches /mcp without its own token acts with it. Expose this endpoint only on a trusted network.');
+      }
 
       // Rate limiter for /mcp endpoint. Defaults to 120 req/min per IP.
       // Tunable via COUNTLY_RATE_LIMIT_RPM=<number> or 0 to disable.
@@ -798,6 +808,19 @@ class CountlyMCPServer {
         });
 
         void (async () => {
+        // Refuse browser-originated /mcp requests (including preflights)
+        // while the server holds its own token. Runs before CORS so a
+        // refused origin never receives Access-Control-Allow-* headers.
+        if (url.parse(req.url || '', true).pathname === mcpEndpoint
+          && !isOriginPermitted(corsAllowed, req.headers.origin as string | undefined, serverHoldsToken)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Origin not allowed',
+            message: 'This server holds a configured Countly token, so browser requests to /mcp are refused unless their origin is listed in COUNTLY_CORS_ALLOWED_ORIGINS.',
+          }));
+          return;
+        }
+
         // Handle CORS for MCP and health endpoints only. Allowlist is
         // configured via COUNTLY_CORS_ALLOWED_ORIGINS; see parseCorsAllowed.
         if (corsEnabled) {
@@ -1159,7 +1182,15 @@ class CountlyMCPServer {
             .filter((c) => c.count > 0)
             .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          // The page embeds the request's Host header. A shared cache that
+          // ignores Host could otherwise serve one caller's forged host as the
+          // endpoint everyone is told to register, so the response is never
+          // stored and is marked as varying on Host.
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Vary': 'Host',
+          });
           res.end(`<!DOCTYPE html>
 <html lang="en">
 <head>

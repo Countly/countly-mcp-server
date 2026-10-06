@@ -41,6 +41,15 @@ describe('welcome page', () => {
       expect(indexSource).toMatch(/isPlainHostHeader\(requestHost\) \? requestHost :/);
     });
 
+    it('keeps the Host-derived page out of shared caches', () => {
+      // A plain but attacker-chosen hostname passes isPlainHostHeader. Without
+      // no-store, a cache that ignores Host could serve it to everyone as the
+      // endpoint to register, sending their tokens to that host.
+      const write = indexSource.slice(indexSource.indexOf("'Content-Type': 'text/html; charset=utf-8'") - 200, indexSource.indexOf("'Content-Type': 'text/html; charset=utf-8'") + 200);
+      expect(write).toContain("'Cache-Control': 'no-store'");
+      expect(write).toContain("'Vary': 'Host'");
+    });
+
     it('HTML-escapes the endpoint URL built from the Host header', () => {
       // pageEndpointUrl is derived from req.headers.host (and X-Forwarded-Proto
       // behind a trusted proxy). Unescaped, a forged Host reflected markup

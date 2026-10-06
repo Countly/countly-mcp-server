@@ -48,6 +48,33 @@ export function resolveCorsOrigin(
 }
 
 /**
+ * Decide whether a request to `/mcp` may proceed given its `Origin` header.
+ *
+ * When the server holds its own Countly token (COUNTLY_AUTH_TOKEN or
+ * COUNTLY_AUTH_TOKEN_FILE), any caller that reaches `/mcp` without a token
+ * acts with it. MCP clients (desktop apps, IDEs, CLIs, server-side
+ * connectors) send no `Origin` header, but a browser always does on a
+ * cross-origin request, and also on a DNS-rebound one, where CORS never
+ * applies because the page looks same-origin. Page scripts cannot set or
+ * forge `Origin`. So a request carrying an `Origin` is a web page driving
+ * the operator's browser, and it is refused unless that origin is listed
+ * explicitly in COUNTLY_CORS_ALLOWED_ORIGINS; the `*` default does not count.
+ *
+ * Without a server-side token every caller brings its own, a page gains
+ * nothing, and the check is skipped.
+ */
+export function isOriginPermitted(
+  allowed: CorsAllowed,
+  requestOrigin: string | undefined,
+  serverHoldsToken: boolean
+): boolean {
+  if (!serverHoldsToken || !requestOrigin) {
+    return true;
+  }
+  return allowed !== '*' && allowed.includes(requestOrigin);
+}
+
+/**
  * Simple in-memory sliding-window rate limiter, keyed by client IP.
  *
  * Each IP may make at most `maxRequests` requests per `windowMs` milliseconds.

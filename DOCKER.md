@@ -42,10 +42,19 @@ docker pull countly/countly-mcp-server:latest
 
 ### Run from Docker Hub
 
+These examples give the container a server-side token, so they publish the
+port on `127.0.0.1` only. The HTTP transport does not authenticate its
+callers: anyone who can reach the port acts with the configured token. Do not
+publish it more widely (`-p 3000:3000`) unless a firewall or an authenticating
+reverse proxy sits in front. For a shared deployment, leave
+`COUNTLY_AUTH_TOKEN` unset and have each client send its own token in the
+`X-Countly-Auth-Token` header. See "Server-side token in HTTP mode" in the
+README.
+
 ```bash
 docker run -d \
   --name countly-mcp-server \
-  -p 3000:3000 \
+  -p 127.0.0.1:3000:3000 \
   -e COUNTLY_SERVER_URL=https://your-countly-instance.com \
   -e COUNTLY_AUTH_TOKEN=your-token-here \
   countly/countly-mcp-server:latest
@@ -68,7 +77,7 @@ docker build -t countly-mcp-server:1.0.0 .
 ```bash
 docker run -d \
   --name countly-mcp-server \
-  -p 3000:3000 \
+  -p 127.0.0.1:3000:3000 \
   -e COUNTLY_SERVER_URL=https://your-countly-instance.com \
   -e COUNTLY_AUTH_TOKEN=your-token-here \
   countly-mcp-server:local
@@ -331,7 +340,7 @@ kubectl logs -f deployment/countly-mcp-server -n countly-mcp
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `COUNTLY_SERVER_URL` | Countly server URL | `https://api.count.ly` |
-| `COUNTLY_AUTH_TOKEN` | Direct auth token | - |
+| `COUNTLY_AUTH_TOKEN` | Direct auth token. In HTTP mode it is used for every caller that sends no token of its own; expose the port only to a trusted network | - |
 | `COUNTLY_AUTH_TOKEN_FILE` | Path to token file | - |
 | `COUNTLY_TIMEOUT` | Request timeout (ms) | `30000` |
 
