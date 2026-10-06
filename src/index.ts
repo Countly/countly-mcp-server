@@ -51,7 +51,7 @@ import {
   resolveCorsOrigin,
   sanitizeForLog,
 } from './lib/http-security.js';
-import { loadToolsConfig, filterTools, getConfigSummary, TOOL_CATEGORIES, type ToolsConfig } from './lib/tools-config.js';
+import { loadToolsConfig, filterTools, getConfigSummary, isToolCallAllowed, TOOL_CATEGORIES, type ToolsConfig } from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
@@ -412,6 +412,15 @@ class CountlyMCPServer {
           );
         }
         
+        // The tool is enabled, but some tools write depending on their
+        // arguments (see TOOL_OPERATION_RULES): check what this call needs.
+        if (!isToolCallAllowed(name, args, this.toolsConfig)) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            `Tool ${name} with these arguments needs an operation that is disabled by the tools configuration`
+          );
+        }
+
         const instance = toolInstances[instanceKey];
         
         // Check for potential infinite loops before executing the tool

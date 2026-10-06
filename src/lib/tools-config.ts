@@ -485,6 +485,419 @@ export const ADMIN_ONLY_TOOLS: ReadonlySet<string> = new Set<string>([
 ]);
 
 /**
+ * How a tool call's arguments change the operation it performs.
+ *
+ * TOOL_CATEGORIES gives every tool one static operation. That is the whole
+ * story for most tools, but a few do something else depending on their
+ * arguments: a read that also persists, a create that also updates. For those
+ * tools the rule below derives the operation(s) a given call needs, and every
+ * caller that enforces CRUD (library mode per call, the standalone modes per
+ * call, the host via `requiredOperations`) checks the EFFECTIVE operations,
+ * not the static one.
+ *
+ * `possible` is every operation the tool can perform. A rule that throws is
+ * treated as needing all of them (fail closed), and a rule must only return
+ * the read-only answer when the arguments prove the call does not write.
+ *
+ * Audit of every handler in src/tools/*.ts (2026-10) for argument-dependent
+ * behaviour - save/persist flags, upsert by id, modes, actions, delete flags:
+ *
+ * Argument-dependent, ruled below:
+ * - formulas_run: `mode` other than "unsaved" (the schema also offers "saved",
+ *   documented as persisting the formula with formulaMeta) and `report_name`
+ *   (names a stored report) need C as well as R. Only an absent/empty or
+ *   "unsaved" mode with no report_name is a pure read.
+ * - retention: a truthy `save_report` dispatches the calculation to the report
+ *   manager as a saved report (Countly treats any truthy value as "save"), so
+ *   it needs C as well as R.
+ * - alerts_create: /i/alert/save updates the alert named by
+ *   `alert_config._id` and creates one otherwise, so an `_id` needs U and no
+ *   `_id` needs C. `alert_config` may arrive as a JSON string; if it cannot be
+ *   parsed the call needs both.
+ * - events_create: /i/events/edit_map overwrites the name, description and
+ *   category of an event key that already exists, and the arguments cannot
+ *   prove the key is new, so every call needs C and U.
+ *
+ * Checked and not argument-dependent (static operation is accurate):
+ * - dashboards_data `action` is a "refresh" hint for /o/dashboards, a read.
+ * - drill_bookmarks_list `app_level`/`global`, journeys_stats_* `status` and
+ *   `task_id`, query_data `query_type`/`method`, views_* and funnels_* filter
+ *   options only select what is read.
+ * - crashes_get: Countly clears the group's "new" flag when it is viewed; it
+ *   authorizes that endpoint as a read and no argument changes it.
+ * - collections_aggregate / databases_query: dbviewer rejects pipeline stages
+ *   outside its operator allow-list (no $out/$merge), so they stay reads.
+ * - email_reports_preview renders without sending; email_reports_send (C)
+ *   sends.
+ * - email_reports_update `report_data` merges extra fields into the same
+ *   update (U); journeys_publish `status`, filtering_rules_toggle_status and
+ *   *_update `enabled`/`status` flags are all updates (U).
+ * - app_users_delete `force` only skips a safety check on a delete (D).
+ * - hooks_test is already C: it really runs the hook's effects.
+ * - dashboards_create `send_email_invitation`, notes_create `emails` and
+ *   email_reports_* recipients are part of the create/update itself.
+ * - formulas_save, notes_create, content_blocks_create, journeys_create,
+ *   cohorts_create, funnels_create, drill_bookmarks_create and the other
+ *   *_create tools build their payload from named fields and never pass an
+ *   id, so they cannot be turned into an update; the *_update tools always
+ *   address an existing record (U).
+ */
+export interface OperationRule {
+  /** Every operation the tool can perform. */
+  possible: readonly CrudOperation[];
+  /** The operations this call needs, derived from its arguments. */
+  operationsFor: (args: Record<string, unknown>) => CrudOperation[];
+}
+
+function parseMaybeJson(value: unknown): { ok: boolean; value: unknown } {
+  if (typeof value !== 'string') {
+    return { ok: true, value };
+  }
+  try {
+    return { ok: true, value: JSON.parse(value) };
+  } catch {
+    return { ok: false, value: undefined };
+  }
+}
+
+function isTruthyFlag(value: unknown): boolean {
+  if (value === undefined || value === null || value === false || value === 0 || value === '') {
+    return false;
+  }
+  if (typeof value === 'string' && ['false', '0'].includes(value.trim().toLowerCase())) {
+    return false;
+  }
+  return true;
+}
+
+export const TOOL_OPERATION_RULES: Readonly<Record<string, OperationRule>> = {
+  formulas_run: {
+    possible: ['R', 'C'],
+    operationsFor: (args) => {
+      const mode = args.mode;
+      const readOnlyMode = mode === undefined || mode === null || mode === '' || mode === 'unsaved';
+      const namesReport = args.report_name !== undefined && args.report_name !== null && args.report_name !== '';
+      return readOnlyMode && !namesReport ? ['R'] : ['R', 'C'];
+    },
+  },
+  retention: {
+    possible: ['R', 'C'],
+    operationsFor: (args) => (isTruthyFlag(args.save_report) ? ['R', 'C'] : ['R']),
+  },
+  alerts_create: {
+    possible: ['C', 'U'],
+    operationsFor: (args) => {
+      const parsed = parseMaybeJson(args.alert_config);
+      if (!parsed.ok) {
+        return ['C', 'U'];
+      }
+      const config = parsed.value;
+      if (config === undefined || config === null) {
+        return ['C'];
+      }
+      if (typeof config !== 'object' || Array.isArray(config)) {
+        return ['C', 'U'];
+      }
+      const id = (config as Record<string, unknown>)._id;
+      return id === undefined || id === null || id === '' ? ['C'] : ['U'];
+    },
+  },
+  events_create: {
+    possible: ['C', 'U'],
+    operationsFor: () => ['C', 'U'],
+  },
+};
+
+/**
+ * How a tool relates to an app allow-list (library mode, `context.apps`).
+ *
+ * - `app`: every request the tool makes is confined to the app(s) named in
+ *   its arguments, which library mode validates against the allow-list (top
+ *   level app_id / app_name and every nested app field): the Countly endpoint
+ *   filters or authorizes by that app_id, a per-app collection, or an id looked
+ *   up together with the app.
+ * - `safe`: exposes no app data, or its output is already limited to the
+ *   allowed apps by library mode.
+ * - `unscoped`: can read or change another app's data (cross-app lists,
+ *   records addressed by id without checking they belong to app_id, server
+ *   administration, or not provably confined). Hidden while an allow-list is
+ *   set. When unsure, a tool is `unscoped` (fail closed).
+ *
+ * Decided from the Countly endpoints each handler calls (audit 2026-10,
+ * countly-platform plugins/ and api/); the reason is noted per tool.
+ */
+export type ToolAppScope = 'app' | 'safe' | 'unscoped';
+
+export const TOOL_APP_SCOPE: Readonly<Record<string, ToolAppScope>> = {
+  // core
+  ping: 'safe', // /o/ping, no app data
+  get_version: 'safe', // /o/system/version, no app data
+  get_plugins: 'unscoped', // /o/system/plugins, server-wide administration
+
+  // apps
+  apps_list: 'safe', // library getApps() filters /o/apps/mine to the allow-list
+  apps_get_by_name: 'safe', // same filtered app list
+  apps_create: 'unscoped', // creates an app that cannot be in the allow-list
+  apps_update: 'app', // /i/apps/update writes args.app_id, which the tool sets to the validated app
+  apps_delete: 'app', // /i/apps/delete on args.app_id = validated app
+  apps_reset: 'app', // /i/apps/reset on args.app_id = validated app
+
+  // analytics: per-app fetches keyed by params.app_id
+  query_data: 'app',
+  app_analytics_summary: 'app',
+  slipping_users: 'app',
+  session_frequency: 'app',
+  user_loyalty: 'app',
+  session_durations: 'app',
+
+  // crashes: everything runs on the per-app collection app_crashgroups<app_id>
+  crash_groups_list: 'app',
+  crashes_stats_get: 'app',
+  crashes_get: 'app',
+  crashes_comment_add: 'app',
+  crashes_comment_update: 'app',
+  crashes_comment_delete: 'app',
+  crashes_resolve: 'app',
+  crashes_unresolve: 'app',
+  crashes_hide: 'app',
+  crashes_show: 'app',
+
+  // notes
+  notes_list: 'app', // the tool always sends notes_apps=[app_id]; query is app_id $in that list
+  notes_create: 'app', // note.app_id = qstring app_id
+  notes_delete: 'unscoped', // no app argument; /i/notes/delete finds the note by _id in any app
+
+  // events: events{_id: app_id}
+  events_create: 'app',
+  events_list: 'app',
+  events_delete: 'app',
+
+  // alerts
+  alerts_list: 'unscoped', // /o/alert/list lists the member's alerts across apps
+  alerts_create: 'unscoped', // with alert_config._id, /i/alert/save updates any alert found by _id alone
+  alerts_delete: 'unscoped', // /i/alert/delete removes by _id (and creator), never checks the app
+
+  // views: app_viewdata collections keyed by app_id
+  views_table: 'app',
+  views_data: 'app',
+
+  // database (dbviewer /o/db ignores app_id; any collection of any app)
+  databases_query: 'unscoped',
+  databases_list: 'unscoped',
+  databases_document: 'unscoped',
+  collections_aggregate: 'unscoped',
+  collections_indexes: 'unscoped',
+  databases_stats: 'unscoped',
+
+  // dashboard users: /o/users/all, every user of the server
+  dashboard_users: 'unscoped',
+
+  // app users: app_users<app_id>
+  app_users_create: 'app',
+  app_users_update: 'app',
+  app_users_delete: 'app',
+
+  // drill: bookmarks filtered by app_id / md5(app_id+event); meta keyed by app_id
+  drill_bookmarks_list: 'app',
+  drill_bookmarks_create: 'app',
+  drill_bookmarks_delete: 'app', // {_id, app_id} on find and remove
+  queriable_fields_list: 'app',
+  metadata_get: 'app',
+
+  // user profiles: app_users<app_id>
+  user_profiles_query: 'app',
+  user_profiles_breakdown: 'app',
+  user_profiles_get: 'app',
+
+  // cohorts: every query includes app_id
+  cohorts_list: 'app',
+  cohorts_data: 'app',
+  cohorts_create: 'app',
+  cohorts_update: 'app', // findOne {_id, app_id} before the edit
+  cohorts_delete: 'app',
+
+  // funnels: {_id, app_id}
+  funnels_list: 'app',
+  funnels_data: 'app',
+  funnels_step_users: 'app',
+  funnels_dropoff_users: 'app',
+  funnels_create: 'app',
+  funnels_update: 'app',
+  funnels_delete: 'app',
+
+  // formulas: {app: app_id} / {_id, app}
+  formulas_run: 'app',
+  formulas_list: 'app',
+  formulas_delete: 'app',
+  formulas_save: 'app',
+
+  // live: the tool pins r_apps=[app_id]
+  live_users: 'app',
+  live_metrics: 'app',
+  live_last_hour: 'app',
+  live_last_day: 'app',
+  live_last_30_days: 'app',
+  live_overall: 'app',
+
+  // retention: query.a = app_id, cache key includes app_id
+  retention: 'app',
+
+  // remote config: per-app collections, ids looked up inside them
+  remote_configs_list: 'app',
+  remote_config_conditions_add: 'app',
+  remote_config_conditions_update: 'app',
+  remote_config_conditions_delete: 'app',
+  remote_config_parameters_add: 'app',
+  remote_config_parameters_update: 'app',
+  remote_config_parameters_delete: 'app',
+
+  // A/B testing: per-app collection ab_testing_experiments<app_id>
+  ab_experiments_list: 'app',
+  ab_experiments_details: 'app',
+  ab_experiments_create: 'app',
+  ab_experiments_start: 'app',
+  ab_experiments_stop: 'app',
+  ab_experiments_delete: 'app',
+
+  // logger / sdks: logs<app_id>, sdk_configs{_id: app_id}, per-app metrics
+  sdk_logs_list: 'app',
+  sdk_stats_get: 'app',
+  sdk_config_get: 'app',
+
+  // compliance hub: queries by app_id
+  consents_stats: 'app',
+  consents_list: 'app',
+  consents_history_search: 'app',
+
+  // filtering rules: stored inside apps{_id: app_id}
+  filtering_rules_list: 'app',
+  filtering_rules_create: 'app',
+  filtering_rules_update: 'app',
+  filtering_rules_delete: 'app',
+  filtering_rules_toggle_status: 'app',
+
+  // server stats: all of the member's apps (or the whole server)
+  datapoints_stats: 'unscoped', // selected_app optional; omitted = every app
+  datapoints_top_apps: 'unscoped',
+  datapoints_punch_card: 'unscoped',
+
+  // server logs: server-wide, app_id only used for the permission check
+  server_logs_files_list: 'unscoped',
+  server_logs_contents: 'unscoped',
+
+  // email reports
+  email_reports_list: 'unscoped', // /o/reports/all lists by user across apps
+  email_reports_core_create: 'app', // report apps and selectedEvents come from validated arguments
+  email_reports_dashboard_create: 'unscoped', // targets a dashboard, authorized by dashboard sharing
+  email_reports_update: 'unscoped', // report found by {_id, user}, app_id never compared
+  email_reports_preview: 'unscoped', // same lookup; renders the report's apps
+  email_reports_send: 'unscoped', // same lookup
+  email_reports_delete: 'unscoped', // same lookup
+
+  // dashboards: not per app; dashboard/widget ids, widgets can name any app
+  dashboards_list: 'unscoped',
+  dashboards_data: 'unscoped',
+  dashboards_create: 'unscoped',
+  dashboards_update: 'unscoped',
+  dashboards_delete: 'unscoped',
+  dashboards_widget_add: 'unscoped',
+  dashboards_widget_update: 'unscoped',
+  dashboards_widget_remove: 'unscoped',
+
+  // times of day: a = app_id
+  times_of_day: 'app',
+
+  // hooks
+  hooks_list: 'unscoped', // /o/hook/list lists across the member's apps
+  hooks_test: 'unscoped', // only qstring app_id is authorized; runs real effects from an arbitrary config
+  hooks_create: 'unscoped', // trigger configuration can reference other apps' records (not provably confined)
+  hooks_update: 'unscoped', // hook found by _id alone, rights checked on its stored apps
+  hooks_delete: 'unscoped', // hook found and removed by _id
+
+  // journeys: {_id, appId}
+  journeys_list: 'app',
+  journeys_get: 'app',
+  journeys_create: 'app',
+  journeys_update: 'app',
+  journeys_delete: 'app',
+  journeys_publish: 'app',
+  journeys_pause: 'app',
+  journeys_resume: 'app',
+  journeys_stats_summary: 'app',
+  journeys_stats_table: 'unscoped', // task_id returns long_tasks.findOne({_id}) with no app filter
+  journeys_stats_performance: 'app',
+  journeys_stats_uids: 'app',
+  journeys_block_reference: 'safe', // static documentation, no request
+
+  // content: {_id, app} / content_assets<app_id>
+  content_blocks_list: 'app',
+  content_blocks_get: 'app',
+  content_blocks_preview: 'app',
+  content_blocks_create: 'app',
+  content_blocks_update: 'app',
+  content_blocks_delete: 'app',
+  content_assets_list: 'app',
+  content_assets_upload: 'app',
+  content_assets_update: 'app',
+  content_assets_delete: 'app',
+  content_langs_list: 'app',
+};
+
+const ALL_CRUD: readonly CrudOperation[] = ['C', 'R', 'U', 'D'];
+
+/** The static operation of a tool from TOOL_CATEGORIES, or undefined. */
+export function getToolOperation(toolName: string): CrudOperation | undefined {
+  for (const data of Object.values(TOOL_CATEGORIES)) {
+    if (Object.prototype.hasOwnProperty.call(data.operations, toolName)) {
+      return data.operations[toolName];
+    }
+  }
+  return undefined;
+}
+
+/** Every operation a tool can perform, whatever its arguments. */
+export function getPossibleOperations(toolName: string): CrudOperation[] | undefined {
+  const base = getToolOperation(toolName);
+  if (!base) {
+    return undefined;
+  }
+  const rule = Object.prototype.hasOwnProperty.call(TOOL_OPERATION_RULES, toolName)
+    ? TOOL_OPERATION_RULES[toolName]
+    : undefined;
+  return rule ? ALL_CRUD.filter((op) => rule.possible.includes(op)) : [base];
+}
+
+/**
+ * The operations one call of `toolName` with `args` needs (all of them must
+ * be granted). Undefined for an unknown tool. Fails closed: if the tool's
+ * rule throws or returns nothing usable, every possible operation is needed.
+ */
+export function getEffectiveOperations(toolName: string, args: unknown): CrudOperation[] | undefined {
+  const possible = getPossibleOperations(toolName);
+  if (!possible) {
+    return undefined;
+  }
+  const rule = Object.prototype.hasOwnProperty.call(TOOL_OPERATION_RULES, toolName)
+    ? TOOL_OPERATION_RULES[toolName]
+    : undefined;
+  if (!rule) {
+    return possible;
+  }
+  const input = args && typeof args === 'object' && !Array.isArray(args)
+    ? (args as Record<string, unknown>)
+    : {};
+  try {
+    const ops = rule.operationsFor(input);
+    if (!Array.isArray(ops) || ops.length === 0 || ops.some((op) => !ALL_CRUD.includes(op))) {
+      return possible;
+    }
+    return ALL_CRUD.filter((op) => ops.includes(op));
+  } catch {
+    return possible;
+  }
+}
+
+/**
  * Parse CRUD permissions from environment variable
  * Format: "CRUD" or any combination like "CR", "RU", "R", etc.
  * Default is "CRUD" (all operations allowed)
@@ -556,15 +969,25 @@ export function loadToolsConfig(env: NodeJS.ProcessEnv = process.env): ToolsConf
  * Check if a specific tool is allowed based on configuration
  */
 export function isToolAllowed(toolName: string, config: ToolsConfig): boolean {
+  // A tool is listed when its plainest call (no arguments) is allowed; see
+  // isToolCallAllowed for the per-call check of argument-dependent tools.
+  return isToolCallAllowed(toolName, {}, config);
+}
+
+/**
+ * Check one call: every operation the call needs, given its arguments (see
+ * TOOL_OPERATION_RULES), must be allowed for the tool's category.
+ */
+export function isToolCallAllowed(toolName: string, args: unknown, config: ToolsConfig): boolean {
   // Find which category this tool belongs to
   for (const [category, categoryData] of Object.entries(TOOL_CATEGORIES)) {
-    if (toolName in categoryData.operations) {
-      const requiredOperation = categoryData.operations[toolName];
+    if (Object.prototype.hasOwnProperty.call(categoryData.operations, toolName)) {
+      const required = getEffectiveOperations(toolName, args) ?? [categoryData.operations[toolName]];
       const allowedOperations = config[category];
-      return allowedOperations.has(requiredOperation);
+      return !!allowedOperations && required.every((op) => allowedOperations.has(op));
     }
   }
-  
+
   // If tool is not in any category, allow it by default
   return true;
 }

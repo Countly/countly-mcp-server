@@ -774,7 +774,7 @@ All tools support flexible app identification via either `app_id` or `app_name` 
 The package also ships a library entry point for hosts that authenticate callers themselves and want to serve the tools in-process (Countly mounts it at `/v2/mcp`). It never reads credentials from the environment, headers, query parameters or tool arguments: the host supplies them per request.
 
 ```ts
-import { createMcpHandler, toolsCalledIn, getToolCatalog } from 'countly-mcp-server/library';
+import { createMcpHandler, requiredOperations, getToolCatalog } from 'countly-mcp-server/library';
 
 const mcp = createMcpHandler({
   countlyUrl: 'http://127.0.0.1:3001',            // trusted, used as-is
@@ -793,7 +793,11 @@ app.post('/v2/mcp', async (req, res) => {
 });
 ```
 
-`getToolCatalog()` returns each tool's category, CRUD operation, area and `adminOnly` flag, and `toolsCalledIn(body)` names the tools a JSON-RPC body calls, so the host can refuse a request before handing it over. Tools outside the grant are not listed, and calling one returns a JSON-RPC error without contacting Countly.
+`getToolCatalog()` returns each tool's category, CRUD operation, `possibleOperations`, area, `adminOnly` flag and `appScope`. Tools outside the grant are not listed, and calling one returns a JSON-RPC error without contacting Countly.
+
+Some tools write depending on their arguments: `formulas_run` with a `mode` other than `"unsaved"` and `retention` with `save_report` also need `C`, `alerts_create` with an `alert_config._id` is an update (`U`), and `events_create` can overwrite an existing event so it needs `C` and `U`. Each call is checked against the operations its own arguments need. `requiredOperations(body)` returns them for every `tools/call` in a JSON-RPC body (`{ tool, operation, adminOnly }[]`), so the host can answer `403 insufficient_scope` before handing the request over; `toolsCalledIn(body)` still returns just the tool names.
+
+With an `apps` allow-list, every app id in a call's arguments is checked, at any depth and inside JSON-string arguments (`app_id`, `apps`, `selectedApps`, `widget.apps`, `<appId>***event` keys, ...), and an every-app wildcard (`"*"`, `"all"`) is refused. Tools that are not provably limited to the named app (`appScope: "unscoped"`, e.g. dashboards, which are not per app) are hidden while an allow-list is set.
 
 ## Health Check
 

@@ -16,6 +16,7 @@ import {
   createMcpHandler,
   getToolCatalog,
   getUnclassifiedTools,
+  requiredOperations,
   toolsCalledIn,
   type McpRequestContext,
   type ToolCallReport,
@@ -211,6 +212,8 @@ describe('getToolCatalog', () => {
       expect(['C', 'R', 'U', 'D'], tool.name).toContain(tool.operation);
       expect(TOOL_AREAS, tool.name).toContain(tool.area);
       expect(typeof tool.adminOnly, tool.name).toBe('boolean');
+      expect(['app', 'safe', 'unscoped'], tool.name).toContain(tool.appScope);
+      expect(tool.possibleOperations, tool.name).toContain(tool.operation);
     }
   });
 
@@ -233,7 +236,9 @@ describe('getToolCatalog', () => {
 
   it('matches the catalog snapshot', () => {
     const catalog = getToolCatalog()
-      .map((t) => `${t.name} ${t.category} ${t.operation} ${t.area}${t.adminOnly ? ' admin' : ''}${t.requiresPlugin ? ` plugin=${t.requiresPlugin}` : ''}`)
+      .map((t) => `${t.name} ${t.category} ${t.operation}` +
+        `${t.possibleOperations.join('') !== t.operation ? ` ops=${t.possibleOperations.join('')}` : ''}` +
+        ` ${t.area} scope=${t.appScope}${t.adminOnly ? ' admin' : ''}${t.requiresPlugin ? ` plugin=${t.requiresPlugin}` : ''}`)
       .sort();
     expect(catalog).toMatchSnapshot();
   });
@@ -273,6 +278,49 @@ describe('toolsCalledIn', () => {
     expect(toolsCalledIn(undefined)).toEqual([]);
     expect(toolsCalledIn('tools/call')).toEqual([]);
     expect(toolsCalledIn([null, 1, 'x'])).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// requiredOperations
+// ---------------------------------------------------------------------------
+
+function call(name: string, args?: Record<string, unknown>, id = 1) {
+  return { jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } };
+}
+
+describe('requiredOperations', () => {
+  it('gives the static operation for a plain tool', () => {
+    expect(requiredOperations(call('events_list', { app_id: 'app1' })))
+      .toEqual([{ tool: 'events_list', operation: 'R', adminOnly: false }]);
+    expect(requiredOperations(call('apps_delete', { app_id: 'app1' })))
+      .toEqual([{ tool: 'apps_delete', operation: 'D', adminOnly: true }]);
+  });
+
+  it('derives the effective operations from the arguments', () => {
+    expect(requiredOperations(call('formulas_run', { formula: '[]' })).map((r) => r.operation)).toEqual(['R']);
+    expect(requiredOperations(call('formulas_run', { formula: '[]', mode: 'saved' })).map((r) => r.operation))
+      .toEqual(['C', 'R']);
+    expect(requiredOperations(call('retention', { save_report: true })).map((r) => r.operation)).toEqual(['C', 'R']);
+    expect(requiredOperations(call('alerts_create', { alert_config: { _id: 'a1' } })).map((r) => r.operation))
+      .toEqual(['U']);
+    expect(requiredOperations(call('alerts_create', { alert_config: {} })).map((r) => r.operation)).toEqual(['C']);
+    expect(requiredOperations(call('events_create', { key: 'k' })).map((r) => r.operation)).toEqual(['C', 'U']);
+  });
+
+  it('collects a batch once per tool and operation, and skips unknown tools and non-calls', () => {
+    expect(requiredOperations([
+      call('alerts_create', { alert_config: {} }, 1),
+      call('alerts_create', { alert_config: { _id: 'x' } }, 2),
+      call('alerts_create', { alert_config: {} }, 3),
+      call('no_such_tool', {}, 4),
+      { jsonrpc: '2.0', id: 5, method: 'tools/list' },
+    ])).toEqual([
+      { tool: 'alerts_create', operation: 'C', adminOnly: false },
+      { tool: 'alerts_create', operation: 'U', adminOnly: false },
+    ]);
+    expect(requiredOperations(null)).toEqual([]);
+    expect(requiredOperations({ method: 'tools/call', params: { name: 42 } })).toEqual([]);
   });
 });
 
@@ -348,6 +396,61 @@ describe('tool filtering', () => {
     expect(reports[0]).toMatchObject({ tool: 'events_create', operation: 'C', outcome: 'no_access' });
   });
 
+  it('still lists argument-dependent read tools for a read-only context', async () => {
+    currentContext = context({ operations: ['R'] });
+    const names = await listToolNames();
+    expect(names).toContain('formulas_run');
+    expect(names).toContain('retention');
+  });
+
+  it('refuses formulas_run in saved mode for a read-only context, with no Countly request', async () => {
+    currentContext = context({ operations: ['R'] });
+    const res = await callTool('formulas_run', { app_id: 'app1', formula: '[]', mode: 'saved', formulaMeta: '{}' });
+    expect(res.error).toBeDefined();
+    expect(res.error.message).toMatch(/insufficient_scope/);
+    expect(countlyRequests).toHaveLength(0);
+    expect(reports[0]).toMatchObject({ tool: 'formulas_run', operation: 'R', operations: ['C', 'R'], outcome: 'no_access' });
+
+    const ok = await callTool('formulas_run', { app_id: 'app1', formula: '[]' });
+    expect(ok.result).toBeDefined();
+    expect(countlyRequests).toHaveLength(1);
+  });
+
+  it('refuses retention with save_report for a read-only context, with no Countly request', async () => {
+    currentContext = context({ operations: ['R'] });
+    const res = await callTool('retention', { app_id: 'app1', save_report: true });
+    expect(res.error).toBeDefined();
+    expect(countlyRequests).toHaveLength(0);
+
+    const ok = await callTool('retention', { app_id: 'app1', save_report: false });
+    expect(ok.result).toBeDefined();
+    expect(countlyRequests).toHaveLength(1);
+    // false must not be sent at all: Countly reads any non-empty value as "save".
+    expect(countlyRequests[0].url).not.toContain('save_report');
+  });
+
+  it('refuses alerts_create with an _id (an update) for a create-only context', async () => {
+    currentContext = context({ operations: ['C', 'R'] });
+    for (const alert_config of [{ _id: 'alert1', alertName: 'x' }, JSON.stringify({ _id: 'alert1' })]) {
+      reports = [];
+      const res = await callTool('alerts_create', { app_id: 'app1', alert_config });
+      expect(res.error).toBeDefined();
+      expect(reports[0]).toMatchObject({ operations: ['U'], outcome: 'no_access' });
+    }
+    expect(countlyRequests).toHaveLength(0);
+
+    const ok = await callTool('alerts_create', { app_id: 'app1', alert_config: { alertName: 'x' } });
+    expect(ok.result).toBeDefined();
+    expect(countlyRequests).toHaveLength(1);
+  });
+
+  it('needs both C and U for events_create, which overwrites an existing event', async () => {
+    currentContext = context({ operations: ['C', 'R'] });
+    expect(await listToolNames()).not.toContain('events_create');
+    currentContext = context({ operations: ['C', 'R', 'U'] });
+    expect(await listToolNames()).toContain('events_create');
+  });
+
   it('hides admin-only tools unless the context is admin', async () => {
     currentContext = context({ admin: false });
     const names = await listToolNames();
@@ -399,6 +502,82 @@ describe('app allow-list', () => {
     expect(res.error).toBeDefined();
     expect(countlyRequests).toHaveLength(0);
     expect(reports[0]).toMatchObject({ outcome: 'no_access', appId: 'app2' });
+  });
+
+  it('refuses out-of-scope app ids nested anywhere in the arguments, with no Countly request', async () => {
+    currentContext = context({ apps: ['app1'] });
+    const report = { app_id: 'app1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ['email_reports_core_create', { ...report, apps: ['app1', 'app2'] }],
+      ['email_reports_core_create', { ...report, apps: 'app1,app2' }],
+      ['email_reports_core_create', { ...report, apps: '["app2"]' }],
+      ['email_reports_core_create', { ...report, apps: ['app1'], selectedEvents: ['0123456789abcdef01234567***purchase'] }],
+      ['app_users_update', { app_id: 'app1', query: { deep: [{ nested: { appId: 'app2' } }] }, update: { $set: { a: 1 } } }],
+      ['cohorts_create', { app_id: 'app1', name: 'c', steps: '[]', user_segmentation: JSON.stringify({ selectedApps: ['app2'] }) }],
+      ['funnels_create', { app_id: 'app1', name: 'f', steps: ['a'], queries: [JSON.stringify({ app_ids: ['app2'] })] }],
+    ];
+    for (const [tool, args] of cases) {
+      reports = [];
+      const res = await callTool(tool, args);
+      expect(res.error, `${tool} ${JSON.stringify(args)}`).toBeDefined();
+      expect(reports[0], tool).toMatchObject({ tool, outcome: 'no_access' });
+    }
+    expect(countlyRequests).toHaveLength(0);
+  });
+
+  it('refuses every-app wildcards and non-id app references under an allow-list', async () => {
+    currentContext = context({ apps: ['app1'] });
+    const report = { app_id: 'app1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
+    for (const apps of [['*'], ['all'], 'all', [{ id: 'app1' }], true]) {
+      const res = await callTool('email_reports_core_create', { ...report, apps });
+      expect(res.error, JSON.stringify(apps)).toBeDefined();
+    }
+    expect(countlyRequests).toHaveLength(0);
+  });
+
+  it('accepts nested app ids that are all in scope', async () => {
+    currentContext = context({ apps: ['app1'] });
+    const res = await callTool('email_reports_core_create', {
+      app_id: 'app1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily',
+      apps: ['app1'], selectedEvents: ['app1***purchase'],
+    });
+    expect(res.result).toBeDefined();
+    expect(countlyRequests).toHaveLength(1);
+  });
+
+  it('does not check nested app ids without an allow-list', async () => {
+    const res = await callTool('alerts_create', { app_id: 'app1', alert_config: { selectedApps: ['app2', '*'] } });
+    expect(res.result).toBeDefined();
+    expect(countlyRequests).toHaveLength(1);
+  });
+
+  it('hides and refuses app-agnostic tools under an allow-list, and keeps them without one', async () => {
+    const unscoped = ['dashboards_list', 'dashboards_data', 'dashboards_create', 'dashboards_widget_add',
+      'get_plugins', 'dashboard_users', 'databases_query', 'datapoints_top_apps', 'notes_delete', 'apps_create',
+      'alerts_list', 'alerts_create', 'hooks_list', 'email_reports_list', 'email_reports_update', 'journeys_stats_table'];
+    const names = await listToolNames();
+    for (const tool of unscoped) {
+      expect(names, tool).toContain(tool);
+    }
+
+    currentContext = context({ apps: ['app1'] });
+    const scopedNames = await listToolNames();
+    for (const tool of unscoped) {
+      expect(scopedNames, tool).not.toContain(tool);
+    }
+    for (const tool of ['ping', 'get_version', 'apps_list', 'apps_get_by_name', 'events_list', 'journeys_block_reference']) {
+      expect(scopedNames, tool).toContain(tool);
+    }
+    const byName = new Map(getToolCatalog().map((t) => [t.name, t]));
+    for (const tool of scopedNames) {
+      expect(byName.get(tool)?.appScope, tool).not.toBe('unscoped');
+    }
+
+    const res = await callTool('dashboards_list');
+    expect(res.error).toBeDefined();
+    const widget = await callTool('dashboards_widget_add', { dashboard_id: 'd1', widget: { apps: ['app1'] } });
+    expect(widget.error).toBeDefined();
+    expect(countlyRequests).toHaveLength(0);
   });
 
   it('does not resolve an app name outside context.apps', async () => {
