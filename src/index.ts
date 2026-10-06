@@ -36,15 +36,18 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, AppCacheRegistry, parseAppsMineResponse, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
 import { FAVICON_SVG } from './lib/favicon.js';
 import {
   ConcurrencyLimiter,
+  escapeHtml,
   extractClientIp,
+  isPlainHostHeader,
   formatRequestLog,
+  isOriginPermitted,
   parseCorsAllowed,
   RateLimiter,
   readLimitedBody,
@@ -266,7 +269,62 @@ class CountlyMCPServer {
       console.error(getConfigSummary(this.toolsConfig));
     }
     
-    this.server = new Server(
+    this.server = this.createServer();
+    
+    // Initialize config from environment variables using lib/config.ts
+    // Auth token can be loaded from environment or overridden per-request from client metadata
+    this.config = buildConfig(process.env, undefined, testMode);
+
+    this.httpClient = axios.create({
+      baseURL: this.config.serverUrl,
+      timeout: this.config.timeout,
+    });
+
+    // Set auth header if token is available from environment
+    if (this.config.authToken) {
+      this.setAuthHeader(this.config.authToken);
+    }
+  }
+
+  /**
+   * Resolve the token for the current request.
+   * Priority: tool arguments > MCP metadata > per-request HTTP state (header
+   * or URL parameter) > COUNTLY_AUTH_TOKEN > COUNTLY_AUTH_TOKEN_FILE.
+   *
+   * The server-level env/file token is looked up last, explicitly: by
+   * default resolveAuthToken also reads process.env, and calling it that way
+   * first let a configured env token silently override the token a caller
+   * sent in X-Countly-Auth-Token.
+   */
+  private resolveRequestToken(metadata: any, args: any): string | undefined {
+    return resolveAuthToken({ metadata, args, env: {} })
+      || this.requestContext.getStore()?.authToken
+      || resolveAuthToken({ env: process.env });
+  }
+
+  /**
+   * Extract auth token for a tool call; see resolveRequestToken for priority.
+   */
+  private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
+    const metadata = (request as any)?._meta || (request as any)?.meta;
+    const authToken = this.resolveRequestToken(metadata, args);
+
+    if (!authToken) {
+      throw createMissingAuthError();
+    }
+
+    return { authToken };
+  }
+
+  /**
+   * Build a fully configured MCP Server instance with all handlers registered.
+   * Stdio mode uses a single instance for the life of the process; HTTP mode
+   * (stateless) builds one per request, because the SDK refuses to reuse a
+   * stateless transport across requests and a Server can only be bound to
+   * one transport at a time.
+   */
+  private createServer(): Server {
+    const server = new Server(
       {
         name: 'countly-mcp-server',
         version: PACKAGE_VERSION,
@@ -287,60 +345,17 @@ class CountlyMCPServer {
       }
     );
 
-    this.setupToolHandlers();
-    this.setupResourceHandlers();
-    this.setupPromptHandlers();
-    
-    // Initialize config from environment variables using lib/config.ts
-    // Auth token can be loaded from environment or overridden per-request from client metadata
-    this.config = buildConfig(process.env, undefined, testMode);
+    this.setupToolHandlers(server);
+    this.setupResourceHandlers(server);
+    this.setupPromptHandlers(server);
 
-    this.httpClient = axios.create({
-      baseURL: this.config.serverUrl,
-      timeout: this.config.timeout,
-    });
-
-    // Set auth header if token is available from environment
-    if (this.config.authToken) {
-      this.setAuthHeader(this.config.authToken);
-    }
+    return server;
   }
 
-  /**
-   * Extract auth token from request metadata, arguments, or environment
-   * Priority: request metadata > arguments > current config (set from headers) > environment variables > file
-   * Uses lib/auth.ts resolveAuthToken function
-   */
-  private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
-    const metadata = (request as any)?._meta || (request as any)?.meta;
-
-    // Try to get from metadata or args first
-    let authToken = resolveAuthToken({ metadata, args });
-
-    // Per-request HTTP state from AsyncLocalStorage (HTTP middleware sets it)
-    if (!authToken) {
-      const reqState = this.requestContext.getStore();
-      if (reqState?.authToken) {
-        authToken = reqState.authToken;
-      }
-    }
-
-    // Server-level config fallback (env / file in stdio mode)
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
-
-    if (!authToken) {
-      throw createMissingAuthError();
-    }
-
-    return { authToken };
-  }
-
-  private setupToolHandlers() {
+  private setupToolHandlers(server: Server) {
     // Use the modular tool definitions from tools/index.ts, filter by
     // configuration, then by what the connected Countly server supports
-    this.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
+    server.setRequestHandler(ListToolsRequestSchema, async (request) => {
       const allTools = getAllToolDefinitions();
       const filteredTools = filterTools(allTools, this.toolsConfig);
       const { client, authToken } = this.buildPerRequestClient(request);
@@ -354,7 +369,7 @@ class CountlyMCPServer {
       };
     });
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       const startTime = Date.now();
 
@@ -518,9 +533,9 @@ class CountlyMCPServer {
     });
   }
 
-  private setupResourceHandlers() {
+  private setupResourceHandlers(server: Server) {
     // Handle resources/list requests
-    this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+    server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -541,7 +556,7 @@ class CountlyMCPServer {
     });
 
     // Handle resources/read requests
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -569,9 +584,9 @@ class CountlyMCPServer {
     });
   }
 
-  private setupPromptHandlers() {
+  private setupPromptHandlers(server: Server) {
     // Handle prompts/list requests
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
       try {
         const prompts = listPrompts();
         
@@ -592,7 +607,7 @@ class CountlyMCPServer {
     });
 
     // Handle prompts/get requests
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       try {
         const { name, arguments: args } = request.params;
         
@@ -713,17 +728,8 @@ class CountlyMCPServer {
   } {
     const metadata = request?._meta || request?.meta;
     const args = request?.params || {};
-    let authToken = resolveAuthToken({ metadata, args });
+    const authToken = this.resolveRequestToken(metadata, args);
     const reqState = this.requestContext.getStore();
-    if (!authToken && reqState?.authToken) {
-      authToken = reqState.authToken;
-    }
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
-    if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-      authToken = process.env.COUNTLY_AUTH_TOKEN;
-    }
     const serverUrl = reqState?.serverUrl || this.config.serverUrl;
     const client = this.createRequestHttpClient(
       authToken,
@@ -745,16 +751,7 @@ class CountlyMCPServer {
     const params = authToken ? { auth_token: authToken } : {};
     const response = await client.get('/o/apps/mine', { params });
 
-    let apps: CountlyApp[];
-    if (response.data && Array.isArray(response.data)) {
-      apps = response.data;
-    } else if (response.data && response.data.admin_of) {
-      apps = Object.values(response.data.admin_of) as CountlyApp[];
-    } else if (response.data && response.data.apps) {
-      apps = response.data.apps;
-    } else {
-      apps = [];
-    }
+    const apps = parseAppsMineResponse(response.data);
 
     cache.update(apps);
     return apps;
@@ -815,6 +812,15 @@ class CountlyMCPServer {
       // should set COUNTLY_CORS_ALLOWED_ORIGINS to a specific comma-
       // separated list (e.g. "https://my-app.example.com").
       const corsAllowed = parseCorsAllowed(process.env.COUNTLY_CORS_ALLOWED_ORIGINS);
+      // A server-side token (env or file) is used for any /mcp caller that
+      // supplies none, so browser-originated requests are refused unless
+      // their origin is allowlisted explicitly. See isOriginPermitted.
+      const serverHoldsToken = Boolean(
+        process.env.COUNTLY_AUTH_TOKEN || process.env.COUNTLY_AUTH_TOKEN_FILE
+      );
+      if (serverHoldsToken) {
+        console.error('Server-side Countly token configured: any caller that reaches /mcp without its own token acts with it. Expose this endpoint only on a trusted network.');
+      }
 
       // Rate limiter for /mcp endpoint. Defaults to 120 req/min per IP.
       // Tunable via COUNTLY_RATE_LIMIT_RPM=<number> or 0 to disable.
@@ -855,13 +861,12 @@ class CountlyMCPServer {
       console.error(`Health check available at: /health`);
       console.error(`All other endpoints are available for other applications on this server`);
       
-      // Create a single StreamableHTTPServerTransport instance in stateless mode
-      // Stateless mode (sessionIdGenerator: undefined) allows clients to manage their own sessions
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
-      
-      await this.server.connect(transport);
+      // Stateless mode (sessionIdGenerator: undefined): the SDK requires a
+      // fresh transport per request, and a Server can only be bound to one
+      // transport, so each /mcp request gets its own transport + Server pair
+      // (see the SDK's simpleStatelessStreamableHttp example). Handlers read
+      // per-request auth/server URL from AsyncLocalStorage, so nothing is
+      // lost by not sharing the Server instance.
       
       const httpServer = http.createServer((req, res) => {
         // Per-request wall-clock for the request log emitted at the bottom
@@ -893,6 +898,19 @@ class CountlyMCPServer {
         });
 
         void (async () => {
+        // Refuse browser-originated /mcp requests (including preflights)
+        // while the server holds its own token. Runs before CORS so a
+        // refused origin never receives Access-Control-Allow-* headers.
+        if (url.parse(req.url || '', true).pathname === mcpEndpoint
+          && !isOriginPermitted(corsAllowed, req.headers.origin as string | undefined, serverHoldsToken)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Origin not allowed',
+            message: 'This server holds a configured Countly token, so browser requests to /mcp are refused unless their origin is listed in COUNTLY_CORS_ALLOWED_ORIGINS.',
+          }));
+          return;
+        }
+
         // Handle CORS for MCP and health endpoints only. Allowlist is
         // configured via COUNTLY_CORS_ALLOWED_ORIGINS; see parseCorsAllowed.
         if (corsEnabled) {
@@ -1108,7 +1126,10 @@ class CountlyMCPServer {
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
           
           // Also check URL parameters (alternative method)
-          const urlParams = new URL(req.url || '', `http://${req.headers.host}`).searchParams;
+          // Only the query string is read here, so parse against a fixed
+          // base: a malformed Host header made new URL() throw and turned
+          // the request into a 500.
+          const urlParams = new URL(req.url || '', 'http://localhost').searchParams;
           const paramServerUrl = urlParams.get('server_url') || urlParams.get('serverUrl');
           const paramAuthToken = urlParams.get('auth_token') || urlParams.get('authToken');
           
@@ -1194,6 +1215,15 @@ class CountlyMCPServer {
               serverUrlFromCaller: !!serverUrl,
             },
             async () => {
+              const mcpServer = this.createServer();
+              const transport = new StreamableHTTPServerTransport({
+                sessionIdGenerator: undefined,
+              });
+              res.on('close', () => {
+                transport.close().catch(() => {});
+                mcpServer.close().catch(() => {});
+              });
+              await mcpServer.connect(transport);
               // Pass the body we already buffered so the SDK doesn't try to
               // re-read the (now consumed) request stream. undefined for
               // bodyless methods, matching the SDK's optional parsedBody arg.
@@ -1218,13 +1248,17 @@ class CountlyMCPServer {
           // fine in a request line but not as an argument to `claude mcp add`.
           // Scheme: honour X-Forwarded-Proto only behind a trusted proxy,
           // otherwise assume TLS for anything that isn't a local address.
-          const pageHost = (req.headers.host || `${hostname}:${port}`).trim();
+          // The Host header is caller-controlled and ends up in a shell
+          // command readers copy, so only a plain host[:port] is used.
+          const requestHost = (req.headers.host || '').trim();
+          const pageHost = isPlainHostHeader(requestHost) ? requestHost : `${hostname}:${port}`;
           const forwardedProto = trustProxy
-            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim()
+            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim().toLowerCase()
             : undefined;
-          const pageProto = forwardedProto
+          const pageProto = (forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : undefined)
             || (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(pageHost) ? 'http' : 'https');
-          const pageEndpointUrl = `${pageProto}://${pageHost}${mcpEndpoint}`;
+          // Escape as well, so the markup never depends on the check above.
+          const pageEndpointUrl = escapeHtml(`${pageProto}://${pageHost}${mcpEndpoint}`);
 
           const pageTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
           const pageToolNames = new Set(pageTools.map((t: { name: string }) => t.name));
@@ -1238,7 +1272,15 @@ class CountlyMCPServer {
             .filter((c) => c.count > 0)
             .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          // The page embeds the request's Host header. A shared cache that
+          // ignores Host could otherwise serve one caller's forged host as the
+          // endpoint everyone is told to register, so the response is never
+          // stored and is marked as varying on Host.
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Vary': 'Host',
+          });
           res.end(`<!DOCTYPE html>
 <html lang="en">
 <head>

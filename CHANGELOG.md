@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **`collections_aggregate` sends only allow-listed stages** — the tool is classified as a read, so it stays available under `COUNTLY_TOOLS_ALL=R`, yet it forwarded any pipeline unchanged, including the write stages `$out` and `$merge`. Countly's dbviewer aggregation guard already refuses them, so this was not exploitable against current Countly. The tool now checks every top-level stage against the same stage allow-list as that guard and refuses anything else before sending the request: writes, server introspection such as `$currentOp`, and any stage a future MongoDB adds. Joins stay allowed and are restricted to global admins by Countly; operator-level and join-target checks remain server-side.
+- **Browser requests refused while the server holds its own token** — with `COUNTLY_AUTH_TOKEN` or `COUNTLY_AUTH_TOKEN_FILE` set in HTTP mode, any caller that reaches `/mcp` without a token acts with the configured one, and CORS defaults to `*`. A web page open in the operator's browser could therefore call a localhost server and read the responses, and DNS rebinding reaches it even under a CORS allowlist because the page then looks same-origin. `/mcp` now answers 403 to any request carrying an `Origin` header while a server-side token is configured, unless that origin is listed explicitly in `COUNTLY_CORS_ALLOWED_ORIGINS` (`*` does not count). MCP clients send no `Origin` and are unaffected, and servers without a configured token, where each caller brings its own, behave exactly as before. The server also logs a startup warning when it runs HTTP mode with a server-side token.
+- **Welcome page escapes the request's `Host` header** — the copy-pasteable endpoint URL on `/` was built from `req.headers.host` (and `X-Forwarded-Proto` behind a trusted proxy) and interpolated into the HTML raw, so a forged `Host` reflected markup into the page. A browser cannot be made to send a forged `Host`, so this needed a caching proxy that does not key on `Host` to reach anyone else, but it is now HTML-escaped regardless, and `X-Forwarded-Proto` is accepted only as `http` or `https`. Because the same URL appears in a `claude mcp add` command readers copy into a shell, where HTML escaping does not help (`a.test$(cmd)` survives it), the `Host` is also used only when it is a plain hostname or IP with an optional port; anything else is replaced by the server's own address. The page is also served with `Cache-Control: no-store` and `Vary: Host`, so a shared cache cannot hand one caller's forged host, however plain, to everyone else as the endpoint to register.
+
+### Fixed
+- **A caller's `X-Countly-Auth-Token` no longer loses to a server-side token** — `resolveAuthToken` falls back to `process.env` by default, and the server called it that way before consulting the per-request HTTP state, so with `COUNTLY_AUTH_TOKEN` or `COUNTLY_AUTH_TOKEN_FILE` set the header token was ignored and the request ran with the server token. Tool calls, resources and prompts now share one resolver whose order matches the documentation: tool arguments, MCP metadata, the request's header or URL parameter, then the env token, then the token file. The unused `this.config.authToken` fallback, which was never populated, is gone.
+- **README authentication order corrected** — tool arguments were listed third but have always overridden headers and URL parameters; the list now matches the code.
+- **Malformed `Host` header no longer turns `/mcp` requests into a 500** — the query string was parsed with `new URL(req.url, \`http://${host}\`)`, which throws on a `Host` such as `a b` or `[`. It is now parsed against a fixed base, since only the query string is read.
+
+### Changed
+- **Docs: server-side tokens in HTTP mode** — README and `DOCKER.md` now state that the HTTP transport does not authenticate its callers, so a server-side token belongs only on a trusted network, and the Docker quick-starts that pass a token publish the port on `127.0.0.1` instead of all interfaces.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added
