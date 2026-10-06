@@ -44,8 +44,11 @@ function idOf(op: EditOp, what: string): string {
 export function newLayerPieces(scene: Record<string, any>, ops: EditOp[]): string[] {
   const existing = new Set((scene.layers ?? []).map((l: any) => l.id));
   const pieces = new Set<string>();
+  // Follow the ops in order: a layer removed and set again is new again
   for (const op of ops) {
-    if (op.op === 'set_layer' && !existing.has(op.id) && typeof op.piece === 'string') {
+    if (op.op === 'remove_layer') {
+      existing.delete(op.id);
+    } else if (op.op === 'set_layer' && !existing.has(op.id) && typeof op.piece === 'string') {
       pieces.add(op.piece);
       existing.add(op.id);
     }

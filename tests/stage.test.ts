@@ -173,6 +173,14 @@ describe('scene tools', () => {
     expect(json(res)).toEqual({ id: SCENE_ID, rev: 8 });
   });
 
+  it('update refuses a whole scene without the revision it was read at', async () => {
+    const { context, request } = platformContext(() => ok({ id: SCENE_ID, rev: 9, scene: {} }));
+    const res: any = await new StageTools(context).stage_scenes_update({ scene_id: SCENE_ID, scene: { version: 1, layers: [] } });
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('pass rev with scene');
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('update with scene and rev sends them as given, and surfaces a conflict', async () => {
     const { context, request } = platformContext(() => ({ status: 409, data: { error: { code: 'CONFLICT', message: 'Someone saved this scene since you opened it (now rev 9); reload it' } } }));
     const res: any = await new StageTools(context).stage_scenes_update({ scene_id: SCENE_ID, rev: 5, scene: { version: 1, layers: [] } });

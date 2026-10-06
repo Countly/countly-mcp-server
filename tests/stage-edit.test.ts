@@ -108,4 +108,16 @@ describe('stage scene edit operations', () => {
       { op: 'set_layer', id: 'n2', piece: 'badge' },
     ])).toEqual(['quote', 'badge']);
   });
+
+  it('a layer removed and set again in one batch is new: its piece start props are needed', () => {
+    expect(newLayerPieces(base(), [
+      { op: 'remove_layer', id: 'title' },
+      { op: 'set_layer', id: 'title', piece: 'quote' },
+    ])).toEqual(['quote']);
+    const scene = applyEditOps(base(), [
+      { op: 'remove_layer', id: 'title' },
+      { op: 'set_layer', id: 'title', piece: 'quote' },
+    ], { quote: { defaultSize: { w: 700, h: 300 }, startProps: { text: 'Q' } } });
+    expect(scene.layers.find((l: any) => l.id === 'title')).toMatchObject({ piece: 'quote', w: 700, props: { text: 'Q' } });
+  });
 });

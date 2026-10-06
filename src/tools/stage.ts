@@ -341,7 +341,7 @@ export const stageScenesUpdateTool = {
     properties: {
       ...sceneIdProp,
       ...revProp,
-      scene: { type: 'object', description: 'Complete new scene JSON, replacing the stored content. Field arguments are applied on top.' },
+      scene: { type: 'object', description: 'Complete new scene JSON, replacing the stored content. Requires rev (the revision it was read at). Field arguments are applied on top.' },
       ...sceneFields,
     },
     required: ['scene_id'],
@@ -915,6 +915,11 @@ export class StageTools {
       const id = sceneIdOf(args);
       if (args.scene !== undefined && !isRecord(args.scene)) {
         throw new Error('scene must be a JSON object (from stage_scenes_get view "full")');
+      }
+      if (args.scene !== undefined && args.rev === undefined) {
+        // The scene was read earlier: saving it over the current revision would
+        // silently overwrite whatever was saved since
+        throw new Error('pass rev with scene: the revision stage_scenes_get returned with the content you edited');
       }
       let rev = args.rev;
       let content = args.scene;
