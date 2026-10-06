@@ -38,6 +38,13 @@ describe('stage scene edit operations', () => {
     expect(() => applyEditOps(base(), [{ op: 'set_step', id: 's1', play: { layer: 'nope', scenario: 'x' } }])).toThrow(/ops\[0\].*not a layer/);
   });
 
+  it('replacing a step\'s layers cannot drop the layer it plays', () => {
+    const playing = applyEditOps(base(), [{ op: 'set_step', id: 's1', play: { layer: 'app', scenario: 'drill-query' } }]);
+    expect(() => applyEditOps(playing, [{ op: 'set_step', id: 's1', layers: ['title'] }])).toThrow(/leaves out app, which this step plays/);
+    const stopped = applyEditOps(playing, [{ op: 'set_step', id: 's1', layers: ['title'], play: null }]);
+    expect(stopped.steps[0]).toEqual({ id: 's1', name: 'Intro', layers: ['title'], hold: 4000 });
+  });
+
   it('removing a layer clears it from steps, plays and breakpoints', () => {
     const scene = applyEditOps(base(), [
       { op: 'set_step', id: 's1', play: { layer: 'app', scenario: 'drill-query' } },

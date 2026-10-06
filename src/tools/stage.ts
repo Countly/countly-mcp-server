@@ -529,13 +529,33 @@ export function sceneState(row: any): 'draft' | 'published' | 'unpublished' {
 }
 
 /** Public host URLs of a published scene, or undefined when the host does not serve */
-export function publicLinks(host: any, slug: string | null | undefined, latest?: number | null, scene?: unknown): Record<string, any> | undefined {
+/**
+ * Public host URLs and embed snippets of a published scene.
+ * @param latest - the version websites get (or, unpublished, the one to pin)
+ * @param options.scene - the content of that version, for the per-delivery
+ *   snippets and the responsive note; omit when unknown (a draft edited since)
+ * @param options.unpublished - the scene has no live latest: only the pinned
+ *   version serves, so only pinned links are given
+ */
+export function publicLinks(
+  host: any,
+  slug: string | null | undefined,
+  latest?: number | null,
+  options: { scene?: unknown; unpublished?: boolean } = {}
+): Record<string, any> | undefined {
   if (!host?.serving || !host.publicHost || !slug) {
     return undefined;
   }
+  const pinned = Number.isInteger(latest);
+  if (options.unpublished && !pinned) {
+    return undefined;
+  }
+  const { scene } = options;
   const base = `https://${host.publicHost}/v2/stage/host/`;
   const script = `<script type="module" src="${base}v1/countly-stage.js"></script>`;
-  const element = (attrs: string) => `${script}\n<countly-stage scene="${slug}"${attrs}></countly-stage>`;
+  // An unpublished scene has no latest; its pinned versions keep serving
+  const ref = options.unpublished ? `${slug}@${latest}` : slug;
+  const element = (attrs: string) => `${script}\n<countly-stage scene="${ref}"${attrs}></countly-stage>`;
   // <countly-stage delivery="..."> asks for another delivery the sequence offers
   const own = isRecord(scene) ? scene.delivery?.mode ?? 'autoplay' : undefined;
   const stepped = isRecord(scene) && stepsOf(scene).length > 0;
@@ -546,9 +566,12 @@ export function publicLinks(host: any, slug: string | null | undefined, latest?:
     ])
   );
   return clean({
-    latest_url: `${base}scenes/${slug}.json`,
-    pinned_url: Number.isInteger(latest) ? `${base}scenes/${slug}@${latest}.json` : undefined,
+    latest_url: options.unpublished ? undefined : `${base}scenes/${slug}.json`,
+    pinned_url: pinned ? `${base}scenes/${slug}@${latest}.json` : undefined,
     embed_snippet: element(''),
+    embed_note_unpublished: options.unpublished
+      ? `The scene is unpublished: these links pin version ${latest}; the latest URL works again after stage_scenes_restore.`
+      : undefined,
     embed_by_delivery: deliveries,
     embed_note: isRecord(scene) && scene.fit
       ? 'Responsive scene: it takes the width of its container and picks its breakpoint; the height follows within its min/max (or set height="..." on the element).'
@@ -875,10 +898,17 @@ export class StageTools {
       const data = await this.getScene(id);
       const full = args.view === 'full';
       const host = data.slug ? await this.hostStatus() : null;
+      const latestVersion = (data.versionDetails || []).find((v: any) => v.version === data.latest);
+      // The draft describes the published version only if nothing was saved after it
+      const draftIsLatest = !!latestVersion?.publishedAt && !!data.updatedAt
+        && Date.parse(data.updatedAt) <= Date.parse(latestVersion.publishedAt);
       return jsonResult(`Stage scene ${id} (rev ${data.rev}, ${sceneState(data)})`, clean({
         ...sceneRowOut(data),
         preview_url: this.previewUrl(id),
-        public: publicLinks(host, data.slug, data.latest, data.scene),
+        public: publicLinks(host, data.slug, data.latest, { scene: draftIsLatest ? data.scene : undefined, unpublished: data.unpublished === true }),
+        draft_note: data.latest && !draftIsLatest
+          ? `The draft was saved after version ${data.latest} was published: websites show version ${data.latest} until stage_scenes_publish.`
+          : undefined,
         versionDetails: (data.versionDetails || []).map((v: any) => clean({
           version: v.version,
           title: v.title,
@@ -969,7 +999,7 @@ export class StageTools {
       return jsonResult(`Published ${published.slug} version ${published.version}.${note}`, clean({
         slug: published.slug,
         version: published.version,
-        public: publicLinks(host, published.slug, published.version, current.scene),
+        public: publicLinks(host, published.slug, published.version, { scene: current.scene, unpublished: current.unpublished === true }),
         host: host && !host.serving ? `public host is off${host.reason ? `: ${host.reason}` : ''}` : undefined,
       }));
     });

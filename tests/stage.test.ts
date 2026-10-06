@@ -405,13 +405,39 @@ describe('templates, scenarios, validate and edit', () => {
     expect(request.mock.calls.some((c) => c[0].method === 'put')).toBe(true);
   });
 
+  it('an unpublished scene gets pinned links only', () => {
+    const links = publicLinks({ serving: true, publicHost: 'stage.count.ly' }, 'deck', 3, { scene: SCENE, unpublished: true })!;
+    expect(links.latest_url).toBeUndefined();
+    expect(links.pinned_url).toBe('https://stage.count.ly/v2/stage/host/scenes/deck@3.json');
+    expect(links.embed_snippet).toContain('scene="deck@3"');
+    expect(links.embed_by_delivery.player).toContain('scene="deck@3" delivery="player"');
+  });
+
+  it('get gives delivery hints only when the draft is the latest version', async () => {
+    const row = { id: SCENE_ID, name: 'Deck', rev: 4, slug: 'deck', latest: 2, versions: [1, 2], scene: SCENE };
+    const edited = platformContext((_m, url) => url === '/v2/stage/status' ? ok({ host: { serving: true, publicHost: 'stage.count.ly' } }) : ok({
+      ...row, updatedAt: '2026-10-06T12:00:00.000Z', versionDetails: [{ version: 2, publishedAt: '2026-10-06T10:00:00.000Z' }],
+    }));
+    const out = json(await new StageTools(edited.context).stage_scenes_get({ scene_id: SCENE_ID }));
+    expect(out.public.embed_by_delivery).toBeUndefined();
+    expect(out.public.latest_url).toBeDefined();
+    expect(out.draft_note).toContain('version 2');
+
+    const same = platformContext((_m, url) => url === '/v2/stage/status' ? ok({ host: { serving: true, publicHost: 'stage.count.ly' } }) : ok({
+      ...row, updatedAt: '2026-10-06T09:00:00.000Z', versionDetails: [{ version: 2, publishedAt: '2026-10-06T10:00:00.000Z' }],
+    }));
+    const out2 = json(await new StageTools(same.context).stage_scenes_get({ scene_id: SCENE_ID }));
+    expect(out2.public.embed_by_delivery.presentation).toBeDefined();
+    expect(out2.draft_note).toBeUndefined();
+  });
+
   it('a published scene gets an embed per delivery its sequence offers', () => {
-    const links = publicLinks({ serving: true, publicHost: 'stage.count.ly' }, 'deck', 2, SCENE)!;
+    const links = publicLinks({ serving: true, publicHost: 'stage.count.ly' }, 'deck', 2, { scene: SCENE })!;
     expect(links.embed_by_delivery.presentation).toContain('<countly-stage scene="deck"></countly-stage>');
     expect(links.embed_by_delivery.player).toContain('delivery="player"');
     expect(links.embed_by_delivery.single_page).toContain('delivery="autoplay"');
     const { steps: _s, ...still } = SCENE;
-    const section = publicLinks({ serving: true, publicHost: 'stage.count.ly' }, 'hero', 1, { ...still, delivery: undefined, fit: { minHeight: 400, maxHeight: 700, minText: 13 } })!;
+    const section = publicLinks({ serving: true, publicHost: 'stage.count.ly' }, 'hero', 1, { scene: { ...still, delivery: undefined, fit: { minHeight: 400, maxHeight: 700, minText: 13 } } })!;
     expect(Object.keys(section.embed_by_delivery)).toEqual(['single_page']);
     expect(section.embed_note).toContain('Responsive');
   });

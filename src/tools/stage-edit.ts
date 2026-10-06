@@ -239,6 +239,10 @@ function setStep(scene: Record<string, any>, op: EditOp): void {
       step.layers.push(op.play.layer);
     }
   }
+  if (step.play && !step.layers.includes(step.play.layer)) {
+    // Only `layers` can leave the played layer out (play adds it)
+    throw new Error(`set_step ${id}: layers leaves out ${step.play.layer}, which this step plays; keep it, or pass play: null to stop playing it`);
+  }
   if (op.position !== undefined) {
     const to = Math.max(0, Math.min(steps.length - 1, Number(op.position)));
     steps.splice(index, 1);
