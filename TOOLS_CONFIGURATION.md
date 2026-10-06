@@ -207,7 +207,7 @@ These categories are always available without plugin checks:
 **⚠️ Requires Plugin**: `views` plugin must be installed on Countly server
 
 ### database
-**Tools**: `databases_query`, `databases_list`, `databases_document`, `collections_aggregate`, `collections_indexes`, `databases_stats`
+**Tools**: `databases_query`, `databases_list`, `databases_document`, `collections_aggregate`, `collections_indexes`
 
 **Operations**:
 - R: All database tools (read-only)
