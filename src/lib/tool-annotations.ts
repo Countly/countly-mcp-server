@@ -40,8 +40,10 @@ const OVERRIDES: Record<string, ToolAnnotations> = {
   journeys_resume: REVERSIBLE_STATUS,
   filtering_rules_toggle_status: REVERSIBLE_STATUS,
 
-  // Labelled 'C' but also updates an alert when alert_config._id is given
+  // Labelled 'C' but also update an existing record: an alert when
+  // alert_config._id is given, an event key's name/description/category
   alerts_create: { destructiveHint: true, ...SENDS_OUTSIDE },
+  events_create: { destructiveHint: true },
   // Not a dry run: the configured effects really execute (emails, webhooks, custom code)
   hooks_test: { destructiveHint: true, ...SENDS_OUTSIDE },
   hooks_create: SENDS_OUTSIDE,
@@ -50,6 +52,10 @@ const OVERRIDES: Record<string, ToolAnnotations> = {
   email_reports_core_create: SENDS_OUTSIDE,
   email_reports_dashboard_create: SENDS_OUTSIDE,
   email_reports_update: SENDS_OUTSIDE,
+  // Optional `emails` are notified about the note
+  notes_create: SENDS_OUTSIDE,
+  // send_email_invitation emails the users the dashboard is shared with
+  dashboards_create: SENDS_OUTSIDE,
 };
 
 function getToolOperation(toolName: string): CrudOperation | undefined {

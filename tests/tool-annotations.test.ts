@@ -44,10 +44,12 @@ describe('tool annotations', () => {
     expect(getToolAnnotations('notes_create')).toMatchObject({ destructiveHint: false });
     // alerts_create updates an existing alert when alert_config._id is given
     expect(getToolAnnotations('alerts_create')).toMatchObject({ destructiveHint: true });
+    // events_create overwrites an existing event key's metadata
+    expect(getToolAnnotations('events_create')).toMatchObject({ destructiveHint: true });
   });
 
   it('flags tools that send emails or call webhooks as open-world', () => {
-    for (const name of ['hooks_test', 'email_reports_send', 'hooks_create', 'alerts_create']) {
+    for (const name of ['hooks_test', 'email_reports_send', 'hooks_create', 'alerts_create', 'notes_create', 'dashboards_create']) {
       expect({ name, ...getToolAnnotations(name) }).toMatchObject({ name, openWorldHint: true });
     }
     expect(getToolAnnotations('apps_delete')).toMatchObject({ openWorldHint: false });
