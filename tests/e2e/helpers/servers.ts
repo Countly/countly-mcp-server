@@ -8,8 +8,13 @@
  *   MCP_E2E_<KEY>_URL          override the server URL  optional
  *
  * A server whose required variables are missing is skipped, unless
- * MCP_E2E_REQUIRE_SECRETS=1 (set by the release gate), which turns a missing
- * secret into a failure so a release can't pass on zero coverage.
+ * MCP_E2E_REQUIRE_SECRETS=1 (set by the release gate) and the server is
+ * `required`: then a missing secret fails, so a release can't pass on zero
+ * coverage.
+ *
+ * Lite is optional: Lite and Enterprise 25.03 no longer change, Enterprise
+ * covers nearly all legacy tools, and the Lite dev server is the least
+ * reliable, so its outages must not block releases.
  */
 
 export type Edition = 'lite' | 'enterprise' | 'platform';
@@ -20,6 +25,8 @@ export interface E2eServer {
   /** Name describeCapabilities() prints for this edition */
   editionLabel: string;
   defaultUrl: string;
+  /** Release gate fails when this server's secrets are missing */
+  required: boolean;
 }
 
 export interface E2eServerConfig extends E2eServer {
@@ -30,9 +37,9 @@ export interface E2eServerConfig extends E2eServer {
 }
 
 export const E2E_SERVERS: Record<Edition, E2eServer> = {
-  lite: { key: 'LITE', edition: 'lite', editionLabel: 'Countly Lite', defaultUrl: 'https://ce.count.ly' },
-  enterprise: { key: 'ENTERPRISE', edition: 'enterprise', editionLabel: 'Countly Enterprise', defaultUrl: 'https://arturs.count.ly' },
-  platform: { key: 'PLATFORM', edition: 'platform', editionLabel: 'Countly Platform', defaultUrl: 'https://master.count.ly' },
+  lite: { key: 'LITE', edition: 'lite', editionLabel: 'Countly Lite', defaultUrl: 'https://ce.count.ly', required: false },
+  enterprise: { key: 'ENTERPRISE', edition: 'enterprise', editionLabel: 'Countly Enterprise', defaultUrl: 'https://arturs.count.ly', required: true },
+  platform: { key: 'PLATFORM', edition: 'platform', editionLabel: 'Countly Platform', defaultUrl: 'https://master.count.ly', required: true },
 };
 
 /** Prefix of everything the suite creates, so leftovers are easy to find */

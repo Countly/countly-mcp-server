@@ -127,7 +127,7 @@ export function defineLiveSuite(edition: Edition): void {
 
   if (!config) {
     const missing = requiredEnvVars(server).join(' and ');
-    if (requireSecrets) {
+    if (requireSecrets && server.required) {
       describe(server.editionLabel, () => {
         it('has its e2e secrets configured', () => {
           throw new Error(`MCP_E2E_REQUIRE_SECRETS=1 but ${missing} are not set`);

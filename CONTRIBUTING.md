@@ -83,7 +83,7 @@ Environment variables per server (the same names are the GitHub Actions secrets)
 | `MCP_E2E_<KEY>_USER_TOKEN`   | no       | token of `mcp-detect-user` (read-only on that one app). The read-only checks are skipped without it. |
 | `MCP_E2E_<KEY>_URL`          | no       | another server URL (a repository *variable* in CI) |
 
-Servers without their required variables are skipped. `MCP_E2E_REQUIRE_SECRETS=1`, which the release gate sets, turns a missing secret into a failure instead.
+Servers without their required variables are skipped. `MCP_E2E_REQUIRE_SECRETS=1`, which the release gate sets, turns missing `ENTERPRISE` or `PLATFORM` secrets into a failure instead. `LITE` is always optional: Lite and Enterprise 25.03 no longer change, Enterprise covers nearly all legacy tools, and the Lite dev server's outages shouldn't block releases.
 
 Mint a non-expiring token while logged in as the user (pass that user's API key):
 

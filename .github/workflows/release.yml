@@ -94,8 +94,9 @@ jobs:
           retention-days: 1
 
   # Live e2e suite against the Countly dev servers (see e2e.yml). Publishing
-  # needs it, so a release cannot ship while the suite fails. Missing e2e
-  # secrets fail this gate rather than letting it pass on zero coverage.
+  # needs it, so a release cannot ship while the suite fails. Missing
+  # Enterprise/Platform secrets fail this gate rather than letting it pass on
+  # zero coverage; Lite is optional (see tests/e2e/helpers/servers.ts).
   # Upstream default-plugin drift is left to the nightly run.
   e2e:
     name: Live e2e gate
