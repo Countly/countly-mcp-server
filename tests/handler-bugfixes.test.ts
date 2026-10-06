@@ -2,7 +2,7 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleCreateNote } from '../src/tools/notes.js';
 import { handleCreateHook, handleUpdateHook } from '../src/tools/hooks.js';
-import { findWriteStage, handleAggregateCollection } from '../src/tools/database.js';
+import { findDisallowedStage, handleAggregateCollection } from '../src/tools/database.js';
 import { TOOL_CATEGORIES } from '../src/lib/tools-config.js';
 import { ToolContext } from '../src/tools/types.js';
 
@@ -241,25 +241,28 @@ describe('tools-config: metadata_get is always available', () => {
   });
 });
 
-describe('database.ts handleAggregateCollection: read-only tool rejects write stages', () => {
+describe('database.ts handleAggregateCollection: read-only tool allows only reviewed stages', () => {
   // collections_aggregate is classified R, so it is exposed under
-  // COUNTLY_TOOLS_ALL=R. $out / $merge write, and must not pass through.
+  // COUNTLY_TOOLS_ALL=R. The stage allow-list mirrors Countly's dbviewer guard.
   let context: ToolContext;
 
   beforeEach(() => {
     context = makeContext();
   });
 
-  it.each(['$out', '$merge'])('rejects a JSON-string pipeline ending in %s without calling Countly', async (op) => {
-    const aggregation = JSON.stringify([{ $match: {} }, { [op]: 'some_collection' }]);
-    await expect(
-      handleAggregateCollection(context, { collection: 'apps', aggregation })
-    ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
-    expect(context.httpClient.get).not.toHaveBeenCalled();
-  });
+  it.each(['$out', '$merge', '$currentOp', '$collStats', '$documents', '$madeUpFutureStage'])(
+    'rejects %s without calling Countly',
+    async (op) => {
+      const aggregation = JSON.stringify([{ $match: {} }, { [op]: 'x' }]);
+      await expect(
+        handleAggregateCollection(context, { collection: 'apps', aggregation })
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+      expect(context.httpClient.get).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects an already-parsed pipeline array', () => {
-    expect(findWriteStage([{ $match: {} }, { $merge: { into: 'x' } }])).toBe('$merge');
+    expect(findDisallowedStage([{ $match: {} }, { $merge: { into: 'x' } }])).toBe('$merge');
   });
 
   it('forwards an ordinary read pipeline unchanged', async () => {
@@ -270,11 +273,18 @@ describe('database.ts handleAggregateCollection: read-only tool rejects write st
     expect(call[1].params.aggregation).toBe(aggregation);
   });
 
-  it('does not mistake a field or value named like a stage for a stage', () => {
-    expect(findWriteStage([{ $match: { $out: 1 } }, { $project: { note: '$merge' } }])).toBeUndefined();
+  it('leaves joins to Countly, which allows them for global admins only', () => {
+    expect(findDisallowedStage([{ $lookup: { from: 'events', as: 'e' } }, { $unionWith: 'x' }])).toBeUndefined();
+  });
+
+  it('checks stage names only, not operators or values inside them', () => {
+    expect(findDisallowedStage([
+      { $match: { $expr: { $eq: ['$a', 1] } } },
+      { $project: { note: '$merge', m: { $mergeObjects: ['$a', '$b'] } } },
+    ])).toBeUndefined();
   });
 
   it('leaves non-JSON input for Countly to reject', () => {
-    expect(findWriteStage('not json')).toBeUndefined();
+    expect(findDisallowedStage('not json')).toBeUndefined();
   });
 });

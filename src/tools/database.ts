@@ -197,7 +197,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 
 export const aggregateCollectionToolDefinition = {
   name: 'collections_aggregate',
-  description: 'Run a read-only MongoDB aggregation pipeline on a collection via /o/db; $out and $merge stages are rejected. Requires the dbviewer plugin. For simple find queries use databases_query.',
+  description: 'Run a read-only MongoDB aggregation pipeline on a collection via /o/db; write and introspection stages such as $out, $merge and $currentOp are rejected. Requires the dbviewer plugin. For simple find queries use databases_query.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -217,26 +217,43 @@ export const aggregateCollectionToolDefinition = {
 };
 
 /**
- * Pipeline stages that write. MongoDB only accepts them as the final stage of
- * the top-level pipeline (never inside $lookup, $unionWith or $facet), so
- * checking the top level is complete.
+ * Aggregation stages collections_aggregate may send, mirroring the stage
+ * allow-list of Countly's dbviewer aggregation guard
+ * (plugins/dbviewer/api/parts/aggregation_guard.js: STAGES_USER plus
+ * STAGES_GLOBAL_ADMIN_ONLY). The MCP server cannot tell whether the token
+ * belongs to a global admin, so it allows the union and Countly narrows the
+ * joins per role.
+ *
+ * This is an allow-list, so it fails closed: writes ($out, $merge),
+ * server/cluster introspection ($currentOp, $collStats, ...), $documents and
+ * any stage a future MongoDB adds are refused until reviewed here. Only stage
+ * names are checked. Countly's guard also validates every operator at every
+ * depth and the join targets; those depend on its MongoDB version and the
+ * caller's role, so they stay server-side rather than being copied here to
+ * drift.
  */
-const WRITE_STAGES = ['$out', '$merge'];
+const ALLOWED_STAGES = new Set([
+  '$addFields', '$bucket', '$bucketAuto', '$count', '$densify', '$facet',
+  '$fill', '$geoNear', '$group', '$limit', '$match', '$project',
+  '$querySettings', '$redact', '$replaceRoot', '$replaceWith', '$sample',
+  '$search', '$searchMeta', '$set', '$setWindowFields', '$skip', '$sort',
+  '$sortByCount', '$unset', '$unwind', '$vectorSearch',
+  // joins and unions: global admins only, enforced by Countly
+  '$lookup', '$graphLookup', '$unionWith',
+]);
 
 /**
  * collections_aggregate is classified as a read operation, so it stays
- * available under COUNTLY_TOOLS_ALL=R. A pipeline that writes must not ride
- * on that classification. Countly's dbviewer aggregation guard rejects these
- * stages too; this keeps the tool's own behaviour matching its classification
- * rather than relying on the server alone.
+ * available under COUNTLY_TOOLS_ALL=R. Return the first top-level stage that
+ * is not on the allow-list, or undefined. Input that is not a JSON array is
+ * left for Countly to reject as an invalid pipeline.
  */
-export function findWriteStage(aggregation: unknown): string | undefined {
+export function findDisallowedStage(aggregation: unknown): string | undefined {
   let pipeline = aggregation;
   if (typeof pipeline === 'string') {
     try {
       pipeline = JSON.parse(pipeline);
     } catch {
-      // Not JSON: Countly rejects it as an invalid pipeline.
       return undefined;
     }
   }
@@ -244,8 +261,8 @@ export function findWriteStage(aggregation: unknown): string | undefined {
     return undefined;
   }
   for (const stage of pipeline) {
-    if (stage && typeof stage === 'object') {
-      const found = WRITE_STAGES.find((op) => Object.prototype.hasOwnProperty.call(stage, op));
+    if (stage && typeof stage === 'object' && !Array.isArray(stage)) {
+      const found = Object.keys(stage).find((key) => key.startsWith('$') && !ALLOWED_STAGES.has(key));
       if (found) {
         return found;
       }
@@ -257,11 +274,11 @@ export function findWriteStage(aggregation: unknown): string | undefined {
 export async function handleAggregateCollection(context: ToolContext, args: any): Promise<ToolResult> {
   const { database = 'countly', collection, aggregation } = args;
 
-  const writeStage = findWriteStage(aggregation);
-  if (writeStage) {
+  const disallowedStage = findDisallowedStage(aggregation);
+  if (disallowedStage) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      `collections_aggregate is read-only: the ${writeStage} stage writes to a collection and is not allowed.`
+      `collections_aggregate is read-only and does not allow the ${disallowedStage} stage. Allowed stages: ${[...ALLOWED_STAGES].join(', ')}.`
     );
   }
   
