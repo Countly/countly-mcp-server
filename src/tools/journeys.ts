@@ -409,7 +409,7 @@ export async function handleUpdateJourney(
 
 export const deleteJourneyToolDefinition = {
   name: 'journeys_delete',
-  description: 'Soft-delete a journey definition and all its versions via /i/journey-engine/delete (status is set to "deleted"). Requires the journey_engine plugin (Countly Enterprise). To find journey IDs use journeys_list.',
+  description: 'Soft-delete a journey definition and all its versions via /i/journey-engine/delete (status is set to "deleted"). Requires the journey_engine plugin (Countly Enterprise). WARNING: no tool can restore a deleted journey. To find journey IDs use journeys_list.',
   inputSchema: {
     type: 'object',
     properties: {

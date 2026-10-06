@@ -77,7 +77,7 @@ export async function handleListHooks(
 
 export const testHookToolDefinition = {
   name: 'hooks_test',
-  description: 'Dry-run a hook configuration with optional mock data via /i/hook/test (evaluates trigger match and runs effects in test mode). Requires the hooks plugin. To persist the hook use hooks_create.',
+  description: 'Test a hook configuration with optional mock data via /i/hook/test (evaluates the trigger match and runs the effects). WARNING: not a dry run; the configured effects really execute, so emails are sent, webhooks are called and custom code runs. Requires the hooks plugin. To persist the hook use hooks_create.',
   inputSchema: {
     type: 'object',
     properties: {
