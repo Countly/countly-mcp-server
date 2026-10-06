@@ -438,6 +438,9 @@ const APP_KEYS: ReadonlySet<string> = new Set([
 /** Values in an app field that mean "every app"; refused under an allow-list. */
 const APP_WILDCARDS: ReadonlySet<string> = new Set(['*', 'all', 'all_apps', 'allapps']);
 
+/** A Countly app id. */
+const APP_ID = /^[0-9a-fA-F]{24}$/;
+
 /** An event or segment key prefixed with its app id: `<24-hex id>***key`. */
 const APP_PREFIXED_KEY = /^([0-9a-fA-F]{24})\*\*\*/;
 
@@ -463,11 +466,15 @@ function parseJsonString(value: string): { ok: true; value: unknown } | { ok: fa
 /**
  * Reject a call whose arguments name an app outside `context.apps`, wherever
  * the app appears: any app-bearing key (see APP_KEYS) at any depth, inside
- * arrays and inside arguments that are JSON strings, comma-separated lists,
- * and `<appId>***key` composite keys. A wildcard ("*", "all") is refused, and
- * so is an app field holding something that is not an id (an object, a
- * boolean) or nesting too deep to check. Countly still applies the token's
- * own rights on every call.
+ * arrays, operator objects (`{"$in": [...]}`) and arguments that are JSON
+ * strings, comma-separated lists, and `<appId>***key` composite keys. A
+ * wildcard ("*", "all") is refused, and so is nesting too deep to check.
+ *
+ * Countly app ids are always 24-hex ObjectIds, so only such a value names an
+ * app. Anything else under an app-named key (`{"custom": {"app": "ios"}}` in
+ * an app-user update) is data and passes; the tool's own app is resolved,
+ * and checked, separately. Countly still applies the token's own rights on
+ * every call.
  */
 function assertAppsInScope(args: Record<string, unknown>, allowed: ReadonlySet<string> | undefined): void {
   if (!allowed) {
@@ -480,6 +487,9 @@ function assertAppsInScope(args: Record<string, unknown>, allowed: ReadonlySet<s
     }
     if (APP_WILDCARDS.has(id.toLowerCase())) {
       throw new McpError(ErrorCode.InvalidParams, 'Every-app wildcards are not available to this connection');
+    }
+    if (!APP_ID.test(id)) {
+      return; // not an app id: data that happens to sit under an app-named key
     }
     if (!allowed.has(id)) {
       throw new AppScopeError(id);
@@ -509,7 +519,11 @@ function assertAppsInScope(args: Record<string, unknown>, allowed: ReadonlySet<s
       value.forEach((item) => checkAppValue(item, depth + 1));
       return;
     }
-    throw new McpError(ErrorCode.InvalidParams, 'Unsupported app reference in arguments');
+    if (typeof value === 'object') {
+      // An operator object ({"$in": [...]}) or a nested record: every id in it counts.
+      Object.values(value as Record<string, unknown>).forEach((item) => checkAppValue(item, depth + 1));
+    }
+    // booleans and the like cannot name an app
   };
   const walk = (value: unknown, depth: number): void => {
     if (depth > MAX_ARG_DEPTH) {
@@ -772,6 +786,12 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
           if (a?.app_name) {
             const app = (await getApps()).find((x) => x.name === a.app_name);
             if (!app) {
+              // An app that exists but is outside this connection is a refusal, not a typo.
+              const hidden = allowedApps && (await fetchApps(client, cache)).find((x) => x.name === a.app_name);
+              if (hidden) {
+                appId = String(hidden._id);
+                throw new AppScopeError(appId);
+              }
               throw new McpError(ErrorCode.InvalidParams, `App not found: ${a.app_name}`);
             }
             appId = String(app._id);

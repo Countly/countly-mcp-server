@@ -24,6 +24,8 @@
 
 import { createRequire } from 'module';
 
+import { stripTrailingSlashes } from './url.js';
+
 const require = createRequire(import.meta.url);
 
 export const DEFAULT_ANALYTICS_URL = 'https://stats.count.ly';
@@ -80,7 +82,7 @@ export class HostAnalytics {
 
   constructor(options: HostAnalyticsOptions, fetchImpl?: Fetch) {
     this.options = options;
-    this.url = (options.url ?? DEFAULT_ANALYTICS_URL).replace(/\/+$/, '');
+    this.url = stripTrailingSlashes(options.url ?? DEFAULT_ANALYTICS_URL);
     this.appKey = options.appKey ?? DEFAULT_ANALYTICS_APP_KEY;
     this.fetchImpl = fetchImpl ?? (globalThis.fetch as unknown as Fetch);
   }

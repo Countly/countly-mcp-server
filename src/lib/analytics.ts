@@ -24,6 +24,9 @@ import { createHash } from 'crypto';
 import { createRequire } from 'module';
 
 import { redactSensitiveInMessage } from './error-handler.js';
+import { stripTrailingSlashes } from './url.js';
+
+export { stripTrailingSlashes };
 
 const ANALYTICS_URL = 'https://stats.count.ly';
 /**
@@ -75,24 +78,30 @@ export function normalizeServerUrlForHash(url: string): string {
       (parsed.protocol === 'http:' && parsed.port === '80') ||
       (parsed.protocol === 'https:' && parsed.port === '443');
     const port = parsed.port && !isDefaultPort ? `:${parsed.port}` : '';
-    const pathname = parsed.pathname.replace(/\/+$/, '');
+    const pathname = stripTrailingSlashes(parsed.pathname);
     // Preserve search + hash (rare on Countly URLs but keep case).
     return `${hostname}${port}${pathname}${parsed.search}${parsed.hash}`;
   } catch {
     // Non-URL input (malformed, unexpected scheme, etc.): minimal best-
     // effort normalization — strip scheme prefix and trailing slashes,
     // preserve path case.
-    return trimmed
-      .replace(/^[a-z][a-z\d+.-]*:\/\//i, '')
-      .replace(/\/+$/, '');
+    return stripTrailingSlashes(trimmed.replace(/^[a-z][a-z\d+.-]*:\/\//i, ''));
   }
+}
+
+/** Loopback hosts: a server only reachable on this machine has no domain. */
+function isLoopbackHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === 'localhost' || h.endsWith('.localhost') || h === '[::1]' || h === '0.0.0.0' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
 }
 
 /**
  * The device id a Countly server reports telemetry under: its domain with the
- * scheme and trailing slashes stripped, exactly as the Countly platform's
- * tracker derives it from `api.domain` (api/parts/mgmt/tracker.js), so the
- * same server gets the same device id from both.
+ * scheme and trailing slashes stripped, as the Countly platform's tracker
+ * derives it from `api.domain` (api/parts/mgmt/tracker.js), so the same
+ * server gets the same device id from both. Credentials in the URL
+ * (`user:pass@`) are dropped and never leave the process. A loopback host
+ * (localhost with any port or path, 127.x, [::1]) is no domain.
  * @param url - the Countly server URL
  * @returns the device id, or undefined when there is no usable domain
  */
@@ -100,8 +109,17 @@ export function deviceIdFromServerUrl(url: string | undefined | null): string | 
   if (typeof url !== 'string') {
     return undefined;
   }
-  const id = (url.split('://').pop() ?? '').replace(/\/+$/, '');
-  if (!id || id === 'localhost') {
+  let id = stripTrailingSlashes(url.trim().split('://').pop() ?? '');
+  const authorityEnd = id.search(/[/?#]/);
+  let authority = authorityEnd < 0 ? id : id.slice(0, authorityEnd);
+  const rest = authorityEnd < 0 ? '' : id.slice(authorityEnd);
+  const at = authority.lastIndexOf('@');
+  if (at >= 0) {
+    authority = authority.slice(at + 1);
+    id = authority + rest;
+  }
+  const host = authority.startsWith('[') ? authority.slice(0, authority.indexOf(']') + 1) : authority.split(':')[0];
+  if (!host || isLoopbackHost(host)) {
     return undefined;
   }
   return id;

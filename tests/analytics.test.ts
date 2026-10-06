@@ -926,6 +926,17 @@ describe('Analytics', () => {
       expect(deviceIdFromServerUrl('http://countly.example.com:8443/countly//')).toBe('countly.example.com:8443/countly');
       expect(deviceIdFromServerUrl('Countly.Example.com')).toBe('Countly.Example.com');
       expect(deviceIdFromServerUrl('http://localhost')).toBeUndefined();
+      expect(deviceIdFromServerUrl('http://localhost:3001')).toBeUndefined();
+      expect(deviceIdFromServerUrl('http://localhost:3001/countly/')).toBeUndefined();
+      expect(deviceIdFromServerUrl('http://LOCALHOST')).toBeUndefined();
+      expect(deviceIdFromServerUrl('http://countly.localhost:8080')).toBeUndefined();
+      expect(deviceIdFromServerUrl('http://127.0.0.1:3001')).toBeUndefined();
+      expect(deviceIdFromServerUrl('http://[::1]:3001')).toBeUndefined();
+      expect(deviceIdFromServerUrl('https://user:secret@countly.example.com/')).toBe('countly.example.com');
+      expect(deviceIdFromServerUrl('https://user@countly.example.com:8443/c')).toBe('countly.example.com:8443/c');
+      expect(deviceIdFromServerUrl('https://user:secret@localhost')).toBeUndefined();
+      expect(deviceIdFromServerUrl('https://countly.example.com/path@x')).toBe('countly.example.com/path@x');
+      expect(deviceIdFromServerUrl('https://localhost.example.com')).toBe('localhost.example.com');
       expect(deviceIdFromServerUrl('')).toBeUndefined();
       expect(deviceIdFromServerUrl(undefined)).toBeUndefined();
     });

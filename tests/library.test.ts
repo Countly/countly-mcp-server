@@ -36,10 +36,10 @@ interface RecordedRequest {
 
 const APPS_BY_TOKEN: Record<string, Array<{ _id: string; name: string }>> = {
   'token-a': [
-    { _id: 'app1', name: 'Alpha' },
-    { _id: 'app2', name: 'Beta' },
+    { _id: 'aaaaaaaaaaaaaaaaaaaaaaa1', name: 'Alpha' },
+    { _id: 'aaaaaaaaaaaaaaaaaaaaaaa2', name: 'Beta' },
   ],
-  'token-b': [{ _id: 'app9', name: 'Gamma' }],
+  'token-b': [{ _id: 'aaaaaaaaaaaaaaaaaaaaaaa9', name: 'Gamma' }],
 };
 
 let countlyRequests: RecordedRequest[] = [];
@@ -102,8 +102,9 @@ beforeAll(async () => {
       const raw = Buffer.concat(chunks).toString('utf8');
       const body = raw ? JSON.parse(raw) : undefined;
       handler.handle(req, res, body, currentContext).catch((err) => {
+        console.error(err);
         res.statusCode = 500;
-        res.end(String(err));
+        res.end('internal error');
       });
     });
   });
@@ -291,9 +292,9 @@ function call(name: string, args?: Record<string, unknown>, id = 1) {
 
 describe('requiredOperations', () => {
   it('gives the static operation for a plain tool', () => {
-    expect(requiredOperations(call('events_list', { app_id: 'app1' })))
+    expect(requiredOperations(call('events_list', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1' })))
       .toEqual([{ tool: 'events_list', operation: 'R', adminOnly: false }]);
-    expect(requiredOperations(call('apps_delete', { app_id: 'app1' })))
+    expect(requiredOperations(call('apps_delete', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1' })))
       .toEqual([{ tool: 'apps_delete', operation: 'D', adminOnly: true }]);
   });
 
@@ -388,7 +389,7 @@ describe('tool filtering', () => {
 
   it('refuses a call to a filtered tool with a JSON-RPC error and no Countly request', async () => {
     currentContext = context({ operations: ['R'] });
-    const res = await callTool('events_create', { app_id: 'app1', key: 'purchase' });
+    const res = await callTool('events_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', key: 'purchase' });
     expect(res.error).toBeDefined();
     expect(res.result).toBeUndefined();
     expect(countlyRequests).toHaveLength(0);
@@ -405,24 +406,24 @@ describe('tool filtering', () => {
 
   it('refuses formulas_run in saved mode for a read-only context, with no Countly request', async () => {
     currentContext = context({ operations: ['R'] });
-    const res = await callTool('formulas_run', { app_id: 'app1', formula: '[]', mode: 'saved', formulaMeta: '{}' });
+    const res = await callTool('formulas_run', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', formula: '[]', mode: 'saved', formulaMeta: '{}' });
     expect(res.error).toBeDefined();
     expect(res.error.message).toMatch(/insufficient_scope/);
     expect(countlyRequests).toHaveLength(0);
     expect(reports[0]).toMatchObject({ tool: 'formulas_run', operation: 'R', operations: ['C', 'R'], outcome: 'no_access' });
 
-    const ok = await callTool('formulas_run', { app_id: 'app1', formula: '[]' });
+    const ok = await callTool('formulas_run', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', formula: '[]' });
     expect(ok.result).toBeDefined();
     expect(countlyRequests).toHaveLength(1);
   });
 
   it('refuses retention with save_report for a read-only context, with no Countly request', async () => {
     currentContext = context({ operations: ['R'] });
-    const res = await callTool('retention', { app_id: 'app1', save_report: true });
+    const res = await callTool('retention', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', save_report: true });
     expect(res.error).toBeDefined();
     expect(countlyRequests).toHaveLength(0);
 
-    const ok = await callTool('retention', { app_id: 'app1', save_report: false });
+    const ok = await callTool('retention', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', save_report: false });
     expect(ok.result).toBeDefined();
     expect(countlyRequests).toHaveLength(1);
     // false must not be sent at all: Countly reads any non-empty value as "save".
@@ -433,13 +434,13 @@ describe('tool filtering', () => {
     currentContext = context({ operations: ['C', 'R'] });
     for (const alert_config of [{ _id: 'alert1', alertName: 'x' }, JSON.stringify({ _id: 'alert1' })]) {
       reports = [];
-      const res = await callTool('alerts_create', { app_id: 'app1', alert_config });
+      const res = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config });
       expect(res.error).toBeDefined();
       expect(reports[0]).toMatchObject({ operations: ['U'], outcome: 'no_access' });
     }
     expect(countlyRequests).toHaveLength(0);
 
-    const ok = await callTool('alerts_create', { app_id: 'app1', alert_config: { alertName: 'x' } });
+    const ok = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config: { alertName: 'x' } });
     expect(ok.result).toBeDefined();
     expect(countlyRequests).toHaveLength(1);
   });
@@ -489,32 +490,32 @@ describe('tool filtering', () => {
 
 describe('app allow-list', () => {
   it('limits app lists to context.apps', async () => {
-    currentContext = context({ apps: ['app1'] });
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
     const res = await callTool('apps_list');
     const text = res.result.content[0].text;
-    expect(text).toContain('app1');
-    expect(text).not.toContain('app2');
+    expect(text).toContain('aaaaaaaaaaaaaaaaaaaaaaa1');
+    expect(text).not.toContain('aaaaaaaaaaaaaaaaaaaaaaa2');
   });
 
   it('refuses an app outside context.apps without calling Countly', async () => {
-    currentContext = context({ apps: ['app1'] });
-    const res = await callTool('events_list', { app_id: 'app2' });
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
+    const res = await callTool('events_list', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa2' });
     expect(res.error).toBeDefined();
     expect(countlyRequests).toHaveLength(0);
-    expect(reports[0]).toMatchObject({ outcome: 'no_access', appId: 'app2' });
+    expect(reports[0]).toMatchObject({ outcome: 'no_access', appId: 'aaaaaaaaaaaaaaaaaaaaaaa2' });
   });
 
   it('refuses out-of-scope app ids nested anywhere in the arguments, with no Countly request', async () => {
-    currentContext = context({ apps: ['app1'] });
-    const report = { app_id: 'app1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
+    const report = { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
     const cases: Array<[string, Record<string, unknown>]> = [
-      ['email_reports_core_create', { ...report, apps: ['app1', 'app2'] }],
-      ['email_reports_core_create', { ...report, apps: 'app1,app2' }],
-      ['email_reports_core_create', { ...report, apps: '["app2"]' }],
-      ['email_reports_core_create', { ...report, apps: ['app1'], selectedEvents: ['0123456789abcdef01234567***purchase'] }],
-      ['app_users_update', { app_id: 'app1', query: { deep: [{ nested: { appId: 'app2' } }] }, update: { $set: { a: 1 } } }],
-      ['cohorts_create', { app_id: 'app1', name: 'c', steps: '[]', user_segmentation: JSON.stringify({ selectedApps: ['app2'] }) }],
-      ['funnels_create', { app_id: 'app1', name: 'f', steps: ['a'], queries: [JSON.stringify({ app_ids: ['app2'] })] }],
+      ['email_reports_core_create', { ...report, apps: ['aaaaaaaaaaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaaaaaaaaaa2'] }],
+      ['email_reports_core_create', { ...report, apps: 'aaaaaaaaaaaaaaaaaaaaaaa1,aaaaaaaaaaaaaaaaaaaaaaa2' }],
+      ['email_reports_core_create', { ...report, apps: '["aaaaaaaaaaaaaaaaaaaaaaa2"]' }],
+      ['email_reports_core_create', { ...report, apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'], selectedEvents: ['0123456789abcdef01234567***purchase'] }],
+      ['app_users_update', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', query: { deep: [{ nested: { appId: 'aaaaaaaaaaaaaaaaaaaaaaa2' } }] }, update: { $set: { a: 1 } } }],
+      ['cohorts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', name: 'c', steps: '[]', user_segmentation: JSON.stringify({ selectedApps: ['aaaaaaaaaaaaaaaaaaaaaaa2'] }) }],
+      ['funnels_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', name: 'f', steps: ['a'], queries: [JSON.stringify({ app_ids: ['aaaaaaaaaaaaaaaaaaaaaaa2'] })] }],
     ];
     for (const [tool, args] of cases) {
       reports = [];
@@ -525,10 +526,10 @@ describe('app allow-list', () => {
     expect(countlyRequests).toHaveLength(0);
   });
 
-  it('refuses every-app wildcards and non-id app references under an allow-list', async () => {
-    currentContext = context({ apps: ['app1'] });
-    const report = { app_id: 'app1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
-    for (const apps of [['*'], ['all'], 'all', [{ id: 'app1' }], true]) {
+  it('refuses every-app wildcards and out-of-scope ids inside objects under an allow-list', async () => {
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
+    const report = { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily' };
+    for (const apps of [['*'], ['all'], 'all', [{ id: 'aaaaaaaaaaaaaaaaaaaaaaa2' }], { $in: ['aaaaaaaaaaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaaaaaaaaaa2'] }]) {
       const res = await callTool('email_reports_core_create', { ...report, apps });
       expect(res.error, JSON.stringify(apps)).toBeDefined();
     }
@@ -536,17 +537,17 @@ describe('app allow-list', () => {
   });
 
   it('accepts nested app ids that are all in scope', async () => {
-    currentContext = context({ apps: ['app1'] });
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
     const res = await callTool('email_reports_core_create', {
-      app_id: 'app1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily',
-      apps: ['app1'], selectedEvents: ['app1***purchase'],
+      app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', title: 't', emails: ['a@b.c'], metrics: {}, frequency: 'daily',
+      apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'], selectedEvents: ['aaaaaaaaaaaaaaaaaaaaaaa1***purchase'],
     });
     expect(res.result).toBeDefined();
     expect(countlyRequests).toHaveLength(1);
   });
 
   it('does not check nested app ids without an allow-list', async () => {
-    const res = await callTool('alerts_create', { app_id: 'app1', alert_config: { selectedApps: ['app2', '*'] } });
+    const res = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config: { selectedApps: ['aaaaaaaaaaaaaaaaaaaaaaa2', '*'] } });
     expect(res.result).toBeDefined();
     expect(countlyRequests).toHaveLength(1);
   });
@@ -560,7 +561,7 @@ describe('app allow-list', () => {
       expect(names, tool).toContain(tool);
     }
 
-    currentContext = context({ apps: ['app1'] });
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
     const scopedNames = await listToolNames();
     for (const tool of unscoped) {
       expect(scopedNames, tool).not.toContain(tool);
@@ -575,16 +576,33 @@ describe('app allow-list', () => {
 
     const res = await callTool('dashboards_list');
     expect(res.error).toBeDefined();
-    const widget = await callTool('dashboards_widget_add', { dashboard_id: 'd1', widget: { apps: ['app1'] } });
+    const widget = await callTool('dashboards_widget_add', { dashboard_id: 'd1', widget: { apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] } });
     expect(widget.error).toBeDefined();
     expect(countlyRequests).toHaveLength(0);
   });
 
-  it('does not resolve an app name outside context.apps', async () => {
-    currentContext = context({ apps: ['app1'] });
+  it('refuses an app name outside context.apps as no access', async () => {
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
     const res = await callTool('events_list', { app_name: 'Beta' });
     expect(res.error).toBeDefined();
     expect(countlyRequests.map((r) => r.url)).toEqual(['/o/apps/mine']);
+    expect(reports[0]).toMatchObject({ outcome: 'no_access', appId: 'aaaaaaaaaaaaaaaaaaaaaaa2' });
+  });
+
+  it('reports an unknown app name as a failure, not a refusal', async () => {
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
+    const res = await callTool('events_list', { app_name: 'Nope' });
+    expect(res.error).toBeDefined();
+    expect(reports[0]).toMatchObject({ outcome: 'failed' });
+  });
+
+  it('treats values that are not app ids under app-named keys as data', async () => {
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
+    const res = await callTool('app_users_update', {
+      app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', query: { uid: 'u1' }, update: { $set: { custom: { app: 'ios', apps: ['web', 'tv'], app_id: true } } },
+    });
+    expect(res.result, JSON.stringify(res)).toBeDefined();
+    expect(countlyRequests).toHaveLength(1);
   });
 });
 
@@ -604,7 +622,7 @@ describe('onToolCall', () => {
 
   it('reports the app a call resolved', async () => {
     await callTool('events_list', { app_name: 'Alpha' });
-    expect(reports[0]).toMatchObject({ tool: 'events_list', appId: 'app1', outcome: 'success' });
+    expect(reports[0]).toMatchObject({ tool: 'events_list', appId: 'aaaaaaaaaaaaaaaaaaaaaaa1', outcome: 'success' });
   });
 
   it('reports no_access when Countly answers 401 or 403', async () => {
