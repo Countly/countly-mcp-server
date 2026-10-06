@@ -36,7 +36,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, AppCacheRegistry, parseAppsMineResponse, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
@@ -682,16 +682,7 @@ class CountlyMCPServer {
     const params = authToken ? { auth_token: authToken } : {};
     const response = await client.get('/o/apps/mine', { params });
 
-    let apps: CountlyApp[];
-    if (response.data && Array.isArray(response.data)) {
-      apps = response.data;
-    } else if (response.data && response.data.admin_of) {
-      apps = Object.values(response.data.admin_of) as CountlyApp[];
-    } else if (response.data && response.data.apps) {
-      apps = response.data.apps;
-    } else {
-      apps = [];
-    }
+    const apps = parseAppsMineResponse(response.data);
 
     cache.update(apps);
     return apps;
