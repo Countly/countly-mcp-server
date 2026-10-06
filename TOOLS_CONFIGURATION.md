@@ -51,6 +51,8 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `crash_group_breakdown`, `crash_group_users`: crash distribution over a field, and affected users
   - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
   - `drill_query` (requires the drill plugin): ad-hoc metrics over raw events. Supports count, unique, sum, avg, min, max and percentile; cohort and formula metrics; filters, breakdowns, time series, sorting and cursor paging. Custom event keys are mapped to drill's storage format automatically.
+  - `drill_saved_query_run` (requires the drill plugin): runs a saved drill query (from `drill_bookmarks_list`), optionally re-windowed, and returns results like `drill_query`
+  - `drill_property_values` (requires the drill plugin): distinct values of a user property, custom property, campaign property or event segment, for building exact filters
 - **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
   - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
   - `funnels_list`: paging with totals
@@ -58,6 +60,10 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `funnels_step_users`, `funnels_dropoff_users`: full user profiles, paginated (they fall back to legacy uids when drill profiles are unavailable or a filter is used)
   - `sdk_logs_list`: paging, plus filters by request type, SDK, time range, text and problem requests
   - `user_profiles_query`: free-text search, sorting, paging and total count (it falls back to legacy when drill profiles are unavailable)
+  - `live_users`, `live_last_hour`, `live_last_day`, `live_last_30_days`: also return new-user counts, as compact series with ISO timestamps and the peak (they fall back to legacy when the user cannot read the v2 route). `live_overall` (v2 has no peak timestamp) and `live_metrics` (no v2 breakdown) stay legacy.
+  - `drill_bookmarks_list`, `drill_bookmarks_create`, `drill_bookmarks_delete`: work on Platform saved queries, which include bookmarks saved in the old drill UI. Listing covers all events of the app (or every app with `scope: "mine"`); creating accepts the same metrics, filter and breakdowns as `drill_query` (or `event_key` + `query_obj` + `by_val` for a count); deleting an old-UI bookmark goes through the legacy endpoint.
+  - `queriable_fields_list`, `metadata_get`: read drill metadata from `/v2/drill`; `metadata_get` lists every custom event with its segments in one batched call (both fall back to legacy for users without drill rights)
+  - `query_data`: unchanged behaviour (its `drill` mode keeps the classic segmentation response); on Platform its description points to `drill_query` for metrics, formulas and cohorts
 
   Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API.
 - **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).

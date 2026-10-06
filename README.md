@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **161 Tools** across 33 categories for comprehensive Countly operations
+- **163 Tools** across 33 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (161 available)
+### Tools (163 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -574,7 +574,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 161 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 163 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -647,11 +647,13 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 
 ### Drill Segmentation (requires `drill` plugin)
 - **`drill_query`** (Platform) - Ad-hoc analytics over raw events: count, unique users, sum, average, percentiles, cohort and formula metrics, filters, breakdowns, time series and paging
-- **`queriable_fields_list`** - Get available properties for segmentation
+- **`queriable_fields_list`** (v2 on Platform) - Get available properties for segmentation
 - **`run_query`** - Run drill query with filters and time buckets
-- **`drill_bookmarks_list`** - List saved segmentation queries
-- **`drill_bookmarks_create`** - Save a segmentation query
-- **`drill_bookmarks_delete`** - Delete a saved query
+- **`drill_bookmarks_list`** (v2 on Platform) - List saved segmentation queries; on Platform all saved queries of an app (or all yours), including old-UI bookmarks
+- **`drill_bookmarks_create`** (v2 on Platform) - Save a segmentation query; on Platform also any `drill_query` metrics, filter and breakdowns
+- **`drill_bookmarks_delete`** (v2 on Platform) - Delete a saved query
+- **`drill_saved_query_run`** (Platform) - Run a saved drill query, optionally over another period
+- **`drill_property_values`** (Platform) - Distinct values of a user property, custom property or event segment, for building filters
 
 ### User Profiles (requires `users` plugin)
 - **`user_profiles_query`** (v2 on Platform) - Query users with MongoDB filters; on Platform also free-text search, sorting, paging and totals
@@ -683,11 +685,11 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 - **`formulas_delete`** - Delete a saved formula
 
 ### Live/Concurrent Users (requires `concurrent_users` plugin)
-- **`live_users`** - Get current online user count and new users at this moment
+- **`live_users`** (v2 on Platform) - Get current online user count and new users at this moment
 - **`live_metrics`** - Get breakdown by countries, devices and carriers for users currently online
-- **`live_last_hour`** - Get minute-by-minute data for the last hour (60 data points)
-- **`live_last_day`** - Get hour-by-hour data for the last day (24 data points)
-- **`live_last_30_days`** - Get daily data for the last 30 days (30 data points)
+- **`live_last_hour`** (v2 on Platform) - Get minute-by-minute data for the last hour (60 data points)
+- **`live_last_day`** (v2 on Platform) - Get hour-by-hour data for the last day (24 data points)
+- **`live_last_30_days`** (v2 on Platform) - Get daily data for the last 30 days (30 data points)
 - **`live_overall`** - Get maximum values for online users (peak concurrent usage records)
 
 ### Retention (requires `retention_segments` plugin)

@@ -243,6 +243,8 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   funnels_trends: f('funnels', 'r'),
   funnels_user_progress: f('funnels', 'r'),
   drill_query: f('drill', 'r'),
+  drill_saved_query_run: f('drill', 'r'),
+  drill_property_values: f('drill', 'r'),
 };
 
 /**
