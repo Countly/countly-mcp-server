@@ -213,9 +213,9 @@ class CountlyMCPServer {
     this.loopDetector = new LoopDetector();
     this.requestContext = new AsyncLocalStorage<RequestState>();
     
-    // Initialize analytics. Opt-in: enabled only when ENABLE_ANALYTICS=true.
-    // README has always documented this as "disabled by default"; the previous
-    // `!== 'false'` check silently opted users in. Flip to explicit opt-in.
+    // Initialize analytics. On by default, like the Countly platform's own
+    // telemetry; opt out with ENABLE_ANALYTICS=false (or 0/no/off). Events are
+    // reported under the Countly server's domain (see src/lib/analytics.ts).
     //
     // The getServerUrl callback lets analytics attach a short opaque SHA-256
     // hash of the current Countly server URL (as the `server` segment) to
@@ -229,7 +229,7 @@ class CountlyMCPServer {
     //      `server_started` event fires from inside analytics.init() which
     //      runs before this.config is assigned, so without this fallback
     //      the very first event would ship without the `server` segment)
-    const analyticsEnabled = (process.env.ENABLE_ANALYTICS || '').toLowerCase() === 'true';
+    const analyticsEnabled = !['false', '0', 'no', 'off'].includes((process.env.ENABLE_ANALYTICS || '').trim().toLowerCase());
     analytics.init(analyticsEnabled, () => {
       const reqState = this.requestContext.getStore();
       return (

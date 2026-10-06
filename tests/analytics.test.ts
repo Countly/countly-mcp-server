@@ -2,8 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   analytics,
   computeServerHash,
+  deviceIdFromServerUrl,
   normalizeServerUrlForHash,
 } from '../src/lib/analytics.js';
+
+/** The Countly server events are reported for (its domain is the device id). */
+const SERVER = () => 'https://countly.example.com';
 
 /**
  * Analytics Tests
@@ -20,6 +24,7 @@ vi.mock('countly-sdk-nodejs', () => {
     log_error: vi.fn(),
     user_details: vi.fn(),
     track_view: vi.fn(),
+    request: vi.fn(),
   };
   return { default: mockCountly };
 });
@@ -54,13 +59,13 @@ describe('Analytics', () => {
     it('should initialize analytics when enabled', async () => {
       const Countly = await getCountlyMock();
       
-      analytics.init(true);
+      analytics.init(true, SERVER);
       
       expect(Countly.init).toHaveBeenCalledWith(
         expect.objectContaining({
           app_key: '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7',
           url: 'https://stats.count.ly',
-          device_id: 'mcp',
+          device_id: 'countly.example.com',
           debug: false,
         })
       );
@@ -80,7 +85,7 @@ describe('Analytics', () => {
     it('should track server start event on initialization', async () => {
       const Countly = await getCountlyMock();
       
-      analytics.init(true);
+      analytics.init(true, SERVER);
       
       // Should have called add_event for server_started
       expect(Countly.add_event).toHaveBeenCalledWith(
@@ -98,7 +103,7 @@ describe('Analytics', () => {
       });
       
       // Should not throw
-      expect(() => analytics.init(true)).not.toThrow();
+      expect(() => analytics.init(true, SERVER)).not.toThrow();
       expect(analytics.isEnabled()).toBe(false);
     });
   });
@@ -109,7 +114,7 @@ describe('Analytics', () => {
     });
 
     it('should return true when enabled and initialized', async () => {
-      analytics.init(true);
+      analytics.init(true, SERVER);
       expect(analytics.isEnabled()).toBe(true);
     });
 
@@ -122,7 +127,7 @@ describe('Analytics', () => {
   describe('trackTransport', () => {
     it('should track transport type when enabled', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks(); // Clear init calls
       
       analytics.trackTransport('http');
@@ -140,7 +145,7 @@ describe('Analytics', () => {
 
     it('should track stdio transport', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackTransport('stdio');
@@ -168,7 +173,7 @@ describe('Analytics', () => {
   describe('trackToolExecution', () => {
     it('should track successful tool execution', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackToolExecution('apps_list', true, 150);
@@ -187,7 +192,7 @@ describe('Analytics', () => {
 
     it('should track failed tool execution', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackToolExecution('apps_create', false, 200);
@@ -204,7 +209,7 @@ describe('Analytics', () => {
 
     it('should track timed event when duration is provided', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackToolExecution('databases_query', true, 500);
@@ -221,7 +226,7 @@ describe('Analytics', () => {
 
     it('should handle execution without duration', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackToolExecution('apps_list', true);
@@ -248,7 +253,7 @@ describe('Analytics', () => {
   describe('trackToolCategory', () => {
     it('should track tool category usage', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackToolCategory('database');
@@ -276,7 +281,7 @@ describe('Analytics', () => {
   describe('trackAuthMethod', () => {
     it('should track environment variable auth method', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackAuthMethod('env');
@@ -293,7 +298,7 @@ describe('Analytics', () => {
 
     it('should track file auth method', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackAuthMethod('file');
@@ -309,7 +314,7 @@ describe('Analytics', () => {
 
     it('should track headers auth method', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackAuthMethod('headers');
@@ -325,7 +330,7 @@ describe('Analytics', () => {
 
     it('should track metadata auth method', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackAuthMethod('metadata');
@@ -341,7 +346,7 @@ describe('Analytics', () => {
 
     it('should track args auth method', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackAuthMethod('args');
@@ -359,7 +364,7 @@ describe('Analytics', () => {
   describe('trackApiEndpoint', () => {
     it('should track API endpoint usage', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackApiEndpoint('/o', 'GET', 200);
@@ -378,7 +383,7 @@ describe('Analytics', () => {
 
     it('should track error status codes', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackApiEndpoint('/i', 'POST', 500);
@@ -396,7 +401,7 @@ describe('Analytics', () => {
   describe('trackHttpRequest', () => {
     it('should track HTTP request', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackHttpRequest('/health', 'GET');
@@ -414,7 +419,7 @@ describe('Analytics', () => {
 
     it('should track different HTTP methods', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackHttpRequest('/mcp', 'POST');
@@ -432,7 +437,7 @@ describe('Analytics', () => {
   describe('trackError', () => {
     it('should track error occurrence', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackError('ValidationError', 'Invalid input', 'apps_create');
@@ -452,7 +457,7 @@ describe('Analytics', () => {
 
     it('should truncate long error messages', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       const longMessage = 'A'.repeat(200);
@@ -469,7 +474,7 @@ describe('Analytics', () => {
 
     it('should use "unknown" for tool when not provided', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackError('Error', 'Something went wrong');
@@ -487,7 +492,7 @@ describe('Analytics', () => {
   describe('trackSession', () => {
     it('should begin session', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackSession('begin');
@@ -497,7 +502,7 @@ describe('Analytics', () => {
 
     it('should end session', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackSession('end');
@@ -518,7 +523,7 @@ describe('Analytics', () => {
   describe('trackEvent', () => {
     it('should track custom event with segmentation', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackEvent('custom_event', { key: 'value', count: 5 });
@@ -526,13 +531,13 @@ describe('Analytics', () => {
       expect(Countly.add_event).toHaveBeenCalledWith({
         key: 'custom_event',
         count: 1,
-        segmentation: { key: 'value', count: 5 },
+        segmentation: { key: 'value', count: 5, server: expect.stringMatching(/^[0-9a-f]{16}$/) },
       });
     });
 
     it('should track event without segmentation', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackEvent('simple_event');
@@ -540,13 +545,13 @@ describe('Analytics', () => {
       expect(Countly.add_event).toHaveBeenCalledWith({
         key: 'simple_event',
         count: 1,
-        segmentation: undefined,
+        segmentation: { server: expect.stringMatching(/^[0-9a-f]{16}$/) },
       });
     });
 
     it('should handle event tracking errors gracefully', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       Countly.add_event.mockImplementationOnce(() => {
         throw new Error('Event failed');
       });
@@ -559,7 +564,7 @@ describe('Analytics', () => {
   describe('trackTimedEvent', () => {
     it('should track timed event with duration', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackTimedEvent('operation', { type: 'db_query' }, 1500);
@@ -568,13 +573,13 @@ describe('Analytics', () => {
         key: 'operation',
         count: 1,
         dur: 1500,
-        segmentation: { type: 'db_query' },
+        segmentation: expect.objectContaining({ type: 'db_query' }),
       });
     });
 
     it('should handle timed event errors gracefully', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       Countly.add_event.mockImplementationOnce(() => {
         throw new Error('Timed event failed');
       });
@@ -586,7 +591,7 @@ describe('Analytics', () => {
   describe('trackUserProperty', () => {
     it('should track user property', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackUserProperty('plan', 'premium');
@@ -598,7 +603,7 @@ describe('Analytics', () => {
 
     it('should track numeric user property', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackUserProperty('login_count', 42);
@@ -610,7 +615,7 @@ describe('Analytics', () => {
 
     it('should handle user property errors gracefully', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       Countly.user_details.mockImplementationOnce(() => {
         throw new Error('User details failed');
       });
@@ -622,7 +627,7 @@ describe('Analytics', () => {
   describe('trackView', () => {
     it('should track view', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackView('welcome_page');
@@ -632,7 +637,7 @@ describe('Analytics', () => {
 
     it('should handle view tracking errors gracefully', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       Countly.track_view.mockImplementationOnce(() => {
         throw new Error('View tracking failed');
       });
@@ -643,7 +648,7 @@ describe('Analytics', () => {
 
   describe('flush', () => {
     it('should flush events when enabled', async () => {
-      analytics.init(true);
+      analytics.init(true, SERVER);
       
       // Should not throw
       expect(() => analytics.flush()).not.toThrow();
@@ -656,7 +661,7 @@ describe('Analytics', () => {
     });
 
     it('should handle flush errors gracefully', async () => {
-      analytics.init(true);
+      analytics.init(true, SERVER);
       
       // Should not throw even if there's an error
       expect(() => analytics.flush()).not.toThrow();
@@ -771,27 +776,26 @@ describe('Analytics', () => {
       }
     });
 
-    it('omits `server` segment when no resolver is configured', async () => {
+    it('sends nothing when no resolver is configured (no domain to report under)', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true);
       vi.clearAllMocks();
 
       analytics.trackEvent('no_server', { x: 1 });
 
-      const seg = (Countly.add_event as any).mock.calls[0][0].segmentation;
-      expect(seg).toEqual({ x: 1 });
-      expect(seg.server).toBeUndefined();
+      expect(Countly.add_event).not.toHaveBeenCalled();
+      expect((Countly as any).request).not.toHaveBeenCalled();
     });
 
-    it('omits `server` segment when the resolver returns undefined / empty', async () => {
+    it('sends nothing when the resolver returns undefined / empty', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, () => undefined);
       vi.clearAllMocks();
 
       analytics.trackEvent('still_no_server');
 
-      const seg = (Countly.add_event as any).mock.calls[0][0].segmentation;
-      expect(seg).toBeUndefined();
+      expect(Countly.add_event).not.toHaveBeenCalled();
+      expect((Countly as any).request).not.toHaveBeenCalled();
     });
 
     it('re-evaluates the resolver on every event (per-request URL variation)', async () => {
@@ -804,16 +808,19 @@ describe('Analytics', () => {
       currentUrl = 'https://tenant-b.count.ly';
       analytics.trackEvent('e2');
 
+      // tenant-a is the SDK's own device id; tenant-b goes as a request under its domain
       const segA = (Countly.add_event as any).mock.calls[0][0].segmentation;
-      const segB = (Countly.add_event as any).mock.calls[1][0].segmentation;
+      const req = ((Countly as any).request as any).mock.calls[0][0];
+      expect(req.device_id).toBe('tenant-b.count.ly');
+      const segB = JSON.parse(req.events)[0].segmentation;
       expect(segA.server).not.toBe(segB.server);
     });
 
-    it('keeps device_id at "mcp" (hash is on events, not device id)', async () => {
+    it('uses the server domain as device_id, like the Countly platform', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, () => 'https://api.count.ly');
       expect(Countly.init).toHaveBeenCalledWith(
-        expect.objectContaining({ device_id: 'mcp' })
+        expect.objectContaining({ device_id: 'api.count.ly' })
       );
     });
 
@@ -849,7 +856,7 @@ describe('Analytics', () => {
       vi.clearAllMocks();
       
       // Call the private method directly
-      analytics.init(true);
+      analytics.init(true, SERVER);
       
       // Check that server_started was tracked with platform info
       expect(Countly.add_event).toHaveBeenCalledWith(
@@ -868,8 +875,8 @@ describe('Analytics', () => {
     it('should handle multiple init calls', async () => {
       const Countly = await getCountlyMock();
       
-      analytics.init(true);
-      analytics.init(true);
+      analytics.init(true, SERVER);
+      analytics.init(true, SERVER);
       
       // Should only initialize once (plus server_started event each time)
       expect(Countly.init).toHaveBeenCalledTimes(2);
@@ -877,26 +884,63 @@ describe('Analytics', () => {
 
     it('should handle empty segmentation', async () => {
       const Countly = await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       analytics.trackEvent('event', {});
       
       expect(Countly.add_event).toHaveBeenCalledWith(
         expect.objectContaining({
-          segmentation: {},
+          key: 'event',
+          segmentation: { server: expect.stringMatching(/^[0-9a-f]{16}$/) },
         })
       );
     });
 
     it('should handle null/undefined in tracking methods', async () => {
       await getCountlyMock();
-      analytics.init(true);
+      analytics.init(true, SERVER);
       vi.clearAllMocks();
       
       // Should not throw
       expect(() => analytics.trackToolExecution('tool', true, undefined)).not.toThrow();
       expect(() => analytics.trackError('Error', 'message', undefined)).not.toThrow();
+    });
+  });
+  describe('device id = Countly server domain', () => {
+    it('derives the device id the way the Countly platform does', () => {
+      expect(deviceIdFromServerUrl('https://countly.example.com/')).toBe('countly.example.com');
+      expect(deviceIdFromServerUrl('http://countly.example.com:8443/countly//')).toBe('countly.example.com:8443/countly');
+      expect(deviceIdFromServerUrl('Countly.Example.com')).toBe('Countly.Example.com');
+      expect(deviceIdFromServerUrl('http://localhost')).toBeUndefined();
+      expect(deviceIdFromServerUrl('')).toBeUndefined();
+      expect(deviceIdFromServerUrl(undefined)).toBeUndefined();
+    });
+
+    it('initializes the SDK under the server domain', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, SERVER);
+      expect(Countly.init).toHaveBeenCalledWith(expect.objectContaining({ device_id: 'countly.example.com' }));
+    });
+
+    it("reports another tenant's events under that tenant's domain", async () => {
+      const Countly = await getCountlyMock();
+      let current = 'https://countly.example.com';
+      analytics.init(true, () => current);
+      vi.clearAllMocks();
+      current = 'https://other.example.org';
+      analytics.trackEvent('tool_executed', { tool: 'apps_list' });
+      expect(Countly.add_event).not.toHaveBeenCalled();
+      expect(Countly.request).toHaveBeenCalledWith(expect.objectContaining({ device_id: 'other.example.org' }));
+    });
+
+    it('reports nothing without a usable domain', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, () => 'http://localhost');
+      vi.clearAllMocks();
+      analytics.trackEvent('tool_executed', { tool: 'apps_list' });
+      expect(Countly.add_event).not.toHaveBeenCalled();
+      expect(Countly.request).not.toHaveBeenCalled();
     });
   });
 });

@@ -35,7 +35,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 - **Flexible Authentication**: Environment variables, HTTP headers, URL parameters, or token files
 - **Plugin-Aware**: Automatically detects and enables tools based on available Countly plugins
 - **Docker Support**: Pre-built Docker images with multi-architecture support (amd64, arm64)
-- **Anonymous Analytics**: Optional usage tracking (disabled by default) to help improve the server
+- **Usage Analytics**: Usage reporting to stats.count.ly under your Countly server's domain (on by default; `ENABLE_ANALYTICS=false` opts out)
 -
 
 ## MCP Capabilities
@@ -216,7 +216,7 @@ The server supports multiple authentication methods (in priority order):
 | `COUNTLY_AUTH_TOKEN` | No* | - | Authentication token (direct) |
 | `COUNTLY_AUTH_TOKEN_FILE` | No* | - | Path to file containing auth token |
 | `COUNTLY_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
-| `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics (set to `true` to opt in) |
+| `ENABLE_ANALYTICS` | No | `true` | Usage analytics to stats.count.ly under your Countly server's domain (set to `false` to opt out) |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
 | `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). |
@@ -228,39 +228,39 @@ The server supports multiple authentication methods (in priority order):
 
 *At least one authentication method must be configured
 
-### Analytics Tracking (Optional)
+### Analytics Tracking
 
-The MCP server includes optional anonymous usage analytics to help improve the product. Analytics are **disabled by default** and can be opted into via the `ENABLE_ANALYTICS=true` environment variable.
+The MCP server reports usage analytics to `stats.count.ly` to help improve the product, the same way the Countly platform reports its own server telemetry. Analytics are **enabled by default**; opt out with `ENABLE_ANALYTICS=false`.
+
+**Device ID: your Countly server's domain.** Events are reported under the domain of the Countly server the MCP server talks to (`COUNTLY_SERVER_URL`, or the per-request server URL in multi-tenant HTTP mode), with the scheme and trailing slashes removed, e.g. `countly.example.com` or `countly.example.com:8443/countly`. This is the same device ID the Countly platform uses for its own telemetry, so both line up on the stats server. When there is no usable domain (no server URL, or `localhost`), nothing is reported.
 
 **What is tracked:**
+- Your Countly server's domain (as the device ID, above)
 - Transport type used (stdio vs HTTP)
 - Tool execution metrics (success/failure, duration, tool names)
 - Authentication methods used (headers, env, file, args)
 - HTTP endpoint access patterns
-- Error occurrences (type and message, NO sensitive data)
-- Server start/stop events
-- A **truncated opaque hash** of your Countly server URL (64-bit SHA-256 prefix), attached as the `server` segment on every event — used for distinct-server aggregation. The raw URL is never sent.
+- Error occurrences (type and redacted message, no tokens)
+- Server start events
+- A truncated hash of the server URL, attached as the `server` segment on every event
 
 **What is NOT tracked:**
 - Authentication tokens or credentials
-- Raw Countly server URLs or domains (only the opaque `server` hash above)
 - User data or analytics content
 - Personal information
-- IP addresses or client identifiers
 - Tool arguments or request/response bodies
 
-**Privacy & Device ID:**
-All analytics are aggregated under a single device ID `"mcp"` — Countly cannot distinguish individual operators from the device ID alone. The only per-deployment signal is the `server` hash on events, which is a truncated SHA-256 of the normalized server URL. The hash is intentionally coarse (64 bits) and the server URL is low-entropy, so do not assume the hash is unguessable for cloud patterns; it is meant for aggregation, not secrecy.
-
-**To opt in:**
+**To opt out:**
 ```bash
-export ENABLE_ANALYTICS=true
+export ENABLE_ANALYTICS=false
 ```
 
 Or in your `.env` file:
 ```
-ENABLE_ANALYTICS=true
+ENABLE_ANALYTICS=false
 ```
+
+When the tools are embedded in another process through `countly-mcp-server/library`, the host decides whether and under which device ID usage is reported (see "Embedding in another process").
 
 ### Tools Configuration
 
@@ -391,10 +391,10 @@ want.
 
 ### Telemetry
 
-Analytics are **disabled by default**. Opt in with `ENABLE_ANALYTICS=true`.
-No authentication tokens, server URLs, or tool arguments are ever sent
-to `stats.count.ly`; error messages shipped to the analytics SDK are
-redacted for token-shaped substrings.
+Analytics are **enabled by default** and report under your Countly server's
+domain; opt out with `ENABLE_ANALYTICS=false`. No authentication tokens or
+tool arguments are ever sent to `stats.count.ly`; error messages shipped to
+the analytics SDK are redacted for token-shaped substrings.
 
 ## Docker Deployment
 

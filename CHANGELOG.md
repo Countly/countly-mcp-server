@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Host-driven usage analytics in library mode** — an optional `analytics: { isEnabled, deviceId, host? }` option reports tool usage to the MCP app on stats.count.ly with the standalone event names, under the host's device id and only while the host allows it. Library mode never initializes the global Countly SDK.
 
+### Changed
+- **Usage analytics are on by default and report under your Countly server's domain** — like the Countly platform's own telemetry. The device ID is the domain of `COUNTLY_SERVER_URL` (per request in multi-tenant HTTP mode), derived exactly as the platform does; nothing is sent without a usable domain. Opt out with `ENABLE_ANALYTICS=false`. Previously analytics were opt-in and reported under the fixed device ID `"mcp"`.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added

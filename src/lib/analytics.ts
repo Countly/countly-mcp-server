@@ -1,7 +1,14 @@
 /**
  * Analytics tracking module using Countly SDK
  * Provides comprehensive product and usage analytics.
- * Disabled by default — opt in with ENABLE_ANALYTICS=true.
+ * Enabled by default — opt out with ENABLE_ANALYTICS=false.
+ *
+ * Events are reported under the Countly server's domain as the device id,
+ * derived exactly the way the Countly platform derives its own telemetry
+ * device id (scheme and trailing slashes stripped, host[:port][/path] kept),
+ * so the MCP app's data on stats.count.ly lines up with the server's own
+ * telemetry. In multi-tenant HTTP mode each request reports under its own
+ * server's domain. No domain (or "localhost"): nothing is reported.
  */
 
 // @ts-ignore - countly-sdk-nodejs doesn't have TypeScript definitions
@@ -71,6 +78,25 @@ export function normalizeServerUrlForHash(url: string): string {
 }
 
 /**
+ * The device id a Countly server reports telemetry under: its domain with the
+ * scheme and trailing slashes stripped, exactly as the Countly platform's
+ * tracker derives it from `api.domain` (api/parts/mgmt/tracker.js), so the
+ * same server gets the same device id from both.
+ * @param url - the Countly server URL
+ * @returns the device id, or undefined when there is no usable domain
+ */
+export function deviceIdFromServerUrl(url: string | undefined | null): string | undefined {
+  if (typeof url !== 'string') {
+    return undefined;
+  }
+  const id = (url.split('://').pop() ?? '').replace(/\/+$/, '');
+  if (!id || id === 'localhost') {
+    return undefined;
+  }
+  return id;
+}
+
+/**
  * Compute the short opaque server-URL hash that rides along as the `server`
  * segment on every event.
  *
@@ -101,6 +127,7 @@ type ServerUrlResolver = () => string | undefined;
 class Analytics {
   private enabled: boolean = false;
   private initialized: boolean = false;
+  /** The SDK's own device id (sessions, user details, crashes). */
   private deviceId: string = 'mcp';
   private getServerUrl?: ServerUrlResolver;
 
@@ -119,9 +146,11 @@ class Analytics {
     this.getServerUrl = getServerUrl;
 
     if (!this.enabled) {
-      console.error('📊 Analytics: Disabled (set ENABLE_ANALYTICS=true to opt in)');
+      console.error('📊 Analytics: Disabled (ENABLE_ANALYTICS=false)');
       return;
     }
+
+    this.deviceId = deviceIdFromServerUrl(getServerUrl?.()) ?? 'mcp';
 
     try {
       Countly.init({
@@ -138,7 +167,7 @@ class Analytics {
       });
 
       this.initialized = true;
-      console.error('📊 Analytics: Enabled and initialized');
+      console.error('📊 Analytics: Enabled — usage is reported to stats.count.ly under your Countly server\'s domain. Set ENABLE_ANALYTICS=false to opt out.');
 
       // Track session start
       this.trackServerStart();
@@ -335,7 +364,7 @@ class Analytics {
     }
 
     try {
-      Countly.add_event({
+      this.send({
         key: eventName,
         count: 1,
         segmentation: this.withServerSegment(segmentation),
@@ -355,7 +384,7 @@ class Analytics {
     }
 
     try {
-      Countly.add_event({
+      this.send({
         key: eventName,
         count: 1,
         dur: duration,
@@ -364,6 +393,28 @@ class Analytics {
     } catch (error) {
       console.error('📊 Analytics: Failed to track timed event:', error);
     }
+  }
+
+  /**
+   * Sends one event under the current request's server domain. The SDK's own
+   * device id takes it through the SDK queue; another server's domain (a
+   * multi-tenant HTTP request) goes as a request with that device id, the way
+   * the Countly platform reports bulk server events. No domain: not sent.
+   */
+  private send(event: { key: string; count: number; dur?: number; segmentation?: Record<string, string | number> }): void {
+    const deviceId = deviceIdFromServerUrl(this.getServerUrl?.());
+    if (!deviceId) {
+      return;
+    }
+    if (deviceId === this.deviceId) {
+      Countly.add_event(event);
+      return;
+    }
+    Countly.request({
+      app_key: ANALYTICS_APP_KEY,
+      device_id: deviceId,
+      events: JSON.stringify([{ ...event, timestamp: Date.now() }]),
+    });
   }
 
   /**
