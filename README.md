@@ -14,7 +14,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ### Server Requirements
 - **Node.js 18+** (for local installation) OR **Docker** (recommended)
-- **Countly Server**: Access to a Countly instance (cloud or self-hosted)
+- **Countly Server**: Access to a Countly instance (cloud or self-hosted): Countly Lite, Countly Enterprise or Countly Platform (see [Supported Countly Editions](#supported-countly-editions))
 - **Auth Token**: Valid Countly authentication token with appropriate permissions
 
 ### Client Requirements
@@ -33,17 +33,35 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
 - **Flexible Authentication**: Environment variables, HTTP headers, URL parameters, or token files
-- **Plugin-Aware**: Automatically detects and enables tools based on available Countly plugins
+- **Edition-Aware**: Detects Countly Lite, Enterprise or Platform on connection and only exposes the tools that server and the connected user can use
 - **Docker Support**: Pre-built Docker images with multi-architecture support (amd64, arm64)
 - **Anonymous Analytics**: Optional usage tracking (disabled by default) to help improve the server
 -
+
+## Supported Countly Editions
+
+The server works with every Countly flavor and detects which one it is talking to on the first request for a server URL and token. The result is cached for 10 minutes.
+
+| Edition | What it is | How it is detected |
+|---|---|---|
+| **Countly Lite** | `countly-server` | No `/v2` API, no enterprise plugins |
+| **Countly Enterprise** | `countly-server` + enterprise plugins | No `/v2` API, enterprise plugins present (drill, funnels, cohorts, …) |
+| **Countly Platform** | `countly-platform`, the new architecture | Answers the `/v2` API (new UI), or Platform-only endpoints/plugins when running without it |
+
+Based on the detection, `tools/list` only contains tools that will work:
+
+- **Plugins**: tools whose Countly plugin is not enabled are hidden (e.g. cohorts on Lite, server logs on Platform). Global admins read the real plugin list. For other users the edition's default plugin set is assumed, because Countly only shows the plugin list to global admins.
+- **User permissions**: tools the connected user could never run are hidden, based on the user's feature permissions (create/read/update/delete per app, app admin, global admin), including group permissions. A read-only user sees roughly half the tools.
+- **Explanations instead of failures**: calling a hidden tool returns an error naming the missing plugin or permission, so the assistant can tell the user what is missing.
+
+Detection never hides tools on a guess: if the server cannot be reached or the user's permissions cannot be read, the configured tools stay available. `get_version` reports the detected edition. Set `COUNTLY_AUTO_DETECT=false` to turn detection off. Details are in [TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md#server-detection-and-plugin-based-tool-availability).
 
 ## MCP Capabilities
 
 This server implements the full MCP specification with support for:
 
 ### Tools (151 available)
-Execute Countly operations like analytics queries, app management, crash analysis, etc.
+Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
 Read-only access to Countly data for AI context:
@@ -96,7 +114,7 @@ COUNTLY_SERVER_URL=https://your-countly-instance.com \
 COUNTLY_AUTH_TOKEN=your-countly-auth-token \
 npx -y countly-mcp-server
 
-# HTTP mode
+# HTTP mode (binds localhost; see "Server-side token in HTTP mode" before exposing it)
 COUNTLY_SERVER_URL=https://your-countly-instance.com \
 COUNTLY_AUTH_TOKEN=your-countly-auth-token \
 npx -y countly-mcp-server --http
@@ -185,18 +203,19 @@ docker run -d \
 
 The server supports multiple authentication methods (in priority order):
 
-1. **HTTP Headers** (recommended for HTTP/SSE transport)
+1. **Tool Arguments**
+   - Passed as `countly_auth_token` parameter in individual tool calls
+   - Overrides every other source for that call
+
+2. **HTTP Headers** (recommended for HTTP/SSE transport)
    - Pass via `X-Countly-Server-Url` and `X-Countly-Auth-Token` headers
    - Supported by VS Code MCP extension and other HTTP clients
    - See [VS Code MCP Configuration](examples/vscode-mcp.md) for details
 
-2. **URL Parameters** (alternative for HTTP/SSE transport)
+3. **URL Parameters** (alternative for HTTP/SSE transport)
    - Pass as query string: `?server_url=https://your-server.count.ly&auth_token=your-api-key`
    - Useful for quick testing or tools that don't support custom headers
    - Less secure than headers, use headers when possible
-
-3. **Tool Arguments**
-   - Passed as `countly_auth_token` parameter in individual tool calls
 
 4. **Environment Variable**
    - Set `COUNTLY_AUTH_TOKEN` in environment
@@ -205,6 +224,9 @@ The server supports multiple authentication methods (in priority order):
 5. **Token File** (recommended for production)
    - Set `COUNTLY_AUTH_TOKEN_FILE` pointing to a file containing the token
    - Useful with Docker secrets
+
+A token the caller supplies (1–3) always wins over the server's own (4–5);
+the server-side token is only used for a request that brings none.
 
 ## Configuration
 
@@ -220,7 +242,7 @@ The server supports multiple authentication methods (in priority order):
 | `COUNTLY_AUTO_DETECT` | No | `true` | Detect Countly Lite / Enterprise / Platform and hide tools the server doesn't support (set to `false` to always show all configured tools) |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
-| `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). |
+| `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). When a server-side token is configured, browser requests to `/mcp` are refused unless their origin is listed here explicitly; `*` does not count. |
 | `COUNTLY_RATE_LIMIT_RPM` | No | `120` | Per-IP requests per minute on the `/mcp` endpoint (HTTP transport). Set to `0` to disable. |
 | `COUNTLY_TRUST_PROXY` | No | `false` | When `true`, use `X-Forwarded-For` for the rate-limit client IP. Only enable when the server is behind a trusted reverse proxy that sets this header. |
 | `COUNTLY_MAX_BODY_BYTES` | No | `1048576` | Maximum request-body size accepted on `/mcp` (HTTP transport). Requests over the limit get `413 Payload Too Large`. Set to `0` to disable. |
@@ -373,6 +395,31 @@ COUNTLY_CORS_ALLOWED_ORIGINS="https://dash.example.com,https://ops.example.com"
 The server will then echo only allowed origins and add `Vary: Origin`.
 Pre-flight requests from disallowed origins get a 403.
 
+When the server holds its own token (`COUNTLY_AUTH_TOKEN` or
+`COUNTLY_AUTH_TOKEN_FILE`), `/mcp` refuses every request that carries an
+`Origin` header with a 403, unless that origin is listed explicitly in
+`COUNTLY_CORS_ALLOWED_ORIGINS` (the `*` default does not count). MCP
+clients such as Claude Desktop, Claude Code, VS Code and Cursor send no
+`Origin` header and are unaffected. This stops a web page open in the
+operator's browser, including one using DNS rebinding, from driving a
+server that holds a token. Servers without a configured token, where every
+caller brings its own, are not affected by this rule.
+
+### Server-side token in HTTP mode
+
+`COUNTLY_AUTH_TOKEN` and `COUNTLY_AUTH_TOKEN_FILE` exist for stdio mode,
+where the MCP client launches the server as its own child process. In HTTP
+mode the server does **not** authenticate its callers: when one is set,
+any caller that reaches `/mcp` without supplying its own token acts with
+the configured one, with all the permissions that token carries.
+
+Only configure a server-side token in HTTP mode when the endpoint is
+reachable from a trusted network alone: bound to localhost, behind a
+firewall, or behind a reverse proxy that authenticates callers. The server
+logs a warning at startup when it runs this way. For a shared or
+internet-facing deployment, leave both variables unset and have each
+client send its own token in the `X-Countly-Auth-Token` header.
+
 ### Self-hosted single-tenant deployments
 
 If you're running this as a single-tenant server (e.g. `docker run` on a
@@ -388,7 +435,8 @@ The default Dockerfile binds to `0.0.0.0:3000` so it works inside a
 container without extra flags. This means `docker run -p 3000:3000 ...`
 exposes the MCP endpoint to the public internet — use an explicit local
 bind, a reverse proxy, or an external firewall if that's not what you
-want.
+want. This matters most when the container is given a server-side token:
+see [Server-side token in HTTP mode](#server-side-token-in-http-mode).
 
 ### Telemetry
 
