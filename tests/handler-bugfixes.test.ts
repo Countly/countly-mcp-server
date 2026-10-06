@@ -1,6 +1,6 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleCreateNote } from '../src/tools/notes.js';
+import { handleCreateNote, handleListNotes } from '../src/tools/notes.js';
 import { handleCreateHook, handleUpdateHook } from '../src/tools/hooks.js';
 import { TOOL_CATEGORIES } from '../src/lib/tools-config.js';
 import { ToolContext } from '../src/tools/types.js';
@@ -79,6 +79,38 @@ describe('notes.ts handleCreateNote: color is optional', () => {
     const call = (context.httpClient.get as any).mock.calls[0];
     const parsedArgs = JSON.parse(call[1].params.args);
     expect(parsedArgs.color).toBe(5);
+  });
+});
+
+describe('notes.ts handleCreateNote: app binding and visibility', () => {
+  it('sends app_id as a top-level parameter', async () => {
+    // Countly binds the note to the top-level app_id and ignores args.app_id;
+    // without it notes were saved with app_id "undefined" and never listed.
+    const context = makeContext();
+    await handleCreateNote(context, { app_id: 'app123', note: 'Release', ts: 1700000000 });
+
+    const params = (context.httpClient.get as any).mock.calls[0][1].params;
+    expect(params.app_id).toBe('app123');
+    expect(JSON.parse(params.args).app_id).toBe('app123');
+  });
+
+  it('defaults noteType to private, which Countly requires', async () => {
+    const context = makeContext();
+    await handleCreateNote(context, { app_id: 'app123', note: 'Release', ts: 1700000000 });
+
+    const params = (context.httpClient.get as any).mock.calls[0][1].params;
+    expect(JSON.parse(params.args).noteType).toBe('private');
+  });
+});
+
+describe('notes.ts handleListNotes: note count', () => {
+  it('counts the aaData rows, not the response keys', async () => {
+    const context = makeContext();
+    (context.httpClient.get as any).mockResolvedValue({
+      data: { aaData: [], iTotalDisplayRecords: 0, iTotalRecords: 0, sEcho: 1 },
+    });
+    const result = await handleListNotes(context, { app_id: 'app123' });
+    expect(result.content[0].text).toMatch(/^Found 0 note\(s\)/);
   });
 });
 

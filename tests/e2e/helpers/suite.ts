@@ -277,7 +277,11 @@ export function defineLiveSuite(edition: Edition): void {
           expect(created.isError, resultText(created)).toBeFalsy();
 
           noteId = await findNote(label);
-          expect(noteId, 'created note should be listed by notes_list').toBeTruthy();
+          if (!noteId) {
+            const list = await client.callTool('notes_list', { app_id: config.appId, period: '60days' });
+            expect.fail(`created note not found in notes_list. create said: ${resultText(created).slice(0, 300)}\n` +
+              `notes_list said: ${resultText(list).slice(0, 1500)}`);
+          }
 
           const deleted = await client.callTool('notes_delete', { note_id: noteId });
           expect(deleted.isError, resultText(deleted)).toBeFalsy();
@@ -368,9 +372,15 @@ export function defineLiveSuite(edition: Edition): void {
         for (const tool of HIDDEN_FOR_READ_ONLY) {
           expect(listed, `${tool} should be hidden from a read-only user`).not.toContain(tool);
         }
-        // Writes guarded only by "any authenticated user" (own dashboards)
-        // are legitimately visible; every other write must be hidden.
-        const writes = listed.filter((name) => !isReadOnlyTool(name) && TOOL_GUARDS[name]?.kind !== 'any');
+        // Some writes only need read access on the server (own dashboards,
+        // drill bookmarks), so they're legitimately visible. Every write that
+        // needs create/update/delete or admin rights must be hidden.
+        const needsWriteAccess = (name: string) => {
+          const guard = TOOL_GUARDS[name];
+          return !!guard && guard.kind !== 'any' && guard.kind !== 'app-read'
+            && !(guard.kind === 'feature' && guard.access === 'r');
+        };
+        const writes = listed.filter((name) => !isReadOnlyTool(name) && needsWriteAccess(name));
         expect(writes, 'write tools visible to a read-only user').toEqual([]);
       });
 

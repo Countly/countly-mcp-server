@@ -30,15 +30,17 @@ const NO_PROFILES = '{"uid":"mcp-e2e-no-such-user"}';
 /** Fixed arguments: required non-ID parameters, and narrow filters for heavy queries */
 const STATIC_ARGS: Record<string, (appId: string) => Record<string, unknown>> = {
   query_data: () => ({ query_type: 'analytics', method: 'sessions' }),
-  databases_query: () => ({ collection: 'apps', limit: 1 }),
-  databases_document: (appId) => ({ collection: 'apps', document_id: appId }),
-  collections_aggregate: () => ({ collection: 'apps', aggregation: '[{"$limit":1}]' }),
-  collections_indexes: () => ({ collection: 'apps' }),
-  databases_stats: () => ({ stat_type: 'mongotop' }),
+  // The app's own collection: non-admins may only read their apps' collections.
+  databases_query: (appId) => ({ collection: `app_users${appId}`, limit: 1 }),
+  collections_aggregate: (appId) => ({ collection: `app_users${appId}`, aggregation: '[{"$limit":1}]' }),
+  collections_indexes: (appId) => ({ collection: `app_users${appId}` }),
+  databases_document: (appId) => ({ collection: `app_users${appId}` }),
   user_profiles_query: () => ({ query: NO_PROFILES }),
   user_profiles_breakdown: () => ({ projection_key: '["av"]', query: NO_PROFILES }),
   user_loyalty: () => ({ query: NO_PROFILES }),
   retention: () => ({ period: '7days', query: NO_PROFILES }),
+  // Funnels compute over raw drill events; one day keeps that cheap.
+  funnels_data: () => ({ period: 'yesterday' }),
   server_logs_contents: () => ({ log: 'api', bytes: 2000 }),
 };
 
@@ -48,6 +50,10 @@ const SKIPPED: Record<string, string> = {
   funnels_step_users: 'needs step indices of a real funnel',
   funnels_dropoff_users: 'needs step indices of a real funnel',
   journeys_stats_uids: 'needs a uid_type for a real journey',
+  // Spawns mongotop/mongostat on the API host. Platform images don't ship
+  // them and the spawn error is uncaught, so this call restarts the API
+  // process (seen on master.count.ly, 2026-10-06).
+  databases_stats: 'spawns mongotop/mongostat, which crashes Platform API processes',
   user_profiles_get: 'finding a uid needs a broad profile query, too heavy for large apps',
 };
 
@@ -63,15 +69,18 @@ interface IdSource {
   from: string;
   /** Parameter of the dependent tool */
   param: string;
-  pick?: (json: unknown, appId: string) => string | undefined;
+  pick?: (json: unknown, appId: string, text: string) => string | undefined;
 }
 
 const ID_SOURCES: Record<string, IdSource> = {
   apps_get_by_name: {
     from: 'apps_list',
     param: 'app_name',
-    pick: (json, appId) => findDeep(json, (n) => (n._id === appId || n.id === appId) && typeof n.name === 'string')?.name,
+    // Plain text: "- <name> (ID: <id>)" per line
+    pick: (_json, appId, text) => text.split('\n').map((l) => /^- (.+) \(ID: ([0-9a-f]{24})\)$/.exec(l))
+      .find((m) => m?.[2] === appId)?.[1],
   },
+  databases_document: { from: 'databases_query', param: 'document_id' },
   crashes_get: { from: 'crash_groups_list', param: 'crash_id' },
   cohorts_data: { from: 'cohorts_list', param: 'cohort_id' },
   funnels_data: { from: 'funnels_list', param: 'funnel_id' },
@@ -120,7 +129,8 @@ export async function smokeReadOnlyTools(
   const callList = (name: string) => {
     if (!listResults.has(name)) {
       const tool = visible.get(name)!;
-      listResults.set(name, client.callTool(name, baseArgs(tool, appId)).then(
+      const args = { ...baseArgs(tool, appId), ...(STATIC_ARGS[name]?.(appId) || {}) };
+      listResults.set(name, client.callTool(name, args).then(
         (r) => ({ ok: !r.isError, json: parseResultJson(r), text: resultText(r) }),
         (e) => ({ ok: false, json: undefined, text: String(e) })
       ));
@@ -142,7 +152,7 @@ export async function smokeReadOnlyTools(
       if (!list.ok) {
         return { skip: `${source.from} failed` };
       }
-      const id = (source.pick || firstId)(list.json, appId);
+      const id = source.pick ? source.pick(list.json, appId, list.text) : firstId(list.json);
       if (!id) {
         return { skip: `${source.from} returned nothing to use` };
       }
@@ -160,7 +170,7 @@ export async function smokeReadOnlyTools(
     if ('skip' in p) {
       return { tool: tool.name, status: 'skipped', detail: p.skip };
     }
-    // ID source lists are called with base args only; reuse that call.
+    // ID source lists were already called with these same args; reuse that.
     if (SOURCE_TOOLS.has(tool.name)) {
       const list = await callList(tool.name);
       return list.ok
