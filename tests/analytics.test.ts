@@ -444,52 +444,31 @@ describe('Analytics', () => {
   });
 
   describe('trackError', () => {
-    it('should track error occurrence', async () => {
+    it('sends the error type and tool only, never the message or a crash report', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, SERVER);
       vi.clearAllMocks();
-      
-      analytics.trackError('ValidationError', 'Invalid input', 'apps_create');
-      
+
+      analytics.trackError('ValidationError', 'apps_create');
+
       expect(Countly.add_event).toHaveBeenCalledWith(
         expect.objectContaining({
           key: 'error_occurred',
-          segmentation: expect.objectContaining({
-            error_type: 'ValidationError',
-            tool: 'apps_create',
-          }),
+          segmentation: { error_type: 'ValidationError', tool: 'apps_create', server: expect.any(String) },
         })
       );
-      
       const crash = (Countly as any).request.mock.calls.map((c: any[]) => c[0]).find((p: any) => p.crash);
-      expect(crash.device_id).toBe('countly.example.com');
-      expect(JSON.parse(crash.crash)).toEqual(expect.objectContaining({ _error: 'ValidationError: Invalid input', _nonfatal: true }));
-    });
-
-    it('should truncate long error messages', async () => {
-      const Countly = await getCountlyMock();
-      analytics.init(true, SERVER);
-      vi.clearAllMocks();
-      
-      const longMessage = 'A'.repeat(200);
-      analytics.trackError('Error', longMessage);
-      
-      expect(Countly.add_event).toHaveBeenCalledWith(
-        expect.objectContaining({
-          segmentation: expect.objectContaining({
-            error_message: longMessage.substring(0, 100),
-          }),
-        })
-      );
+      expect(crash).toBeUndefined();
+      expect(JSON.stringify((Countly as any).request.mock.calls)).not.toContain('error_message');
     });
 
     it('should use "unknown" for tool when not provided', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, SERVER);
       vi.clearAllMocks();
-      
-      analytics.trackError('Error', 'Something went wrong');
-      
+
+      analytics.trackError('Error');
+
       expect(Countly.add_event).toHaveBeenCalledWith(
         expect.objectContaining({
           segmentation: expect.objectContaining({
@@ -783,7 +762,7 @@ describe('Analytics', () => {
       analytics.trackAuthMethod('headers');
       analytics.trackApiEndpoint('/o', 'GET', 200);
       analytics.trackHttpRequest('/mcp', 'POST');
-      analytics.trackError('Error', 'boom', 'apps_list');
+      analytics.trackError('Error', 'apps_list');
 
       for (const call of (Countly.add_event as any).mock.calls) {
         expect(call[0].segmentation.server).toMatch(/^[0-9a-f]{16}$/);
@@ -917,7 +896,7 @@ describe('Analytics', () => {
       
       // Should not throw
       expect(() => analytics.trackToolExecution('tool', true, undefined)).not.toThrow();
-      expect(() => analytics.trackError('Error', 'message', undefined)).not.toThrow();
+      expect(() => analytics.trackError('Error', undefined)).not.toThrow();
     });
   });
   describe('device id = Countly server domain', () => {
@@ -937,6 +916,10 @@ describe('Analytics', () => {
       expect(deviceIdFromServerUrl('https://user:secret@localhost')).toBeUndefined();
       expect(deviceIdFromServerUrl('https://countly.example.com/path@x')).toBe('countly.example.com/path@x');
       expect(deviceIdFromServerUrl('https://localhost.example.com')).toBe('localhost.example.com');
+      expect(deviceIdFromServerUrl('https://countly.example.com/base?auth_token=secret')).toBe('countly.example.com/base');
+      expect(deviceIdFromServerUrl('https://countly.example.com/?auth_token=secret#x')).toBe('countly.example.com');
+      expect(deviceIdFromServerUrl('https://countly.example.com#token')).toBe('countly.example.com');
+      expect(deviceIdFromServerUrl('https://countly.example.com:8443?k=v')).toBe('countly.example.com:8443');
       expect(deviceIdFromServerUrl('')).toBeUndefined();
       expect(deviceIdFromServerUrl(undefined)).toBeUndefined();
     });
@@ -967,7 +950,7 @@ describe('Analytics', () => {
       analytics.trackSession('begin');
       analytics.trackView('welcome_page');
       analytics.trackHttpRequest('/health', 'GET');
-      analytics.trackError('Error', 'boom');
+      analytics.trackError('Error');
       analytics.trackSession('end');
       expect((Countly as any).request).not.toHaveBeenCalled();
     });

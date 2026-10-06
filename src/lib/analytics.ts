@@ -23,7 +23,6 @@ import Countly from 'countly-sdk-nodejs';
 import { createHash } from 'crypto';
 import { createRequire } from 'module';
 
-import { redactSensitiveInMessage } from './error-handler.js';
 import { stripTrailingSlashes } from './url.js';
 
 export { stripTrailingSlashes };
@@ -100,7 +99,7 @@ function isLoopbackHost(host: string): boolean {
  * scheme and trailing slashes stripped, as the Countly platform's tracker
  * derives it from `api.domain` (api/parts/mgmt/tracker.js), so the same
  * server gets the same device id from both. Credentials in the URL
- * (`user:pass@`) are dropped and never leave the process. A loopback host
+ * (`user:pass@`), the query and the fragment are dropped and never leave the process. A loopback host
  * (localhost with any port or path, 127.x, [::1]) is no domain.
  * @param url - the Countly server URL
  * @returns the device id, or undefined when there is no usable domain
@@ -112,12 +111,18 @@ export function deviceIdFromServerUrl(url: string | undefined | null): string | 
   let id = stripTrailingSlashes(url.trim().split('://').pop() ?? '');
   const authorityEnd = id.search(/[/?#]/);
   let authority = authorityEnd < 0 ? id : id.slice(0, authorityEnd);
-  const rest = authorityEnd < 0 ? '' : id.slice(authorityEnd);
+  // The path only: a query or fragment can carry a credential
+  // (?auth_token=...) and never leaves the process.
+  let rest = authorityEnd < 0 ? '' : id.slice(authorityEnd);
+  const queryStart = rest.search(/[?#]/);
+  if (queryStart >= 0) {
+    rest = stripTrailingSlashes(rest.slice(0, queryStart));
+  }
   const at = authority.lastIndexOf('@');
   if (at >= 0) {
     authority = authority.slice(at + 1);
-    id = authority + rest;
   }
+  id = authority + rest;
   const host = authority.startsWith('[') ? authority.slice(0, authority.indexOf(']') + 1) : authority.split(':')[0];
   if (!host || isLoopbackHost(host)) {
     return undefined;
@@ -347,33 +352,17 @@ class Analytics {
   /**
    * Track error occurrence
    */
-  trackError(errorType: string, errorMessage: string, toolName?: string): void {
+  trackError(errorType: string, toolName?: string): void {
     if (!this.isEnabled()) {
       return;
     }
 
-    // Defence-in-depth: redact anything that looks like a bearer token /
-    // API key before it leaves the process for stats.count.ly or the
-    // Countly crash-log endpoint.
-    const redacted = redactSensitiveInMessage(errorMessage);
-
+    // A fixed classification only. Error messages can carry what the caller
+    // sent (a query, an app name, the list of app names), so neither the
+    // message nor a crash report built from it leaves the process.
     this.trackEvent('error_occurred', {
       error_type: errorType,
-      error_message: redacted.substring(0, 100), // Limit length
       tool: toolName || 'unknown',
-    });
-
-    // Also record as a non-fatal crash for visibility: the redacted message
-    // only, no stack (it would carry the install's file paths).
-    this.request({
-      crash: JSON.stringify({
-        _os: process.platform,
-        _os_version: process.version,
-        _app_version: this.getAppVersion(),
-        _error: `${errorType}: ${redacted}`,
-        _nonfatal: true,
-        _run: Math.round((Date.now() - this.startedAt) / 1000),
-      }),
     });
   }
 

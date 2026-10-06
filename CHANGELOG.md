@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool classification** — every tool category now has a user-facing `area`, and global-admin tools are listed in `ADMIN_ONLY_TOOLS`. A unit test fails if a registered tool is missing a category, operation, area or app scope.
 
 ### Fixed
+- **Telemetry never carries error messages or URL queries** — an error is reported as its type and tool only (no message, no crash report), since a message can echo what the caller sent; the device id drops the server URL's query and fragment along with `user:pass@`.
+- **Update-only connections see `alerts_create`** — in library mode a tool is listed when any kind of its calls is allowed (updating an existing alert needs only update rights); each call is still checked against its own arguments.
 - **Projects a user only has user rights to are listed** — the app list (`apps_list`, `app_name` lookups, the apps resource) read only `admin_of` from `/o/apps/mine`, so a member without admin rights, or any read-only token, saw no projects. It now lists `user_of` too.
 - **`retention` saved a report when `save_report` was false** — the handler sent `save_report=0`, and Countly treats any non-empty value as "save", so asking not to save dispatched the calculation to the report manager anyway. It is now sent only when true.
 

@@ -545,6 +545,12 @@ export const ADMIN_ONLY_TOOLS: ReadonlySet<string> = new Set<string>([
 export interface OperationRule {
   /** Every operation the tool can perform. */
   possible: readonly CrudOperation[];
+  /**
+   * The smallest operation sets a call can need: the tool is offered to a
+   * caller allowed any one of them (each call is still checked against its
+   * own arguments).
+   */
+  callShapes: readonly (readonly CrudOperation[])[];
   /** The operations this call needs, derived from its arguments. */
   operationsFor: (args: Record<string, unknown>) => CrudOperation[];
 }
@@ -573,6 +579,7 @@ function isTruthyFlag(value: unknown): boolean {
 export const TOOL_OPERATION_RULES: Readonly<Record<string, OperationRule>> = {
   formulas_run: {
     possible: ['R', 'C'],
+    callShapes: [['R'], ['R', 'C']],
     operationsFor: (args) => {
       const mode = args.mode;
       const readOnlyMode = mode === undefined || mode === null || mode === '' || mode === 'unsaved';
@@ -582,10 +589,13 @@ export const TOOL_OPERATION_RULES: Readonly<Record<string, OperationRule>> = {
   },
   retention: {
     possible: ['R', 'C'],
+    callShapes: [['R'], ['R', 'C']],
     operationsFor: (args) => (isTruthyFlag(args.save_report) ? ['R', 'C'] : ['R']),
   },
   alerts_create: {
     possible: ['C', 'U'],
+    // create a new alert, or update an existing one (alert_config._id)
+    callShapes: [['C'], ['U']],
     operationsFor: (args) => {
       const parsed = parseMaybeJson(args.alert_config);
       if (!parsed.ok) {
@@ -604,6 +614,7 @@ export const TOOL_OPERATION_RULES: Readonly<Record<string, OperationRule>> = {
   },
   events_create: {
     possible: ['C', 'U'],
+    callShapes: [['C', 'U']],
     operationsFor: () => ['C', 'U'],
   },
 };
@@ -872,6 +883,23 @@ export function getPossibleOperations(toolName: string): CrudOperation[] | undef
  * be granted). Undefined for an unknown tool. Fails closed: if the tool's
  * rule throws or returns nothing usable, every possible operation is needed.
  */
+/**
+ * The operation sets the tool's calls can need, smallest first: one set for a
+ * tool whose every call needs the same operations.
+ * @param toolName - the tool
+ * @returns the sets, or undefined for an unknown tool
+ */
+export function getCallShapes(toolName: string): CrudOperation[][] | undefined {
+  const possible = getPossibleOperations(toolName);
+  if (!possible) {
+    return undefined;
+  }
+  const rule = Object.prototype.hasOwnProperty.call(TOOL_OPERATION_RULES, toolName)
+    ? TOOL_OPERATION_RULES[toolName]
+    : undefined;
+  return rule ? rule.callShapes.map((shape) => ALL_CRUD.filter((op) => shape.includes(op))) : [possible];
+}
+
 export function getEffectiveOperations(toolName: string, args: unknown): CrudOperation[] | undefined {
   const possible = getPossibleOperations(toolName);
   if (!possible) {

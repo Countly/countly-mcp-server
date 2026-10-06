@@ -449,6 +449,23 @@ describe('tool filtering', () => {
     expect(countlyRequests).toHaveLength(1);
   });
 
+  it('lists alerts_create for an update-only context, and lets it update but not create', async () => {
+    currentContext = context({ operations: ['R', 'U'] });
+    const names = await listToolNames();
+    expect(names).toContain('alerts_create');
+    expect(names).not.toContain('events_create'); // every call needs C and U
+
+    const update = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config: { _id: 'alert1', alertName: 'x' } });
+    expect(update.result).toBeDefined();
+    expect(countlyRequests).toHaveLength(1);
+
+    reports = [];
+    const create = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config: { alertName: 'x' } });
+    expect(create.error).toBeDefined();
+    expect(reports[0]).toMatchObject({ operations: ['C'], outcome: 'no_access' });
+    expect(countlyRequests).toHaveLength(1);
+  });
+
   it('needs both C and U for events_create, which overwrites an existing event', async () => {
     currentContext = context({ operations: ['C', 'R'] });
     expect(await listToolNames()).not.toContain('events_create');

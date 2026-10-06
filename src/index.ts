@@ -447,7 +447,6 @@ class CountlyMCPServer {
         analytics.trackToolExecution(name, false, duration);
         analytics.trackError(
           error instanceof McpError ? error.code.toString() : 'unknown',
-          error instanceof Error ? error.message : String(error),
           name
         );
         
@@ -476,7 +475,6 @@ class CountlyMCPServer {
       } catch (error) {
         analytics.trackError(
           'resource_list_error',
-          error instanceof Error ? error.message : String(error),
           'resources/list'
         );
         throw new McpError(
@@ -498,7 +496,6 @@ class CountlyMCPServer {
       } catch (error) {
         analytics.trackError(
           'resource_read_error',
-          error instanceof Error ? error.message : String(error),
           'resources/read'
         );
         if (error instanceof Error && error.message.includes('not found')) {
@@ -527,7 +524,6 @@ class CountlyMCPServer {
       } catch (error) {
         analytics.trackError(
           'prompt_list_error',
-          error instanceof Error ? error.message : String(error),
           'prompts/list'
         );
         throw new McpError(
@@ -553,7 +549,6 @@ class CountlyMCPServer {
       } catch (error) {
         analytics.trackError(
           'prompt_get_error',
-          error instanceof Error ? error.message : String(error),
           'prompts/get'
         );
         

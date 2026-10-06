@@ -50,6 +50,7 @@ import { AppCache, appsFromMineResponse, type CountlyApp } from './lib/app-cache
 import { getPrompt, listPrompts } from './lib/prompts.js';
 import {
   ADMIN_ONLY_TOOLS,
+  getCallShapes,
   getEffectiveOperations,
   getPossibleOperations,
   TOOL_APP_SCOPE,
@@ -362,9 +363,11 @@ function isToolAllowedFor(
   context: McpRequestContext,
   isPluginEnabled: ((plugin: string) => boolean) | undefined
 ): boolean {
-  // Listed when the plainest call (no arguments) is allowed; each call is
+  // Listed when at least one kind of call is allowed (an update-only grant
+  // still sees alerts_create, for updating an existing alert); each call is
   // then checked against what its own arguments need.
-  if (!operationsForCall(info, {}).every((op) => context.operations.includes(op))) {
+  const shapes = getCallShapes(info.name) ?? [info.possibleOperations];
+  if (!shapes.some((shape) => shape.every((op) => context.operations.includes(op)))) {
     return false;
   }
   if (context.apps && info.appScope === 'unscoped') {

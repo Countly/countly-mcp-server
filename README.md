@@ -242,7 +242,7 @@ When there is no usable domain (no server URL, or `localhost`), nothing is repor
 - Tool execution metrics (success/failure, duration, tool names)
 - Authentication methods used (headers, env, file, args)
 - HTTP endpoint access patterns
-- Error occurrences (type and redacted message, no tokens)
+- Error occurrences (the error type and tool name only, no message)
 - Server start events
 - A truncated hash of the server URL, attached as the `server` segment on every event
 
@@ -394,9 +394,9 @@ want.
 ### Telemetry
 
 Analytics are **enabled by default** and report under your Countly server's
-domain; opt out with `ENABLE_ANALYTICS=false`. No authentication tokens or
-tool arguments are ever sent to `stats.count.ly`; error messages shipped to
-the analytics SDK are redacted for token-shaped substrings.
+domain; opt out with `ENABLE_ANALYTICS=false`. No authentication tokens,
+tool arguments or error messages are ever sent to `stats.count.ly`; an error
+is reported as its type and the tool it came from.
 
 ## Docker Deployment
 

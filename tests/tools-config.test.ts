@@ -843,3 +843,20 @@ describe('Tool Handler Validation', () => {
     });
   });
 });
+
+describe('operation rule call shapes', () => {
+  it('every rule names its call shapes, each within what the tool can do, together covering it', async () => {
+    const { TOOL_OPERATION_RULES, getCallShapes } = await import('../src/lib/tools-config.js');
+    for (const [tool, rule] of Object.entries(TOOL_OPERATION_RULES)) {
+      expect(rule.callShapes.length, tool).toBeGreaterThan(0);
+      for (const shape of rule.callShapes) {
+        expect(shape.length, tool).toBeGreaterThan(0);
+        expect(shape.every((op) => rule.possible.includes(op)), tool).toBe(true);
+      }
+      expect(new Set(rule.callShapes.flat()), tool).toEqual(new Set(rule.possible));
+      expect(getCallShapes(tool), tool).toBeDefined();
+    }
+    expect(getCallShapes('alerts_create')).toEqual([['C'], ['U']]);
+  });
+});
+
