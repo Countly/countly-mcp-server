@@ -186,16 +186,16 @@ export class PlatformInsightsTools {
   constructor(private context: ToolContext) {}
 
   async events_summary(args: any): Promise<ToolResult> {
-    return get(this.context, args, '/v2/events/summary', { period: periodParam(args.period) }, 'Events summary', 'get events summary');
+    return get(this.context, args, '/v2/events/summary', { period: periodParam(args.period) ?? '30days' }, 'Events summary', 'get events summary');
   }
 
   async events_top(args: any): Promise<ToolResult> {
-    return get(this.context, args, '/v2/events/top', { period: periodParam(args.period), limit: args.limit }, 'Top events', 'get top events');
+    return get(this.context, args, '/v2/events/top', { period: periodParam(args.period) ?? '30days', limit: args.limit }, 'Top events', 'get top events');
   }
 
   async events_movers(args: any): Promise<ToolResult> {
     return get(this.context, args, '/v2/events/movers', {
-      period: periodParam(args.period),
+      period: periodParam(args.period) ?? '30days',
       limit: args.limit,
       min_prev: args.min_prev,
     }, 'Event movers', 'get event movers');
@@ -211,7 +211,7 @@ export class PlatformInsightsTools {
       ...(args.min_threshold !== undefined ? { min_threshold: args.min_threshold } : {}),
     }));
     return get(this.context, args, '/v2/views/top', {
-      period: periodParam(args.period),
+      period: periodParam(args.period) ?? '30days',
       metrics: JSON.stringify(metrics),
     }, 'Top views', 'get top views');
   }
