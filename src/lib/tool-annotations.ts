@@ -7,7 +7,7 @@
  * overrides where the label alone gives the wrong hint.
  */
 
-import { TOOL_CATEGORIES, type CrudOperation } from './tools-config.js';
+import { TOOL_CATEGORIES, hasRestrictedArguments, type CrudOperation, type ToolsConfig } from './tools-config.js';
 
 export interface ToolAnnotations {
   readOnlyHint?: boolean;
@@ -52,7 +52,8 @@ const OVERRIDES: Record<string, ToolAnnotations> = {
   events_create: { destructiveHint: true },
   // Upserts by key (default "unnamed_formula"), replacing a saved formula
   formulas_save: { destructiveHint: true },
-  // Labelled 'R', but mode "saved" persists the formula like formulas_save
+  // Labelled 'R', but mode "saved" persists the formula like formulas_save.
+  // Dropped when the tools configuration refuses mode "saved".
   formulas_run: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
   // Rules are enabled by default, so creating one starts dropping incoming data
   filtering_rules_create: { destructiveHint: true },
@@ -84,17 +85,27 @@ function getToolOperation(toolName: string): CrudOperation | undefined {
   return undefined;
 }
 
-/** Annotations for a tool, or undefined when it has no CRUD label */
-export function getToolAnnotations(toolName: string): ToolAnnotations | undefined {
+/**
+ * Annotations for a tool, or undefined when it has no CRUD label. With a tools
+ * configuration that refuses the tool's side-effecting arguments, only its
+ * CRUD label applies.
+ */
+export function getToolAnnotations(toolName: string, config?: ToolsConfig): ToolAnnotations | undefined {
   const operation = getToolOperation(toolName);
   if (!operation) {
     return undefined;
+  }
+  if (config && hasRestrictedArguments(toolName, config)) {
+    return { ...BY_OPERATION[operation] };
   }
   return { ...BY_OPERATION[operation], ...OVERRIDES[toolName] };
 }
 
 /** Copy of the tool definition with its annotations attached */
-export function withAnnotations<T extends { name: string }>(tool: T): T & { annotations?: ToolAnnotations } {
-  const annotations = getToolAnnotations(tool.name);
+export function withAnnotations<T extends { name: string }>(
+  tool: T,
+  config?: ToolsConfig
+): T & { annotations?: ToolAnnotations } {
+  const annotations = getToolAnnotations(tool.name, config);
   return annotations ? { ...tool, annotations } : tool;
 }

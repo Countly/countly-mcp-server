@@ -733,7 +733,9 @@ describe('Tool Handler Validation', () => {
     // running custom code, sending a notification - is 'C'/'U' no matter which HTTP
     // verb or endpoint namespace it happens to use. Rendering or recomputing an
     // already-saved object stays 'R' (email_reports_preview takes a saved report_id
-    // and explicitly does not deliver; formulas_run only recomputes readable data).
+    // and explicitly does not deliver; formulas_run only recomputes readable data, and
+    // its persisting mode "saved" is refused without Create, see
+    // tests/formulas-readonly.test.ts).
     const SIDE_EFFECTING_TOOLS = [
       'hooks_test', // /i/hook/test runs the effects: real email, webhook, custom code
       'hooks_create',
