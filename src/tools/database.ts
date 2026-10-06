@@ -1,3 +1,4 @@
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
@@ -196,7 +197,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 
 export const aggregateCollectionToolDefinition = {
   name: 'collections_aggregate',
-  description: 'Run a MongoDB aggregation pipeline on a collection via /o/db. Requires the dbviewer plugin. For simple find queries use databases_query.',
+  description: 'Run a read-only MongoDB aggregation pipeline on a collection via /o/db; $out and $merge stages are rejected. Requires the dbviewer plugin. For simple find queries use databases_query.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -215,8 +216,54 @@ export const aggregateCollectionToolDefinition = {
   },
 };
 
+/**
+ * Pipeline stages that write. MongoDB only accepts them as the final stage of
+ * the top-level pipeline (never inside $lookup, $unionWith or $facet), so
+ * checking the top level is complete.
+ */
+const WRITE_STAGES = ['$out', '$merge'];
+
+/**
+ * collections_aggregate is classified as a read operation, so it stays
+ * available under COUNTLY_TOOLS_ALL=R. A pipeline that writes must not ride
+ * on that classification. Countly's dbviewer aggregation guard rejects these
+ * stages too; this keeps the tool's own behaviour matching its classification
+ * rather than relying on the server alone.
+ */
+export function findWriteStage(aggregation: unknown): string | undefined {
+  let pipeline = aggregation;
+  if (typeof pipeline === 'string') {
+    try {
+      pipeline = JSON.parse(pipeline);
+    } catch {
+      // Not JSON: Countly rejects it as an invalid pipeline.
+      return undefined;
+    }
+  }
+  if (!Array.isArray(pipeline)) {
+    return undefined;
+  }
+  for (const stage of pipeline) {
+    if (stage && typeof stage === 'object') {
+      const found = WRITE_STAGES.find((op) => Object.prototype.hasOwnProperty.call(stage, op));
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return undefined;
+}
+
 export async function handleAggregateCollection(context: ToolContext, args: any): Promise<ToolResult> {
   const { database = 'countly', collection, aggregation } = args;
+
+  const writeStage = findWriteStage(aggregation);
+  if (writeStage) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `collections_aggregate is read-only: the ${writeStage} stage writes to a collection and is not allowed.`
+    );
+  }
   
   const params: any = {
     ...context.getAuthParams(),
