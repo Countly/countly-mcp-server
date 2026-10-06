@@ -79,6 +79,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'notes_list': 'R',
       'notes_create': 'C',
       'notes_delete': 'D',
+      'notes_update': 'U',
     },
     availableByDefault: true,
   },
@@ -614,6 +615,7 @@ export const V2_ONLY_TOOLS = new Set([
   'crash_group_breakdown', 'crash_group_users',
   'funnels_breakdown', 'funnels_trends', 'funnels_user_progress',
   'drill_query',
+  'notes_update',
 ]);
 
 /**

@@ -51,6 +51,7 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `crash_group_breakdown`, `crash_group_users`: crash distribution over a field, and affected users
   - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
   - `drill_query` (requires the drill plugin): ad-hoc metrics over raw events. Supports count, unique, sum, avg, min, max and percentile; cohort and formula metrics; filters, breakdowns, time series, sorting and cursor paging. Custom event keys are mapped to drill's storage format automatically.
+  - `notes_update`: edit a graph note (owner or global admin). Editing a legacy note moves it to the new format, which the legacy dashboard no longer shows.
 - **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
   - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
   - `funnels_list`: paging with totals
@@ -58,8 +59,14 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `funnels_step_users`, `funnels_dropoff_users`: full user profiles, paginated (they fall back to legacy uids when drill profiles are unavailable or a filter is used)
   - `sdk_logs_list`: paging, plus filters by request type, SDK, time range, text and problem requests
   - `user_profiles_query`: free-text search, sorting, paging and total count (it falls back to legacy when drill profiles are unavailable)
+  - `user_profiles_breakdown`: top-N values of a profile property with each value's share (falls back to legacy when the users route is unavailable)
+  - `events_list`: search, paging, display names, metric labels and events only drill has seen; segments still come from the legacy events document (falls back to the legacy list when drill is unavailable)
+  - `notes_list`, `notes_create`, `notes_delete`: `/v2/notes`. Notes gain private/shared/global visibility and an optional event scope. Notes created on `/v2` are hidden from the legacy dashboard; only the owner or a global admin can delete them.
+  - `crashes_resolve`, `crashes_unresolve`, `crashes_hide`, `crashes_show`: `PUT /v2/crashes/crashgroups/:id`, returning the group's new state
+  - `apps_list`, `apps_get_by_name`: `/v2/apps`, with the caller's role per app. App name/id resolution for other tools still uses `/o/apps/mine`.
+  - `dashboard_users`: `/v2/members`, compacted to identity, role, app access and login times
 
-  Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API.
+  Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API. Also legacy: `crashes_stats_get` (no v2 stats endpoint), `apps_create` (`/v2/apps/create` skips the country/timezone/category validation and defaults), `apps_update`/`apps_delete`/`apps_reset`, `events_create`/`events_delete`, `user_profiles_get` and `app_users_*` (no v2 equivalent).
 - **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).
 
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.
@@ -134,11 +141,12 @@ These categories are always available without plugin checks:
 **⚠️ Requires Plugin**: `crashes` plugin must be installed on Countly server
 
 ### notes
-**Tools**: `notes_list`, `notes_create`, `notes_delete`
+**Tools**: `notes_list`, `notes_create`, `notes_update` (Platform only), `notes_delete`
 
 **Operations**:
 - C: notes_create
 - R: notes_list
+- U: notes_update
 - D: notes_delete
 
 ### events

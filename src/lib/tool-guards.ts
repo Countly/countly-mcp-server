@@ -46,6 +46,7 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   notes_list: f('core', 'r'),
   notes_create: f('core', 'c'),
   notes_delete: f('core', 'd'),
+  notes_update: f('core', 'c'), // PUT /v2/notes/:id checks the create right
 
   // events
   events_list: f('core', 'r'),

@@ -763,8 +763,18 @@ class CountlyMCPServer {
     let apps: CountlyApp[];
     if (response.data && Array.isArray(response.data)) {
       apps = response.data;
-    } else if (response.data && response.data.admin_of) {
-      apps = Object.values(response.data.admin_of) as CountlyApp[];
+    } else if (response.data && (response.data.admin_of || response.data.user_of)) {
+      // Members with read-only access have their apps only under user_of
+      const byId = new Map<string, CountlyApp>();
+      for (const app of [
+        ...Object.values(response.data.admin_of || {}),
+        ...Object.values(response.data.user_of || {}),
+      ] as CountlyApp[]) {
+        if (app && app._id && !byId.has(String(app._id))) {
+          byId.set(String(app._id), app);
+        }
+      }
+      apps = [...byId.values()];
     } else if (response.data && response.data.apps) {
       apps = response.data.apps;
     } else {

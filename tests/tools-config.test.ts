@@ -62,7 +62,7 @@ describe('Tools Configuration', () => {
       apps: 6,
       analytics: 6,
       crashes: 12,
-      notes: 3,
+      notes: 4,
       events: 6,
       alerts: 3,
       views: 3,
@@ -108,12 +108,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 161 tools', () => {
+    it('should have total of 162 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(161);
+      expect(totalTools).toBe(162);
     });
   });
 

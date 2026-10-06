@@ -303,6 +303,9 @@ import { crashesV2ToolDefinitions } from './v2/crashes.js';
 import { funnelsV2ToolDefinitions } from './v2/funnels.js';
 import { loggerV2ToolDefinitions } from './v2/logger.js';
 import { drillV2ToolDefinitions } from './v2/drill.js';
+import { notesV2ToolDefinitions } from './v2/notes.js';
+import { eventsV2ToolDefinitions } from './v2/events.js';
+import { usersV2ToolDefinitions } from './v2/users.js';
 
 /**
  * Tool definitions that replace the legacy ones when the connected server
@@ -315,5 +318,8 @@ export function getV2ToolDefinitionOverrides(): Record<string, any> {
     ...funnelsV2ToolDefinitions,
     ...loggerV2ToolDefinitions,
     ...drillV2ToolDefinitions,
+    ...notesV2ToolDefinitions,
+    ...eventsV2ToolDefinitions,
+    ...usersV2ToolDefinitions,
   };
 }

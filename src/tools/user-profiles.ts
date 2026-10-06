@@ -3,6 +3,7 @@ import { withDefault } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
 import { usesV2 } from '../lib/v2-api.js';
 import { handleQueryUserProfilesV2 } from './v2/drill.js';
+import { handleBreakdownUserProfilesV2 } from './v2/users.js';
 
 // ============================================================================
 // QUERY USER PROFILES TOOL
@@ -232,6 +233,9 @@ export class UserProfilesTools {
   }
 
   async user_profiles_breakdown(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleBreakdownUserProfilesV2(this.context, args, (a) => handleBreakdownUserProfiles(this.context, a));
+    }
     return handleBreakdownUserProfiles(this.context, args);
   }
 

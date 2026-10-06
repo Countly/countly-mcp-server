@@ -1,5 +1,7 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import { handleDashboardUsersV2 } from './v2/apps.js';
 
 // ============================================================================
 // GET_ALL_DASHBOARD_USERS TOOL
@@ -57,6 +59,9 @@ export class DashboardUsersTools {
   constructor(private context: ToolContext) {}
 
   async getAllDashboardUsers(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDashboardUsersV2(this.context, args);
+    }
     return handleGetAllDashboardUsers(this.context, args);
   }
 }

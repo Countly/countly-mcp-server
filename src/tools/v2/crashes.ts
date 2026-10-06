@@ -2,8 +2,9 @@
  * Crash tools: Countly Platform /v2 variants
  *
  * crash_groups_list gains server-side search and sorting and returns lean
- * rows. Detail (crashes_get keeps comments only on the legacy endpoint),
- * status changes and comments stay on the legacy API.
+ * rows. Resolve/unresolve/hide/show use PUT /v2/crashes/crashgroups/:id.
+ * Detail (crashes_get keeps comments only on the legacy endpoint), comments
+ * and crashes_stats_get (no v2 stats/graph endpoint) stay on the legacy API.
  */
 
 import { jsonResult, v2ErrorResult, v2Request } from '../../lib/v2-api.js';
@@ -74,5 +75,35 @@ export async function handleListCrashGroupsV2(context: ToolContext, args: any): 
     return jsonResult(`Crash groups for app ${app_id} (${data.total} total, showing ${rows.length} from offset ${data.offset})`, rows);
   } catch (error) {
     return v2ErrorResult('list crash groups', error);
+  }
+}
+
+export type CrashGroupAction = 'resolve' | 'unresolve' | 'hide' | 'show';
+
+const ACTION_DONE: Record<CrashGroupAction, string> = {
+  resolve: 'resolved',
+  unresolve: 'unresolved',
+  hide: 'hidden',
+  show: 'shown',
+};
+
+/** crashes_resolve / _unresolve / _hide / _show via PUT /v2/crashes/crashgroups/:id */
+export async function handleCrashGroupActionV2(context: ToolContext, args: any, action: CrashGroupAction): Promise<ToolResult> {
+  try {
+    const app_id = await context.resolveAppId(args);
+    const data = await v2Request<any>(context, 'put', `/v2/crashes/crashgroups/${encodeURIComponent(args.crash_id)}`, {
+      params: { app_id },
+      body: { app_id, action },
+    });
+    const state = {
+      id: data?._id ?? args.crash_id,
+      is_resolved: data?.is_resolved,
+      is_hidden: data?.is_hidden,
+      is_new: data?.is_new,
+      resolved_version: data?.resolved_version ?? undefined,
+    };
+    return jsonResult(`Crash ${args.crash_id} ${ACTION_DONE[action]}`, state);
+  } catch (error) {
+    return v2ErrorResult(`${action} crash group`, error);
   }
 }

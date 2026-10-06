@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **161 Tools** across 33 categories for comprehensive Countly operations
+- **162 Tools** across 33 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (161 available)
+### Tools (162 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -574,7 +574,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 161 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 162 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -582,8 +582,8 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 - **`get_plugins`** - Get list of installed plugins on the server
 
 ### App Management
-- **`apps_list`** - List all applications
-- **`apps_get_by_name`** - Get app details by name
+- **`apps_list`** (v2 on Platform) - List all applications; on Platform with your role (admin/user) per app
+- **`apps_get_by_name`** (v2 on Platform) - Get app details by name
 - **`apps_create`** - Create new application
 - **`apps_update`** - Update app settings
 - **`apps_delete`** - Delete application
@@ -599,14 +599,14 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 
 ### Events
 - **`events_create`** - Define event with metadata and configuration
-- **`events_list`** - List all events and their segments, including internal Countly events with exact database structure
+- **`events_list`** (v2 on Platform) - List all events and their segments, including internal Countly events with exact database structure; on Platform with search, paging, display names and drill-only events
 - **`events_summary`** (Platform) - All custom events with count, sum, duration and per-occurrence averages for a period
 - **`events_top`** (Platform) - Events ranked by count, average sum and average duration
 - **`events_movers`** (Platform) - Fastest-growing and newly appearing events vs the previous period, with daily series
 - **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
 
 ### Dashboard User Management
-- **`dashboard_users`** - List all dashboard users (admin/management users who access the Countly dashboard)
+- **`dashboard_users`** (v2 on Platform) - List all dashboard users (admin/management users who access the Countly dashboard); on Platform as compact rows with role and app access
 
 ### App User Management
 - **`apps_create_user`** - Create app user (end-user being tracked in your application)
@@ -619,9 +619,10 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 - **`alerts_list`** - List all alerts
 
 ### Notes
-- **`notes_list`** - List all dashboard notes
-- **`notes_create`** - Create note
-- **`notes_delete`** - Delete note
+- **`notes_list`** (v2 on Platform) - List all dashboard notes
+- **`notes_create`** (v2 on Platform) - Create note; on Platform with private/shared/global visibility and optional event scope (hidden from the legacy dashboard)
+- **`notes_update`** (Platform) - Edit a note's text, time, color, visibility or event scope
+- **`notes_delete`** (v2 on Platform) - Delete note
 
 ### Database Operations
 - **`databases_list`** - List available databases
@@ -637,10 +638,10 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 - **`crashes_get`** - View crash details
 - **`crash_group_breakdown`** (Platform) - Distribution of a crash group over a field (OS version, device, app version, …)
 - **`crash_group_users`** (Platform) - Users affected by a crash group
-- **`crashes_resolve`** - Mark crash as resolved
-- **`uncrashes_resolve`** - Mark crash as unresolved
-- **`crashes_hide`** - Hide crash from view
-- **`crashes_show`** - Show hidden crash
+- **`crashes_resolve`** (v2 on Platform) - Mark crash as resolved
+- **`crashes_unresolve`** (v2 on Platform) - Mark crash as unresolved
+- **`crashes_hide`** (v2 on Platform) - Hide crash from view
+- **`crashes_show`** (v2 on Platform) - Show hidden crash
 - **`crashes_comment_add`** - Add comment to crash
 - **`crashes_comment_update`** - Edit crash comment
 - **`crashes_comment_delete`** - Delete crash comment
@@ -655,7 +656,7 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 
 ### User Profiles (requires `users` plugin)
 - **`user_profiles_query`** (v2 on Platform) - Query users with MongoDB filters; on Platform also free-text search, sorting, paging and totals
-- **`user_profiles_breakdown`** - Break down user counts by properties
+- **`user_profiles_breakdown`** (v2 on Platform) - Break down user counts by a property; on Platform with a top-N limit and each value's share
 - **`user_profiles_get`** - Get specific user details by UID
 
 ### Cohorts (requires `cohorts` plugin)

@@ -1,5 +1,80 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import { handleEventsListV2 } from './v2/events.js';
+
+/** Built-in [CLY]_* events and their known segments (key -> display name + type) */
+export const INTERNAL_EVENTS: Record<string, Record<string, { name: string; type: string }>> = {
+  "[CLY]_view": {
+    start: { name: "start", type: "l" },
+    exit: { name: "exit", type: "l" },
+    bounce: { name: "bounce", type: "l" }
+  },
+  "[CLY]_session": {
+  },
+  "[CLY]_crash": {
+    name: { name: "name", type: "s" },
+    manufacture: { name: "manufacture", type: "l" },
+    cpu: { name: "cpu", type: "l" },
+    opengl: { name: "opengl", type: "l" },
+    view: { name: "view", type: "l" },
+    browser: { name: "browser", type: "l" },
+    os: { name: "operating_system", type: "l" },
+    orientation: { name: "orientation", type: "l" },
+    nonfatal: { name: "nonfatal", type: "l" },
+    root: { name: "root", type: "l" },
+    online: { name: "online", type: "l" },
+    signal: { name: "signal", type: "l" },
+    muted: { name: "muted", type: "l" },
+    background: { name: "background", type: "l" },
+    app_version: { name: "app_version", type: "l" },
+    app_version_major: { name: "app_version_major", type: "n" },
+    app_version_minor: { name: "app_version_minor", type: "n" },
+    app_version_patch: { name: "app_version_patch", type: "n" },
+    app_version_prerelease: { name: "app_version_prerelease", type: "l" },
+    app_version_build: { name: "app_version_build", type: "l" },
+    ram_current: { name: "ram_current", type: "n" },
+    ram_total: { name: "ram_total", type: "n" },
+    disk_current: { name: "disk_current", type: "n" },
+    disk_total: { name: "disk_total", type: "n" },
+    bat_current: { name: "bat_current", type: "n" },
+    bat_total: { name: "bat_total", type: "n" },
+    bat: { name: "bat", type: "n" },
+    run: { name: "run", type: "n" }
+  },
+  "[CLY]_star_rating": {
+    email: { name: "email", type: "s" },
+    comment: { name: "comment", type: "s" },
+    widget_id: { name: "widget_id", type: "l" },
+    contactMe: { name: "contactMe", type: "s" },
+    rating: { name: "rating", type: "n" },
+    platform_version_rate: { name: "platform_version_rate", type: "s" }
+  },
+  "[CLY]_nps": {
+    comment: { name: "comment", type: "s" },
+    widget_id: { name: "widget_id", type: "l" },
+    rating: { name: "rating", type: "n" },
+    shown: { name: "shown", type: "s" },
+    answered: { name: "answered", type: "s" }
+  },
+  "[CLY]_survey": {
+    widget_id: { name: "widget_id", type: "l" },
+    shown: { name: "shown", type: "s" },
+    answered: { name: "answered", type: "s" }
+  },
+  "[CLY]_push_action": {
+    i: { name: "message_id", type: "s" }
+  },
+  "[CLY]_push_sent": {
+    i: { name: "message_id", type: "s" }
+  },
+  "[CLY]_journey_engine": {
+    journey_id: { name: "journey_id", type: "s" },
+    journey_definition_id: { name: "journey_definition_id", type: "s" },
+    journey_state: { name: "journey_state", type: "l" },
+    name: { name: "name", type: "l" },
+  }
+};
 
 // ============================================================================
 // GET_EVENTS_AND_SEGMENTS TOOL
@@ -69,79 +144,8 @@ export async function handleGetEventsAndSegments(context: ToolContext, args: any
 
   // Add internal Countly events
   resultText += `**Internal Countly Events:**\n\n`;
-  const internalEvents = {
-    "[CLY]_view": {
-      start: { name: "start", type: "l" },
-      exit: { name: "exit", type: "l" },
-      bounce: { name: "bounce", type: "l" }
-    },
-    "[CLY]_session": {
-    },
-    "[CLY]_crash": {
-      name: { name: "name", type: "s" },
-      manufacture: { name: "manufacture", type: "l" },
-      cpu: { name: "cpu", type: "l" },
-      opengl: { name: "opengl", type: "l" },
-      view: { name: "view", type: "l" },
-      browser: { name: "browser", type: "l" },
-      os: { name: "operating_system", type: "l" },
-      orientation: { name: "orientation", type: "l" },
-      nonfatal: { name: "nonfatal", type: "l" },
-      root: { name: "root", type: "l" },
-      online: { name: "online", type: "l" },
-      signal: { name: "signal", type: "l" },
-      muted: { name: "muted", type: "l" },
-      background: { name: "background", type: "l" },
-      app_version: { name: "app_version", type: "l" },
-      app_version_major: { name: "app_version_major", type: "n" },
-      app_version_minor: { name: "app_version_minor", type: "n" },
-      app_version_patch: { name: "app_version_patch", type: "n" },
-      app_version_prerelease: { name: "app_version_prerelease", type: "l" },
-      app_version_build: { name: "app_version_build", type: "l" },
-      ram_current: { name: "ram_current", type: "n" },
-      ram_total: { name: "ram_total", type: "n" },
-      disk_current: { name: "disk_current", type: "n" },
-      disk_total: { name: "disk_total", type: "n" },
-      bat_current: { name: "bat_current", type: "n" },
-      bat_total: { name: "bat_total", type: "n" },
-      bat: { name: "bat", type: "n" },
-      run: { name: "run", type: "n" }
-    },
-    "[CLY]_star_rating": {
-      email: { name: "email", type: "s" },
-      comment: { name: "comment", type: "s" },
-      widget_id: { name: "widget_id", type: "l" },
-      contactMe: { name: "contactMe", type: "s" },
-      rating: { name: "rating", type: "n" },
-      platform_version_rate: { name: "platform_version_rate", type: "s" }
-    },
-    "[CLY]_nps": {
-      comment: { name: "comment", type: "s" },
-      widget_id: { name: "widget_id", type: "l" },
-      rating: { name: "rating", type: "n" },
-      shown: { name: "shown", type: "s" },
-      answered: { name: "answered", type: "s" }
-    },
-    "[CLY]_survey": {
-      widget_id: { name: "widget_id", type: "l" },
-      shown: { name: "shown", type: "s" },
-      answered: { name: "answered", type: "s" }
-    },
-    "[CLY]_push_action": {
-      i: { name: "message_id", type: "s" }
-    },
-    "[CLY]_push_sent": {
-      i: { name: "message_id", type: "s" }
-    },
-    "[CLY]_journey_engine": {
-      journey_id: { name: "journey_id", type: "s" },
-      journey_definition_id: { name: "journey_definition_id", type: "s" },
-      journey_state: { name: "journey_state", type: "l" },
-      name: { name: "name", type: "l" },
-    }
-  };
 
-  Object.entries(internalEvents).forEach(([eventKey, segments], index) => {
+  Object.entries(INTERNAL_EVENTS).forEach(([eventKey, segments], index) => {
     resultText += `**${index + 1}. ${eventKey}**\n`;
     const segmentKeys = Object.keys(segments);
     if (segmentKeys.length > 0) {
@@ -320,6 +324,9 @@ export class EventsTools {
   }
 
   async getEventsAndSegments(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleEventsListV2(this.context, args);
+    }
     return handleGetEventsAndSegments(this.context, args);
   }
 
