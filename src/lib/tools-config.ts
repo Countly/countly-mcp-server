@@ -564,6 +564,70 @@ export function filterTools<T extends { name: string }>(
 }
 
 /**
+ * Arguments that turn an otherwise permitted tool into a different CRUD
+ * operation. formulas_run is a read, but mode: "saved" also persists the
+ * formula, so it needs 'C' on the formulas category. Hiding formulas_run
+ * entirely would take ad-hoc formula runs away from read-only deployments,
+ * so the restriction applies to the argument instead of the tool.
+ */
+const ARGUMENT_OPERATIONS: Record<string, { category: string; arg: string; value: string; operation: CrudOperation }> = {
+  formulas_run: { category: 'formulas', arg: 'mode', value: 'saved', operation: 'C' },
+};
+
+/**
+ * Explain why a call to an allowed tool is refused because of its arguments,
+ * or return undefined when the call may proceed.
+ */
+export function getArgumentRefusal(toolName: string, args: any, config: ToolsConfig): string | undefined {
+  const rule = ARGUMENT_OPERATIONS[toolName];
+  if (!rule || args?.[rule.arg] !== rule.value || config[rule.category]?.has(rule.operation)) {
+    return undefined;
+  }
+  if (toolName === 'formulas_run') {
+    const alternative = isToolAllowed('formulas_save', config) ? ', or formulas_save to persist it' : '';
+    return 'formulas_run with mode "saved" persists the formula, which this deployment does not allow ' +
+      `(the formulas category lacks Create). Use mode "unsaved" to run it without saving${alternative}.`;
+  }
+  return `Tool "${toolName}" with ${rule.arg} "${rule.value}" is not allowed by this deployment's tools configuration.`;
+}
+
+/**
+ * Whether the tools configuration removes argument values from this tool,
+ * leaving only the behavior its CRUD label describes.
+ */
+export function hasRestrictedArguments(toolName: string, config: ToolsConfig): boolean {
+  const rule = ARGUMENT_OPERATIONS[toolName];
+  return !!rule && !config[rule.category]?.has(rule.operation);
+}
+
+/**
+ * Remove argument values the tools configuration would refuse from a tool's
+ * input schema, so the model is not offered them. Returns the tool unchanged
+ * when nothing applies.
+ */
+export function restrictToolArguments<T extends { name: string; inputSchema?: any }>(tool: T, config: ToolsConfig): T {
+  const rule = ARGUMENT_OPERATIONS[tool.name];
+  const property = tool.inputSchema?.properties?.[rule?.arg ?? ''];
+  if (!rule || config[rule.category]?.has(rule.operation) || !Array.isArray(property?.enum)) {
+    return tool;
+  }
+  const restricted = {
+    ...property,
+    enum: property.enum.filter((v: unknown) => v !== rule.value),
+  };
+  if (tool.name === 'formulas_run') {
+    restricted.description = 'Only "unsaved" (ad-hoc run) is available: this deployment does not allow saving formulas. Defaults to "unsaved".';
+  }
+  return {
+    ...tool,
+    inputSchema: {
+      ...tool.inputSchema,
+      properties: { ...tool.inputSchema.properties, [rule.arg]: restricted },
+    },
+  };
+}
+
+/**
  * Get human-readable configuration summary
  */
 export function getConfigSummary(config: ToolsConfig): string {
