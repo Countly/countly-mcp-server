@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **187 Tools** across 42 categories for comprehensive Countly operations
+- **186 Tools** across 42 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (187 available)
+### Tools (186 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -314,7 +314,7 @@ COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 - `EVENTS` - Event configuration (1 tool)
 - `ALERTS` - Alert management (3 tools)
 - `VIEWS` - Views analytics (3 tools)
-- `DATABASE` - Direct database access (6 tools)
+- `DATABASE` - Direct database access (5 tools)
 - `DASHBOARD_USERS` - Dashboard user management (1 tool)
 - `APP_USERS` - App user management (3 tools)
 
@@ -604,7 +604,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 187 tools across 42 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 186 tools across 42 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -660,7 +660,6 @@ The server provides 187 tools across 42 categories for comprehensive Countly int
 - **`databases_document`** - Get specific document
 - **`collections_aggregate`** - Run aggregation pipelines
 - **`collections_indexes`** - View collection indexes
-- **`databases_stats`** - Database statistics
 
 ### Crash Analytics
 - **`crash_groups_list`** (v2 on Platform) - List crash groups for an app; on Platform with server-side search and sorting
