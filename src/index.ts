@@ -1791,7 +1791,9 @@ class CountlyMCPServer {
           hint: 'Visit / in your browser for connection instructions'
         }));
         })().catch(error => {
-          console.error('Error handling request:', error);
+          // Log only the message: an AxiosError's inspected form includes
+          // config.headers and config.params, which carry the auth token.
+          console.error('Error handling request:', sanitizeForLog(error instanceof Error ? error.message : String(error)));
           if (!res.headersSent) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Internal server error' }));
