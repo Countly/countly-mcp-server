@@ -237,7 +237,7 @@ describe('user_profiles_breakdown on Platform', () => {
   it('omits an empty filter and defaults the limit', async () => {
     const { context, request } = serverContext(() => ok({ breakDownData: [], filtered: 0, total: 0 }));
     await new UserProfilesTools(context).user_profiles_breakdown({ app_id: 'app', projection_key: 'p', query: '{}' });
-    expect(request.mock.calls[0][0].params).toEqual({ auth_token: 't', app_id: 'app', projectionKey: 'p', limit: 50 });
+    expect(request.mock.calls[0][0].params).toEqual({ app_id: 'app', projectionKey: 'p', limit: 50 });
   });
 
   it('falls back to legacy user_details when the users route is unavailable', async () => {

@@ -159,7 +159,10 @@ export async function handleCreateDashboardEmailReportV2(context: ToolContext, a
 
 export async function handleUpdateEmailReportV2(context: ToolContext, args: any): Promise<ToolResult> {
   try {
-    await context.resolveAppId(args);
+    // The report/hook id is enough on /v2; an app, if given, is still validated
+    if (args.app_id || args.app_name) {
+      await context.resolveAppId(args);
+    }
     const body = {
       ...(args.report_data && typeof args.report_data === 'object' ? args.report_data : {}),
       ...pick(args, ['title', 'emails', 'enabled', ...SCHEDULE_FIELDS]),
@@ -294,7 +297,10 @@ const PREVIEW_MAX_CHARS = 8000;
 
 export async function handlePreviewEmailReportV2(context: ToolContext, args: any): Promise<ToolResult> {
   try {
-    await context.resolveAppId(args);
+    // The report/hook id is enough on /v2; an app, if given, is still validated
+    if (args.app_id || args.app_name) {
+      await context.resolveAppId(args);
+    }
     const data = await v2Request<unknown>(context, 'get', `/v2/reports/${encodeURIComponent(args.report_id)}/preview`);
     if (typeof data !== 'string') {
       return jsonResult('Email report preview', data);
@@ -315,7 +321,10 @@ export async function handlePreviewEmailReportV2(context: ToolContext, args: any
 
 export async function handleSendEmailReportV2(context: ToolContext, args: any): Promise<ToolResult> {
   try {
-    await context.resolveAppId(args);
+    // The report/hook id is enough on /v2; an app, if given, is still validated
+    if (args.app_id || args.app_name) {
+      await context.resolveAppId(args);
+    }
     const data = await v2Request<any>(context, 'post', `/v2/reports/${encodeURIComponent(args.report_id)}/send`);
     if (typeof data === 'string') {
       return { content: [{ type: 'text', text: `Email report not sent: ${data}` }] };
@@ -328,7 +337,10 @@ export async function handleSendEmailReportV2(context: ToolContext, args: any): 
 
 export async function handleDeleteEmailReportV2(context: ToolContext, args: any): Promise<ToolResult> {
   try {
-    await context.resolveAppId(args);
+    // The report/hook id is enough on /v2; an app, if given, is still validated
+    if (args.app_id || args.app_name) {
+      await context.resolveAppId(args);
+    }
     const data = await v2Request<any>(context, 'delete', `/v2/reports/${encodeURIComponent(args.report_id)}`);
     return jsonResult('Email report deleted', data);
   } catch (error) {

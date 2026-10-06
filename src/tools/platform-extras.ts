@@ -769,6 +769,12 @@ export class PlatformExtrasTools {
   async ai_assistants_analytics(args: any): Promise<ToolResult> {
     return run('get AI assistants analytics', async () => {
       const app_id = await this.context.resolveAppId(args);
+      // The v2 route only validates the user, not access to the app
+      // (countly-platform#1712), so only query apps the caller can see.
+      const apps = await this.context.getApps();
+      if (!apps.some((app) => String(app._id) === String(app_id))) {
+        throw new Error(`app ${app_id} is not one of your apps; call apps_list to see the apps you can access`);
+      }
       const tab = args.tab || 'overview';
       const { from, to } = periodToRange(args.period);
       const data = await v2Request<any>(this.context, 'get', '/v2/ai-assistants/analytics', {

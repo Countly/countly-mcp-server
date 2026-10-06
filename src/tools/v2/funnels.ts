@@ -11,7 +11,7 @@
  * Create/update/delete stay on the legacy API.
  */
 
-import { jsonResult, V2ApiError, v2ErrorResult, v2Request } from '../../lib/v2-api.js';
+import { fetchByOffset, jsonResult, V2ApiError, v2ErrorResult, v2Request } from '../../lib/v2-api.js';
 import type { ToolContext, ToolResult } from '../types.js';
 
 const appProps = {
@@ -126,18 +126,27 @@ export async function handleListFunnelsV2(context: ToolContext, args: any): Prom
     const app_id = await context.resolveAppId(args);
     const limit = Math.max(1, Number(args.limit ?? 10));
     const skip = Math.max(0, Number(args.skip ?? 0));
-    const data = await v2Request<any>(context, 'get', '/v2/funnels', {
-      params: { app_id, page: Math.floor(skip / limit) + 1, pageSize: limit, ...(args.search ? { search: args.search } : {}) },
+    const data = await fetchByOffset(skip, limit, async (page, pageSize) => {
+      const res = await v2Request<any>(context, 'get', '/v2/funnels', {
+        params: { app_id, page, pageSize, ...(args.search ? { search: args.search } : {}) },
+      });
+      return { ...res, items: res.funnels || [] };
     });
-    const funnels = (data.funnels || []).map((f: any) => ({
+    const funnels = data.items.map((f: any) => ({
       id: f._id,
       name: f.name,
       description: f.description || undefined,
       type: f.type,
-      steps: (f.steps || []).map((step: string, i: number) => ({
-        event: step,
-        ...(f.queryTexts?.[i] ? { filter: f.queryTexts[i] } : {}),
-      })),
+      steps: (f.steps || []).map((step: string, i: number) => {
+        // queries[i] is the stored filter (what funnels_update takes);
+        // queryTexts[i] is only its readable label
+        const query = typeof f.queries?.[i] === 'string' && f.queries[i] !== '{}' ? f.queries[i] : undefined;
+        return {
+          event: step,
+          ...(query ? { filter: query } : {}),
+          ...(f.queryTexts?.[i] ? { filterText: f.queryTexts[i] } : {}),
+        };
+      }),
       created: f.created ? new Date(f.created).toISOString() : undefined,
     }));
     return jsonResult(`Funnels for app ${app_id} (${data.total} total)`, funnels);

@@ -73,7 +73,7 @@ export const dashboardsV2ToolDefinitions: Record<string, any> = {
         name: { type: 'string', description: 'New name.' },
         description: { type: 'string', description: 'New description.' },
         visibility: { type: 'string', enum: ['global', 'shared', 'private'], description: 'New visibility.' },
-        shared_emails: { type: 'array', items: { type: 'string' }, description: 'Users to share with when visibility is "shared".' },
+        shared_emails: { type: 'array', items: { type: 'string' }, description: 'Users to share with. Given alone, it sets visibility to "shared"; omitted, the current recipients are kept.' },
         category: { type: 'string', description: 'New category label.' },
       },
       required: ['dashboard_id'],
@@ -145,6 +145,23 @@ function parseRangeString(period: unknown): unknown {
   return period;
 }
 
+/**
+ * A timestamp whose UTC calendar day is today's day in `timeZone`, for
+ * resolving relative periods into calendar days (drill takes YYYY-MM-DD).
+ * Without a time zone, or for an unknown one, the current time is returned.
+ */
+export function calendarNow(timeZone?: string, now = Date.now()): number {
+  if (!timeZone) {
+    return now;
+  }
+  try {
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
+    return Date.parse(`${day}T12:00:00Z`);
+  } catch {
+    return now;
+  }
+}
+
 /** Resolve a period keyword or range to epoch-ms bounds (UTC days) */
 export function periodToRange(period: unknown, now = Date.now()): { from: number; to: number } {
   period = parseRangeString(period);
@@ -191,9 +208,8 @@ export function widgetWindow(widget: any, boardPeriod: unknown): Record<string, 
     return { period: JSON.stringify([from, to]) };
   }
   case 'retention': {
-    if (!isCustom) {
-      return {};
-    }
+    // Send the window for keywords too, otherwise the endpoint ignores the
+    // board period and falls back to its own default range.
     const { from, to } = periodToRange(period);
     return { range: JSON.stringify([from, to]) };
   }
@@ -243,6 +259,27 @@ function visibilityPayload(visibility: string | undefined, emails: string[] | un
     return undefined;
   }
   return visibility === 'shared' ? { mode: 'shared', sharedEmails: emails || [] } : { mode: visibility };
+}
+
+/**
+ * Visibility for an update. Omitted recipients keep the board's current
+ * ones; recipients without a visibility imply "shared".
+ */
+async function updateVisibilityPayload(context: ToolContext, args: any) {
+  const emails: string[] | undefined = Array.isArray(args.shared_emails) ? args.shared_emails : undefined;
+  const mode = args.visibility ?? (emails ? 'shared' : undefined);
+  if (!mode) {
+    return undefined;
+  }
+  if (mode !== 'shared') {
+    return { mode };
+  }
+  const current = await v2Request<any>(context, 'get', `/v2/dashboards/${encodeURIComponent(args.dashboard_id)}`);
+  return {
+    mode: 'shared',
+    sharedEmails: emails ?? current?.visibility?.sharedEmails ?? [],
+    sharedUserGroupIds: current?.visibility?.sharedUserGroupIds ?? [],
+  };
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -352,14 +389,14 @@ export async function handleUpdateDashboardV2(context: ToolContext, args: any): 
       body[key] = args[key];
     }
   }
-  const visibility = visibilityPayload(args.visibility, args.shared_emails);
-  if (visibility) {
-    body.visibility = visibility;
-  }
-  if (Object.keys(body).length === 0) {
-    return v2ErrorResult('update dashboard', 'no fields to update were given');
-  }
   try {
+    const visibility = await updateVisibilityPayload(context, args);
+    if (visibility) {
+      body.visibility = visibility;
+    }
+    if (Object.keys(body).length === 0) {
+      return v2ErrorResult('update dashboard', 'no fields to update were given');
+    }
     const board = await v2Request<any>(context, 'put', `/v2/dashboards/${encodeURIComponent(args.dashboard_id)}`, { body });
     return jsonResult('Dashboard updated', { id: board.id, name: board.name, description: board.description, visibility: board.visibility, category: board.category });
   } catch (error) {
@@ -377,17 +414,38 @@ export async function handleDeleteDashboardV2(context: ToolContext, args: any): 
 }
 
 /** Read the board, let `edit` change its rows, then write the rows back */
+/** Pending row edits per dashboard, so overlapping calls in this process run one after another */
+const rowEditQueue = new Map<string, Promise<unknown>>();
+
+/**
+ * Read the board, let `edit` change its rows, then write the rows back.
+ * The v2 API has no revision check, so edits to the same dashboard are
+ * serialized here; otherwise two overlapping widget calls would both read
+ * the same rows and the later PUT would drop the earlier change.
+ */
 async function editRows(
   context: ToolContext,
   dashboardId: string,
   edit: (rows: any[]) => string
 ): Promise<string> {
-  const path = `/v2/dashboards/${encodeURIComponent(dashboardId)}`;
-  const board = await v2Request<any>(context, 'get', path);
-  const rows = JSON.parse(JSON.stringify(board.rows || []));
-  const message = edit(rows);
-  await v2Request(context, 'put', path, { body: { rows } });
-  return message;
+  const run = async () => {
+    const path = `/v2/dashboards/${encodeURIComponent(dashboardId)}`;
+    const board = await v2Request<any>(context, 'get', path);
+    const rows = JSON.parse(JSON.stringify(board.rows || []));
+    const message = edit(rows);
+    await v2Request(context, 'put', path, { body: { rows } });
+    return message;
+  };
+  const previous = rowEditQueue.get(dashboardId) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(run);
+  const settled = current.catch(() => undefined);
+  rowEditQueue.set(dashboardId, settled);
+  void settled.then(() => {
+    if (rowEditQueue.get(dashboardId) === settled) {
+      rowEditQueue.delete(dashboardId);
+    }
+  });
+  return current;
 }
 
 function parseWidget(value: unknown): any {
@@ -407,8 +465,11 @@ export async function handleAddDashboardWidgetV2(context: ToolContext, args: any
     if (!Array.isArray(widget.appIds) || widget.appIds.length === 0) {
       throw new Error('widget.appIds is required (app ids the widget reads)');
     }
-    widget.id = widget.id || newId('w');
     const message = await editRows(context, args.dashboard_id, (rows) => {
+      // A widget copied from dashboards_data keeps its id; never duplicate one
+      if (!widget.id || allWidgets(rows).some((w) => w.id === widget.id)) {
+        widget.id = newId('w');
+      }
       if (args.row_id) {
         const row = rows.find((r) => r.id === args.row_id);
         if (!row) {

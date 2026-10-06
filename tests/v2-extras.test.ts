@@ -19,6 +19,7 @@ function platformContext(v2: (method: string, url: string, params: any, body: an
       httpClient: { request } as any,
       getAuthParams: () => ({ auth_token: 't' }),
       resolveAppId: async (args: any) => args.app_id,
+      getApps: async () => [{ _id: 'a' }],
       getServerCapabilities: async () => ({ v2: true }) as any,
     } as any,
     request,
@@ -181,7 +182,7 @@ describe('tasks and misc', () => {
   it('reads notifications without an app', async () => {
     const { context, request } = platformContext(() => ok({ items: [{ _id: 'n', category: 'c', title: 'T', ts: 0, read: false }], unreadCount: 1 }));
     const res = await new PlatformExtrasTools(context).notifications_list({});
-    expect(request.mock.calls[0][0].params).toEqual({ auth_token: 't', limit: 20 });
+    expect(request.mock.calls[0][0].params).toEqual({ limit: 20 });
     expect(text(res)).toContain('1 unread');
   });
 
@@ -190,5 +191,15 @@ describe('tasks and misc', () => {
     const res = await new PlatformExtrasTools(context).crash_jira_issues({ app_id: 'a', crash_ids: ['c1', ' c2 '] });
     expect(request.mock.calls[0][0].params.crashgroup_ids).toBe('c1,c2');
     expect(json(res)).toEqual([{ crash_id: 'c1', issue: 'J-1', url: 'u', linked: '2023-11-14T22:13:20.000Z' }]);
+  });
+});
+
+describe('ai_assistants_analytics app access', () => {
+  it('refuses apps the caller cannot see without calling the server', async () => {
+    const { context, request } = platformContext(() => ok({}));
+    const res: any = await new PlatformExtrasTools(context).ai_assistants_analytics({ app_id: 'someone-elses-app' });
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('not one of your apps');
+    expect(request).not.toHaveBeenCalled();
   });
 });

@@ -179,7 +179,10 @@ export async function handleUpdateHookV2(context: ToolContext, args: any): Promi
   const body = hookBody(args, true);
   const id = encodeURIComponent(args.hook_id);
   try {
-    await context.resolveAppId(args);
+    // The report/hook id is enough on /v2; an app, if given, is still validated
+    if (args.app_id || args.app_name) {
+      await context.resolveAppId(args);
+    }
     const keys = Object.keys(body);
     if (keys.length === 0) {
       return v2ErrorResult('update hook', new Error('nothing to update, pass at least one field to change'));
@@ -195,7 +198,10 @@ export async function handleUpdateHookV2(context: ToolContext, args: any): Promi
 
 export async function handleDeleteHookV2(context: ToolContext, args: any): Promise<ToolResult> {
   try {
-    await context.resolveAppId(args);
+    // The report/hook id is enough on /v2; an app, if given, is still validated
+    if (args.app_id || args.app_name) {
+      await context.resolveAppId(args);
+    }
     const data = await v2Request<any>(context, 'delete', `/v2/hooks/${encodeURIComponent(args.hook_id)}`);
     return jsonResult('Hook deleted', data);
   } catch (error) {

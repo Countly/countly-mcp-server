@@ -14,7 +14,7 @@
  * journeys_stats_content, journeys_stats_active_users, journeys_templates.
  */
 
-import { jsonResult, v2ErrorResult, v2Request } from '../../lib/v2-api.js';
+import { fetchByOffset, jsonResult, v2ErrorResult, v2Request } from '../../lib/v2-api.js';
 import type { ToolContext, ToolResult } from '../types.js';
 
 const BASE = '/v2/journey_engine/journeys';
@@ -35,7 +35,7 @@ const periodProp = {
 const BLOCKS_DESCRIPTION = 'JSON-encoded array of journey blocks forming the version graph; call journeys_block_reference for the block schema (or journeys_templates for ready-made graphs). Each block: id (unique string), blockType ("trigger", "engagement", "logical", "data_pipeline", "end"), subType, nextBlock (id of the next block) and subtype-specific fields (filters, contentId, waitPeriod, eventKey, updateStatement, ...). The first block must be the trigger.';
 const GOAL_PROPS = {
   goal_event_key: { type: 'string', description: 'Optional conversion goal: event key users should fire after entering the journey (not a [CLY]_journey_engine_* event). Pass an empty string to clear the goal.' },
-  goal_window: { type: 'string', enum: ['1d', '7d', '30d', 'none'], description: 'How long after entering the goal event still counts. Defaults to "none" (no limit). Only used with goal_event_key.' },
+  goal_window: { type: 'string', enum: ['1d', '7d', '30d', 'none'], description: 'How long after entering the goal event still counts. On create defaults to "none" (no limit); on update omitted keeps the current window. Only used with goal_event_key.' },
 };
 
 const versionIdForAction = (action: string) => ({
@@ -372,6 +372,13 @@ export async function handleUpdateJourneyV2(context: ToolContext, args: any): Pr
       }
     }
     const goal = goalFromArgs(args);
+    if (goal && args.goal_window === undefined) {
+      // Changing only the goal event keeps the journey's current window
+      const current = (await getDetail(context, app_id, args.journey_id))?.goal;
+      if (current?.window) {
+        goal.window = current.window;
+      }
+    }
     if (goal !== undefined) {
       body.goal = goal;
     }
@@ -477,18 +484,21 @@ export async function handleJourneyInstancesV2(context: ToolContext, args: any):
     const app_id = await context.resolveAppId(args);
     const limit = Math.max(1, Number(args.limit ?? 10));
     const skip = Math.max(0, Number(args.skip ?? 0));
-    const data = await v2Request<any>(context, 'get', `${BASE}/${encodeURIComponent(args.journey_id)}/instances`, {
-      params: statsParams(app_id, args, {
-        page: Math.floor(skip / limit) + 1,
-        pageSize: limit,
-        ...(args.status ? { status: args.status } : {}),
-        ...(args.task_id ? { taskId: args.task_id } : {}),
-      }),
+    const data = await fetchByOffset(skip, limit, async (page, pageSize) => {
+      const res = await v2Request<any>(context, 'get', `${BASE}/${encodeURIComponent(args.journey_id)}/instances`, {
+        params: statsParams(app_id, args, {
+          page,
+          pageSize,
+          ...(args.status ? { status: args.status } : {}),
+          ...(args.task_id ? { taskId: args.task_id } : {}),
+        }),
+      });
+      return { ...res, items: Array.isArray(res?.rows) ? res.rows : [] };
     });
     if (typeof data?.taskId === 'string' && !Array.isArray(data.rows)) {
       return jsonResult('Instances are being exported', { status: 'computing', task_id: data.taskId, note: 'Call journeys_stats_table again with task_id in a little while.' });
     }
-    const rows = (data.rows || []).map((r: any) => ({
+    const rows = data.items.map((r: any) => ({
       uid: r.appUserId,
       status: r.status,
       start: iso(r.startTime),
@@ -502,7 +512,7 @@ export async function handleJourneyInstancesV2(context: ToolContext, args: any):
         },
       } : {}),
     }));
-    return jsonResult(`Journey ${args.journey_id} instances (${data.total} total, page ${data.page})`, rows);
+    return jsonResult(`Journey ${args.journey_id} instances (${data.total} total, from offset ${skip})`, rows);
   } catch (error) {
     return v2ErrorResult('get journey instances', error);
   }

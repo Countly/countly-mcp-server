@@ -38,7 +38,9 @@ export async function v2Request<T = any>(
   const response = await context.httpClient.request({
     method,
     url: path,
-    params: { ...context.getAuthParams(), ...(options.params || {}) },
+    // The per-request client sends the token in the countly-token header;
+    // never copy it into the query string (access logs, proxies).
+    params: options.params || {},
     data: options.body,
     validateStatus: () => true,
   });
@@ -64,4 +66,23 @@ export function v2ErrorResult(action: string, error: unknown): ToolResult & { is
 
 export function jsonResult(title: string, data: unknown): ToolResult {
   return { content: [{ type: 'text', text: `${title}:\n${JSON.stringify(data, null, 2)}` }] };
+}
+
+/**
+ * Serve skip/limit on top of a page/pageSize API. When the offset is not
+ * page-aligned, the window spans two pages: fetch both and slice.
+ */
+export async function fetchByOffset<P extends { items: any[] }>(
+  skip: number,
+  limit: number,
+  fetchPage: (page: number, pageSize: number) => Promise<P>
+): Promise<P> {
+  const firstPage = Math.floor(skip / limit) + 1;
+  const first = await fetchPage(firstPage, limit);
+  const start = skip % limit;
+  if (start === 0) {
+    return first;
+  }
+  const second = first.items.length === limit ? await fetchPage(firstPage + 1, limit) : { items: [] };
+  return { ...first, items: [...first.items, ...second.items].slice(start, start + limit) };
 }

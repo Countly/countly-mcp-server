@@ -19,7 +19,7 @@
  */
 
 import { jsonResult, V2ApiError, v2ErrorResult, v2Request } from '../../lib/v2-api.js';
-import { periodToRange } from '../dashboards-v2.js';
+import { calendarNow, periodToRange } from '../dashboards-v2.js';
 import type { ToolContext, ToolResult } from '../types.js';
 import { toSlimMetrics } from './drill.js';
 
@@ -421,11 +421,12 @@ export async function handleRunSavedQuery(context: ToolContext, args: any): Prom
     const stored = doc?.query?.scope?.dateRange ?? {};
     // A relative saved window is not resolved server-side, so send it as days
     let window: { from: string; to: string } | undefined;
+    const zone = args.timezone ?? doc?.query?.scope?.timezone;
     if (args.period) {
-      const { from, to } = periodToRange(args.period);
+      const { from, to } = periodToRange(args.period, calendarNow(zone));
       window = { from: day(from), to: day(to) };
     } else if (!(stored.from && stored.to)) {
-      const { from, to } = periodToRange(stored.period || '30days');
+      const { from, to } = periodToRange(stored.period || '30days', calendarNow(zone));
       window = { from: day(from), to: day(to) };
     }
     const sort = parseJson(args.sort, 'sort');

@@ -365,8 +365,14 @@ class CountlyMCPServer {
       const serverUrl = this.requestContext.getStore()?.serverUrl || this.config.serverUrl;
       const caps = await this.getServerCapabilities(client, serverUrl, authToken);
       if (!caps) {
-        // Unknown server: hide only tools that certainly need the Platform /v2 API
-        return { tools: filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null }) };
+        // Detection disabled: expose every configured tool, as documented.
+        // Detection on but inconclusive: hide only tools that certainly need
+        // the Platform /v2 API.
+        return {
+          tools: this.autoDetect
+            ? filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null })
+            : filteredTools,
+        };
       }
       const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
       return {
@@ -452,7 +458,7 @@ class CountlyMCPServer {
             isError: true,
           };
         }
-        if (V2_ONLY_TOOLS.has(name) && !caps?.v2) {
+        if (this.autoDetect && V2_ONLY_TOOLS.has(name) && !caps?.v2) {
           return {
             content: [{
               type: 'text',

@@ -104,9 +104,11 @@ export async function handleGetMetadataV2(context: ToolContext, args: any, legac
     const segments = new Map<string, Record<string, unknown>>();
     let globalMeta: any = null;
     try {
-      const custom = await v2Request<any[]>(context, 'get', '/v2/drill/events', { params: { app_id } });
+      const custom = await v2Request<any>(context, 'get', '/v2/drill/events', { params: { app_id } });
+      // A bare array, or the {events, total} envelope when the server pages
+      const customList: any[] = Array.isArray(custom) ? custom : Array.isArray(custom?.events) ? custom.events : [];
       events = [
-        ...(Array.isArray(custom) ? custom : []).map((e: any) => ({ key: e.key, name: e.name })),
+        ...customList.map((e: any) => ({ key: e.key, name: e.name })),
         ...INTERNAL_EVENTS,
       ];
       for (let i = 0; i < events.length; i += BATCH_LIMIT) {

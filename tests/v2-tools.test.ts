@@ -174,3 +174,23 @@ describe('database tools on ClickHouse databases', () => {
     expect(get).not.toHaveBeenCalled();
   });
 });
+
+describe('v2 requests and credentials', () => {
+  it('never put the auth token in the query string', async () => {
+    const { v2Request } = await import('../src/lib/v2-api.js');
+    const request = vi.fn(async () => ({ status: 200, data: { data: {} } }));
+    await v2Request({ httpClient: { request }, getAuthParams: () => ({ auth_token: 'secret' }) } as any, 'get', '/v2/x', { params: { a: 1 } });
+    expect((request.mock.calls[0] as any)[0].params).toEqual({ a: 1 });
+  });
+});
+
+describe('calendarNow', () => {
+  it('maps "now" to the local calendar day of the time zone', async () => {
+    const { calendarNow } = await import('../src/tools/dashboards-v2.js');
+    const now = Date.UTC(2026, 9, 6, 23, 30); // 23:30 UTC on Oct 6
+    expect(new Date(calendarNow('Asia/Tokyo', now)).toISOString().slice(0, 10)).toBe('2026-10-07');
+    expect(new Date(calendarNow('America/Los_Angeles', now)).toISOString().slice(0, 10)).toBe('2026-10-06');
+    expect(calendarNow(undefined, now)).toBe(now);
+    expect(calendarNow('Not/AZone', now)).toBe(now);
+  });
+});

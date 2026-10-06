@@ -130,10 +130,12 @@ export function classifyFlavor(
  */
 export async function detectServerCapabilities(
   client: AxiosInstance,
-  authToken: string | undefined,
+  _authToken: string | undefined,
   timeoutMs = 5000
 ): Promise<ServerCapabilities> {
-  const params: Record<string, string> = authToken ? { auth_token: authToken } : {};
+  // The client carries the token in its countly-token header; keep it out of
+  // query strings, which end up in access logs.
+  const params: Record<string, string> = {};
   const get = (url: string, extra: Record<string, string> = {}) =>
     client
       .get(url, { params: { ...params, ...extra }, timeout: timeoutMs, validateStatus: () => true })

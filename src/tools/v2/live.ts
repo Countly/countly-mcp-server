@@ -78,16 +78,35 @@ export function foldToHours(raw: OnlinePoint[] | undefined): OnlinePoint[] {
 
 /**
  * Daily points carry the END of the app-timezone day (23:59:59.999 local).
- * Twelve hours earlier is inside that day for every zone from UTC-12 to UTC+12.
+ * Label them with that day in the app's time zone; without one, twelve hours
+ * earlier is inside the day for every zone from UTC-12 to UTC+12.
  */
-const dayOf = (endMs: number) => new Date(endMs - 12 * 3_600_000).toISOString().slice(0, 10);
+export function dayOf(endMs: number, timeZone?: string): string {
+  if (timeZone) {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(endMs));
+    } catch {
+      // unknown zone: fall through
+    }
+  }
+  return new Date(endMs - 12 * 3_600_000).toISOString().slice(0, 10);
+}
+
+async function appTimezone(context: ToolContext, appId: string): Promise<string | undefined> {
+  try {
+    const app = (await context.getApps()).find((a) => String(a._id) === String(appId));
+    return typeof app?.timezone === 'string' ? app.timezone : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 async function withFallback(
   context: ToolContext,
   path: string,
   args: any,
   legacy: () => Promise<ToolResult>,
-  render: (appId: string, data: any) => ToolResult,
+  render: (appId: string, data: any) => ToolResult | Promise<ToolResult>,
   action: string
 ): Promise<ToolResult> {
   try {
@@ -101,7 +120,7 @@ async function withFallback(
       }
       throw error;
     }
-    return render(app_id, data || {});
+    return await render(app_id, data || {});
   } catch (error) {
     return v2ErrorResult(action, error);
   }
@@ -132,7 +151,8 @@ export function handleLiveLastDayV2(context: ToolContext, args: any, legacy: () 
 }
 
 export function handleLiveLast30DaysV2(context: ToolContext, args: any, legacy: () => Promise<ToolResult>): Promise<ToolResult> {
-  return withFallback(context, '/v2/concurrent_users/historical', args, legacy, (appId, d) => {
-    return seriesResult(`Daily peak online users, last 30 days, oldest first - app ${appId}`, { resolution: '1 day', ...series(d.perDay, dayOf) });
+  return withFallback(context, '/v2/concurrent_users/historical', args, legacy, async (appId, d) => {
+    const zone = await appTimezone(context, appId);
+    return seriesResult(`Daily peak online users, last 30 days, oldest first - app ${appId}`, { resolution: '1 day', ...series(d.perDay, (t: number) => dayOf(t, zone)) });
   }, 'get live data for last 30 days');
 }

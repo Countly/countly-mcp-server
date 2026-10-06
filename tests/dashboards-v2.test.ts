@@ -43,8 +43,10 @@ describe('widgetWindow', () => {
     expect(widgetWindow({ kind: 'active-profiles' }, [1, 2])).toEqual({ period: '[1,2]' });
   });
 
-  it('uses range only for custom retention windows', () => {
-    expect(widgetWindow({ kind: 'retention' }, '30days')).toEqual({});
+  it('always sends a range for retention widgets, keywords included', () => {
+    const { range } = widgetWindow({ kind: 'retention' }, '7days') as { range: string };
+    const [from, to] = JSON.parse(range);
+    expect(Math.round((to + 1 - from) / DAY)).toBe(7);
     expect(widgetWindow({ kind: 'retention' }, [1, 2])).toEqual({ range: '[1,2]' });
   });
 
@@ -159,5 +161,45 @@ describe('dashboards tools on Platform', () => {
     const res = await new DashboardsTools(context).getDashboardData({ dashboard_id: 'missing' });
     expect((res as any).isError).toBe(true);
     expect(res.content[0].text).toContain('Dashboard not found');
+  });
+});
+
+describe('dashboard edits on Platform (review fixes)', () => {
+  const board = () => ({
+    id: 'b1',
+    name: 'Board',
+    visibility: { mode: 'shared', sharedEmails: ['a@example.invalid'], sharedUserGroupIds: ['g1'] },
+    rows: [{ id: 'r1', height: 'auto', widgets: [{ id: 'w1', kind: 'profiles', appIds: ['a1'], size: '1/3' }] }],
+  });
+
+  it('gives a copied widget a new id instead of duplicating one', async () => {
+    const b = board();
+    const { context } = platformContext(b);
+    await new DashboardsTools(context).addDashboardWidget({ dashboard_id: 'b1', row_id: 'r1', widget: { id: 'w1', kind: 'profiles', appIds: ['a1'] } });
+    const ids = b.rows[0].widgets.map((w: any) => w.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('serializes overlapping widget edits on the same dashboard', async () => {
+    const b = board();
+    const { context } = platformContext(b);
+    const tools = new DashboardsTools(context);
+    await Promise.all([
+      tools.addDashboardWidget({ dashboard_id: 'b1', row_id: 'r1', widget: { kind: 'online-profiles', appIds: ['a1'] } }),
+      tools.addDashboardWidget({ dashboard_id: 'b1', row_id: 'r1', widget: { kind: 'active-profiles', appIds: ['a1'] } }),
+    ]);
+    expect(b.rows[0].widgets.map((w: any) => w.kind)).toEqual(['profiles', 'online-profiles', 'active-profiles']);
+  });
+
+  it('keeps existing recipients when only visibility is given, and implies shared for recipients alone', async () => {
+    const b = board();
+    const { context, request } = platformContext(b);
+    const tools = new DashboardsTools(context);
+    await tools.updateDashboard({ dashboard_id: 'b1', visibility: 'shared' });
+    let put = request.mock.calls.filter((c: any) => c[0].method === 'put').pop()[0];
+    expect(put.data.visibility).toEqual({ mode: 'shared', sharedEmails: ['a@example.invalid'], sharedUserGroupIds: ['g1'] });
+    await tools.updateDashboard({ dashboard_id: 'b1', shared_emails: ['b@example.invalid'] });
+    put = request.mock.calls.filter((c: any) => c[0].method === 'put').pop()[0];
+    expect(put.data.visibility).toEqual({ mode: 'shared', sharedEmails: ['b@example.invalid'], sharedUserGroupIds: ['g1'] });
   });
 });

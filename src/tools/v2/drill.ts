@@ -10,7 +10,7 @@
  */
 
 import { jsonResult, V2ApiError, v2ErrorResult, v2Request } from '../../lib/v2-api.js';
-import { periodToRange } from '../dashboards-v2.js';
+import { calendarNow, periodToRange } from '../dashboards-v2.js';
 import type { ToolContext, ToolResult } from '../types.js';
 
 const CUSTOM_EVENT = '[CLY]_custom';
@@ -162,7 +162,8 @@ export async function handleDrillQuery(context: ToolContext, args: any): Promise
     const appIds: string[] = Array.isArray(args.app_ids) && args.app_ids.length > 0
       ? args.app_ids
       : [await context.resolveAppId(args)];
-    const { from, to } = periodToRange(args.period || '30days');
+    // Relative periods resolve to calendar days in the requested time zone
+    const { from, to } = periodToRange(args.period || '30days', calendarNow(args.timezone));
     const outputs = Array.isArray(args.output) && args.output.length > 0
       ? args.output
       : typeof args.output === 'string' ? [args.output] : ['total'];
