@@ -3,6 +3,9 @@
  * Allows controlling which tool categories and CRUD operations are available
  */
 
+import { isToolPermitted } from './tool-guards.js';
+import type { MemberPermissions } from './user-permissions.js';
+
 export type CrudOperation = 'C' | 'R' | 'U' | 'D';
 
 export interface ToolsConfig {
@@ -606,7 +609,12 @@ export function isToolSupported(toolName: string, plugins: string[] | null): boo
 export function filterToolsByServer<T extends { name: string }>(
   tools: T[],
   config: ToolsConfig,
-  plugins: string[] | null
+  plugins: string[] | null,
+  member: MemberPermissions | null = null
 ): T[] {
-  return tools.filter((tool) => isToolAllowed(tool.name, config) && isToolSupported(tool.name, plugins));
+  return tools.filter(
+    (tool) => isToolAllowed(tool.name, config)
+      && isToolSupported(tool.name, plugins)
+      && isToolPermitted(tool.name, member)
+  );
 }

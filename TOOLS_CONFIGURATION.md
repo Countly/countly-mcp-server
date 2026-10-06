@@ -35,6 +35,12 @@ On countly-server, `/o/system/plugins` is restricted to global admins. For other
 
 Detection never hides tools on a guess. If the server cannot be reached or the result is inconclusive, all tools allowed by your configuration are shown. Calling a tool whose plugin is missing returns an error that names the plugin and the detected edition. `get_version` also reports the detected edition.
 
+### User Permissions
+
+Detection also reads the connected user's permissions (`/o/users/me`) and hides tools the user could never run, for example write tools for a read-only user or `apps_create` for anyone but a global admin. The required permission of each tool is taken from the validator of the Countly endpoint it calls (see `src/lib/tool-guards.ts`). A tool is shown if the user may use it on **at least one** app. Group permissions are included, since Countly merges them into the user record.
+
+If `/o/users/me` cannot be read (e.g. tokens restricted to specific apps), no tools are hidden for permission reasons. Calling a hidden tool returns an error naming the missing permission.
+
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.
 
 ### Categories Requiring Plugins

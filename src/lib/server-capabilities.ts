@@ -17,6 +17,7 @@ import { createHash } from 'crypto';
 
 import { AxiosInstance, AxiosResponse } from 'axios';
 
+import { fetchMemberPermissions, type MemberPermissions } from './user-permissions.js';
 import { ENTERPRISE_DEFAULT_PLUGINS, LITE_DEFAULT_PLUGINS, PLATFORM_DEFAULT_PLUGINS } from './default-plugins.js';
 
 export type ServerArchitecture = 'legacy' | 'platform' | 'unknown';
@@ -34,6 +35,8 @@ export interface ServerCapabilities {
    * may not read the real list (non-admin on countly-server)
    */
   pluginsAssumed: boolean;
+  /** The connected user's permissions (/o/users/me); null when unreadable */
+  member: MemberPermissions | null;
   detectedAt: number;
 }
 
@@ -69,6 +72,7 @@ const UNKNOWN: Omit<ServerCapabilities, 'detectedAt'> = {
   flavor: 'unknown',
   plugins: null,
   pluginsAssumed: false,
+  member: null,
 };
 
 function isJsonObject(response: AxiosResponse | undefined): boolean {
@@ -131,9 +135,10 @@ export async function detectServerCapabilities(
       .get(url, { params: { ...params, ...extra }, timeout: timeoutMs, validateStatus: () => true })
       .catch(() => undefined);
 
-  const [v2Version, systemVersion] = await Promise.all([
+  const [v2Version, systemVersion, member] = await Promise.all([
     get('/v2/countly_version'),
     get('/o/system/version'),
+    fetchMemberPermissions(client, params, timeoutMs),
   ]);
 
   const version = isJsonObject(systemVersion) && typeof systemVersion!.data.version === 'string'
@@ -148,6 +153,7 @@ export async function detectServerCapabilities(
       flavor: 'platform',
       version,
       ...resolvePlugins('platform', plugins),
+      member,
       detectedAt: Date.now(),
     };
   }
@@ -176,6 +182,7 @@ export async function detectServerCapabilities(
       flavor: 'platform',
       version,
       ...resolvePlugins('platform', plugins),
+      member,
       detectedAt: Date.now(),
     };
   }
@@ -194,6 +201,7 @@ export async function detectServerCapabilities(
     flavor,
     version,
     ...resolvePlugins(flavor, plugins),
+    member,
     detectedAt: Date.now(),
   };
 }

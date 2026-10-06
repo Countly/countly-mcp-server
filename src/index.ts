@@ -57,6 +57,7 @@ import {
   ServerCapabilitiesCache,
   type ServerCapabilities,
 } from './lib/server-capabilities.js';
+import { describeGuard, isToolPermitted } from './lib/tool-guards.js';
 import {
   loadToolsConfig,
   filterTools,
@@ -349,7 +350,7 @@ class CountlyMCPServer {
         return { tools: filteredTools };
       }
       return {
-        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins),
+        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins, caps.member),
       };
     });
 
@@ -407,11 +408,21 @@ class CountlyMCPServer {
             await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken),
         };
 
-        // Refuse tools whose plugin the connected server doesn't have, with
-        // an explanation the model can act on (instead of a raw 400 later).
+        // Refuse tools the connected server or user can't use, with an
+        // explanation the model can act on (instead of a raw 400/401 later).
         const requiredPlugin = getToolRequiredPlugin(name);
+        const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
+        if (caps && !isToolPermitted(name, caps.member)) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Tool "${name}" is not available: it requires ${describeGuard(name)}, ` +
+                'which the connected Countly user does not have.',
+            }],
+            isError: true,
+          };
+        }
         if (requiredPlugin) {
-          const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
           if (caps && !isToolSupported(name, caps.plugins)) {
             return {
               content: [{
