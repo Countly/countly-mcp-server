@@ -123,6 +123,19 @@ describe('stage scene edit operations', () => {
     ])).toEqual(['quote', 'badge']);
   });
 
+  it('a step removed with its layers frees their ids: new pieces and no stale breakpoint data', () => {
+    const responsive = applyEditOps(base(), [
+      { op: 'set_fit' },
+      { op: 'set_breakpoint', id: 'phone', max_width: 480, boxes: { title: { x: 1, y: 2, w: 3, h: 4 } }, overrides: { title: { props: { size: 'sm' } } } },
+    ]);
+    const ops = [{ op: 'remove_step', id: 's1', remove_layers: true }, { op: 'set_layer', id: 'title', piece: 'quote' }];
+    expect(newLayerPieces(responsive, ops)).toEqual(['quote']);
+    const scene = applyEditOps(responsive, ops, { quote: { defaultSize: { w: 700, h: 300 }, startProps: { text: 'Q' } } });
+    expect(scene.layers.find((l: any) => l.id === 'title')).toMatchObject({ piece: 'quote', w: 700, props: { text: 'Q' } });
+    expect(scene.variants[0].boxes).toEqual({});
+    expect(scene.variants[0].overrides).toEqual({});
+  });
+
   it('a layer removed and set again in one batch is new: its piece start props are needed', () => {
     expect(newLayerPieces(base(), [
       { op: 'remove_layer', id: 'title' },

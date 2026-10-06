@@ -40,20 +40,19 @@ function idOf(op: EditOp, what: string): string {
   return id;
 }
 
-/** Pieces that new layers name and the scene does not use yet: their start props are needed */
+/**
+ * Pieces whose start data new layers need: found by running the operations
+ * themselves (so every way an op removes or adds a layer counts), noting
+ * each new layer whose piece has no start data yet.
+ */
 export function newLayerPieces(scene: Record<string, any>, ops: EditOp[]): string[] {
-  const existing = new Set((scene.layers ?? []).map((l: any) => l.id));
-  const pieces = new Set<string>();
-  // Follow the ops in order: a layer removed and set again is new again
-  for (const op of ops) {
-    if (op.op === 'remove_layer') {
-      existing.delete(op.id);
-    } else if (op.op === 'set_layer' && !existing.has(op.id) && typeof op.piece === 'string') {
-      pieces.add(op.piece);
-      existing.add(op.id);
-    }
+  const missing = new Set<string>();
+  try {
+    applyEditOps(scene, ops, {}, missing);
+  } catch {
+    // The real run reports the error; what was collected up to it is enough
   }
-  return [...pieces];
+  return [...missing];
 }
 
 function setScene(scene: Record<string, any>, op: EditOp): void {
@@ -83,13 +82,16 @@ function setScene(scene: Record<string, any>, op: EditOp): void {
   }
 }
 
-function setLayer(scene: Record<string, any>, op: EditOp, pieces: Record<string, PieceStart>): void {
+function setLayer(scene: Record<string, any>, op: EditOp, pieces: Record<string, PieceStart>, missing?: Set<string>): void {
   const id = idOf(op, 'layer');
   const layers: any[] = scene.layers;
   let index = layers.findIndex((l) => l.id === id);
   let layer: Record<string, any>;
   if (index < 0) {
     need(typeof op.piece === 'string', `set_layer ${id}: a new layer needs a piece (stage_pieces_list)`);
+    if (!pieces[op.piece]) {
+      missing?.add(op.piece);
+    }
     const start = pieces[op.piece] ?? {};
     const size = start.defaultSize ?? { w: 600, h: 400 };
     layer = {
@@ -166,11 +168,8 @@ function setLayer(scene: Record<string, any>, op: EditOp, pieces: Record<string,
   }
 }
 
-function removeLayer(scene: Record<string, any>, op: EditOp): void {
-  const id = idOf(op, 'layer');
-  const before = scene.layers.length;
-  scene.layers = scene.layers.filter((l: any) => l.id !== id);
-  need(scene.layers.length < before, `remove_layer: no layer ${id}`);
+/** Everything that names a removed layer: steps, plays, breakpoint boxes and overrides */
+function dropLayerRefs(scene: Record<string, any>, id: string): void {
   for (const step of scene.steps ?? []) {
     step.layers = step.layers.filter((l: string) => l !== id);
     if (step.play?.layer === id) {
@@ -181,6 +180,14 @@ function removeLayer(scene: Record<string, any>, op: EditOp): void {
     delete variant.boxes?.[id];
     delete variant.overrides?.[id];
   }
+}
+
+function removeLayer(scene: Record<string, any>, op: EditOp): void {
+  const id = idOf(op, 'layer');
+  const before = scene.layers.length;
+  scene.layers = scene.layers.filter((l: any) => l.id !== id);
+  need(scene.layers.length < before, `remove_layer: no layer ${id}`);
+  dropLayerRefs(scene, id);
 }
 
 function setStep(scene: Record<string, any>, op: EditOp): void {
@@ -262,6 +269,9 @@ function removeStep(scene: Record<string, any>, op: EditOp): void {
     const used = new Set(scene.steps.flatMap((s: any) => s.layers));
     const only = new Set((removed.layers as string[]).filter((l) => !used.has(l)));
     scene.layers = scene.layers.filter((l: any) => !only.has(l.id));
+    for (const id of only) {
+      dropLayerRefs(scene, id);
+    }
   }
   if (scene.steps.length === 0) {
     delete scene.steps;
@@ -347,7 +357,13 @@ function removeBreakpoint(scene: Record<string, any>, op: EditOp): void {
  * Apply operations in order to a copy of the scene.
  * @param pieces - start data of the pieces new layers name (newLayerPieces)
  */
-export function applyEditOps(scene: Record<string, any>, ops: EditOp[], pieces: Record<string, PieceStart> = {}): Record<string, any> {
+export function applyEditOps(
+  scene: Record<string, any>,
+  ops: EditOp[],
+  pieces: Record<string, PieceStart> = {},
+  /** Filled with pieces new layers named that `pieces` lacks */
+  missing?: Set<string>
+): Record<string, any> {
   need(Array.isArray(ops) && ops.length > 0, 'ops must be a non-empty list of operations');
   const next = structuredClone(scene);
   next.layers = Array.isArray(next.layers) ? next.layers : [];
@@ -361,7 +377,7 @@ export function applyEditOps(scene: Record<string, any>, ops: EditOp[], pieces: 
     try {
       switch (op.op) {
       case 'set_scene': setScene(next, op); break;
-      case 'set_layer': setLayer(next, op, pieces); break;
+      case 'set_layer': setLayer(next, op, pieces, missing); break;
       case 'remove_layer': removeLayer(next, op); break;
       case 'set_step': setStep(next, op); break;
       case 'remove_step': removeStep(next, op); break;
