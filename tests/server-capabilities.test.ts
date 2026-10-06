@@ -224,3 +224,40 @@ describe('ServerCapabilitiesCache', () => {
     }
   });
 });
+
+describe('review fixes', () => {
+  it('finds an app for the drill probe in every /o/apps/mine shape', async () => {
+    for (const apps of [[{ _id: 'app1' }], { apps: [{ _id: 'app1' }] }, { admin_of: {}, user_of: { app1: { _id: 'app1' } } }]) {
+      const client = fakeClient({
+        ...legacyBase('26.01'),
+        '/o/apps/mine': json(200, apps),
+        '/o/system/plugins': json(401, { result: 'User does not have right' }),
+        '/o?method=drill_bookmarks': json(200, []),
+      });
+      const caps = await detectServerCapabilities(client, 'token');
+      expect(caps.flavor).toBe('enterprise');
+    }
+  });
+
+  it('retries detections with an unknown flavor sooner than the TTL', async () => {
+    vi.useFakeTimers();
+    try {
+      const cache = new ServerCapabilitiesCache(60 * 60 * 1000);
+      const detect = vi.fn(async () => ({
+        architecture: 'legacy', flavor: 'unknown', v2: false, plugins: null, pluginsAssumed: false, member: null, detectedAt: Date.now(),
+      }) as ServerCapabilities);
+      await cache.get('https://a', 't', detect);
+      vi.advanceTimersByTime(31_000);
+      await cache.get('https://a', 't', detect);
+      expect(detect).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gates slipping_users on its plugin despite the core analytics category', () => {
+    expect(isToolSupported('slipping_users', ['mobile', 'views'])).toBe(false);
+    expect(isToolSupported('slipping_users', ['slipping-away-users'])).toBe(true);
+    expect(isToolSupported('session_frequency', ['mobile'])).toBe(true);
+  });
+});
