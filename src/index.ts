@@ -43,7 +43,9 @@ import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
 import { FAVICON_SVG } from './lib/favicon.js';
 import {
   ConcurrencyLimiter,
+  escapeHtml,
   extractClientIp,
+  isPlainHostHeader,
   formatRequestLog,
   isOriginPermitted,
   parseCorsAllowed,
@@ -1034,7 +1036,10 @@ class CountlyMCPServer {
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
           
           // Also check URL parameters (alternative method)
-          const urlParams = new URL(req.url || '', `http://${req.headers.host}`).searchParams;
+          // Only the query string is read here, so parse against a fixed
+          // base: a malformed Host header made new URL() throw and turned
+          // the request into a 500.
+          const urlParams = new URL(req.url || '', 'http://localhost').searchParams;
           const paramServerUrl = urlParams.get('server_url') || urlParams.get('serverUrl');
           const paramAuthToken = urlParams.get('auth_token') || urlParams.get('authToken');
           
@@ -1153,13 +1158,17 @@ class CountlyMCPServer {
           // fine in a request line but not as an argument to `claude mcp add`.
           // Scheme: honour X-Forwarded-Proto only behind a trusted proxy,
           // otherwise assume TLS for anything that isn't a local address.
-          const pageHost = (req.headers.host || `${hostname}:${port}`).trim();
+          // The Host header is caller-controlled and ends up in a shell
+          // command readers copy, so only a plain host[:port] is used.
+          const requestHost = (req.headers.host || '').trim();
+          const pageHost = isPlainHostHeader(requestHost) ? requestHost : `${hostname}:${port}`;
           const forwardedProto = trustProxy
-            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim()
+            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim().toLowerCase()
             : undefined;
-          const pageProto = forwardedProto
+          const pageProto = (forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : undefined)
             || (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(pageHost) ? 'http' : 'https');
-          const pageEndpointUrl = `${pageProto}://${pageHost}${mcpEndpoint}`;
+          // Escape as well, so the markup never depends on the check above.
+          const pageEndpointUrl = escapeHtml(`${pageProto}://${pageHost}${mcpEndpoint}`);
 
           const pageTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
           const pageToolNames = new Set(pageTools.map((t: { name: string }) => t.name));
@@ -1173,7 +1182,15 @@ class CountlyMCPServer {
             .filter((c) => c.count > 0)
             .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          // The page embeds the request's Host header. A shared cache that
+          // ignores Host could otherwise serve one caller's forged host as the
+          // endpoint everyone is told to register, so the response is never
+          // stored and is marked as varying on Host.
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Vary': 'Host',
+          });
           res.end(`<!DOCTYPE html>
 <html lang="en">
 <head>

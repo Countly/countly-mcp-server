@@ -5,9 +5,11 @@ import { assertSafeServerHost, assertSafeServerUrl, safeLookup } from '../src/li
 import { redactSensitiveInMessage } from '../src/lib/error-handler.js';
 import {
   ConcurrencyLimiter,
+  escapeHtml,
   extractClientIp,
   formatRequestLog,
   isOriginPermitted,
+  isPlainHostHeader,
   parseContentLength,
   parseCorsAllowed,
   RateLimiter,
@@ -457,6 +459,42 @@ describe('isOriginPermitted: browser requests while the server holds a token', (
   it('permits any origin when the server holds no token (callers bring their own)', () => {
     expect(isOriginPermitted('*', 'https://evil.example', false)).toBe(true);
     expect(isOriginPermitted(['https://app.example'], 'https://evil.example', false)).toBe(true);
+  });
+});
+
+describe('isPlainHostHeader', () => {
+  it.each(['localhost', 'localhost:3101', 'mcp.count.ly', 'mcp.count.ly:443', '127.0.0.1:3000', '[::1]:3101', '[2001:db8::1]'])(
+    'accepts %s',
+    (h) => expect(isPlainHostHeader(h)).toBe(true)
+  );
+  it.each([
+    'good.test$(touch${IFS}/tmp/pwn)',
+    'a.test`id`',
+    'a.test;id',
+    'a.test|id',
+    "a.test'",
+    'a b',
+    'test.com</pre><script>alert(1)</script>',
+    'a.test:99999x',
+    '',
+    '-a.test',
+  ])('rejects %s', (h) => expect(isPlainHostHeader(h)).toBe(false));
+});
+
+describe('escapeHtml', () => {
+  it('neutralises markup in a forged Host header', () => {
+    expect(escapeHtml('test.com</pre><script>alert(1)</script>')).toBe(
+      'test.com&lt;/pre&gt;&lt;script&gt;alert(1)&lt;/script&gt;'
+    );
+  });
+  it('escapes quotes so attribute breakouts fail', () => {
+    expect(escapeHtml(`a" onmouseover='x'`)).toBe('a&quot; onmouseover=&#39;x&#39;');
+  });
+  it('escapes ampersands first so entities are not double-decoded', () => {
+    expect(escapeHtml('&lt;')).toBe('&amp;lt;');
+  });
+  it('leaves an ordinary host:port untouched', () => {
+    expect(escapeHtml('https://mcp.example.com:3000/mcp')).toBe('https://mcp.example.com:3000/mcp');
   });
 });
 
