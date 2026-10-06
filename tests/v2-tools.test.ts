@@ -160,3 +160,17 @@ describe('user_profiles_query on Platform', () => {
     expect(get).toHaveBeenCalled();
   });
 });
+
+describe('database tools on ClickHouse databases', () => {
+  it('refuses aggregation and indexes without calling the server', async () => {
+    const { DatabaseTools } = await import('../src/tools/database.js');
+    const get = vi.fn();
+    const tools = new DatabaseTools({ httpClient: { get } as any, getAuthParams: () => ({}), resolveAppId: async () => 'a' } as any);
+    const agg: any = await tools.aggregateCollection({ database: 'clickhouse_countly_drill', collection: 'drill_events', aggregation: '[]' });
+    const idx: any = await tools.getCollectionIndexes({ database: 'clickhouse_countly_drill', collection: 'drill_events' });
+    expect(agg.isError).toBe(true);
+    expect(agg.content[0].text).toContain('drill_query');
+    expect(idx.isError).toBe(true);
+    expect(get).not.toHaveBeenCalled();
+  });
+});
