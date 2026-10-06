@@ -592,23 +592,12 @@ export function getToolRequiredPlugin(toolName: string): string | undefined {
 }
 
 /**
- * Whether a tool can run on a server with the given plugin knowledge.
- * `plugins === null` means the plugin list is unknown: only plugins listed in
- * `unavailablePlugins` are treated as missing, everything else stays visible.
+ * Whether a tool can run on a server with the given enabled plugins.
+ * `plugins === null` means the plugin set is unknown: the tool stays visible.
  */
-export function isToolSupported(
-  toolName: string,
-  plugins: string[] | null,
-  unavailablePlugins: string[] = []
-): boolean {
+export function isToolSupported(toolName: string, plugins: string[] | null): boolean {
   const required = getToolRequiredPlugin(toolName);
-  if (!required) {
-    return true;
-  }
-  if (plugins) {
-    return plugins.includes(required);
-  }
-  return !unavailablePlugins.includes(required);
+  return !required || !plugins || plugins.includes(required);
 }
 
 /**
@@ -617,10 +606,7 @@ export function isToolSupported(
 export function filterToolsByServer<T extends { name: string }>(
   tools: T[],
   config: ToolsConfig,
-  plugins: string[] | null,
-  unavailablePlugins: string[] = []
+  plugins: string[] | null
 ): T[] {
-  return tools.filter(
-    (tool) => isToolAllowed(tool.name, config) && isToolSupported(tool.name, plugins, unavailablePlugins)
-  );
+  return tools.filter((tool) => isToolAllowed(tool.name, config) && isToolSupported(tool.name, plugins));
 }

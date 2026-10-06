@@ -349,7 +349,7 @@ class CountlyMCPServer {
         return { tools: filteredTools };
       }
       return {
-        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins, caps.unavailablePlugins),
+        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins),
       };
     });
 
@@ -412,12 +412,15 @@ class CountlyMCPServer {
         const requiredPlugin = getToolRequiredPlugin(name);
         if (requiredPlugin) {
           const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
-          if (caps && !isToolSupported(name, caps.plugins, caps.unavailablePlugins)) {
+          if (caps && !isToolSupported(name, caps.plugins)) {
             return {
               content: [{
                 type: 'text',
                 text: `Tool "${name}" is not available: it requires the "${requiredPlugin}" plugin, ` +
-                  `which is not enabled on this server (${describeCapabilities(caps)}).`,
+                  (caps.pluginsAssumed
+                    ? `which is not in the default plugin set of ${describeCapabilities(caps)} ` +
+                      '(this token cannot list the server\'s plugins).'
+                    : `which is not enabled on this server (${describeCapabilities(caps)}).`),
               }],
               isError: true,
             };
@@ -774,7 +777,7 @@ class CountlyMCPServer {
         const caps = await detectServerCapabilities(client, authToken);
         console.error(
           `Detected ${describeCapabilities(caps)} (architecture: ${caps.architecture}, ` +
-          `plugins: ${caps.plugins ? caps.plugins.length : 'unknown'})`
+          `plugins: ${caps.plugins ? `${caps.plugins.length}${caps.pluginsAssumed ? ' (assumed defaults)' : ''}` : 'unknown'})`
         );
         return caps;
       });

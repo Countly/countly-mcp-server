@@ -31,7 +31,7 @@ On the first `tools/list` or `tools/call` for a server URL + token, the MCP serv
 | **Countly Enterprise** (countly-server + enterprise plugins) | No `/v2` API, and the plugin list contains enterprise-only plugins (drill, cohorts, funnels, users, block, …). |
 | **Countly Lite** (countly-server) | No `/v2` API, and no enterprise-only plugins. |
 
-On countly-server, `/o/system/plugins` is restricted to global admins. For other tokens the server checks whether the drill plugin answers (`/o?method=drill_bookmarks`). If drill is missing, the server is treated as Lite and enterprise-only tools are hidden. If drill is present, all tools stay visible because the exact plugin set is unknown.
+On countly-server, `/o/system/plugins` is restricted to global admins. For other tokens the edition is still detected (a drill probe via `/o?method=drill_bookmarks` tells Lite from Enterprise), and the edition's **default plugin set** is assumed — `plugins.default.json` for Lite, `plugins.ee.json` for Enterprise, `plugins.default.json` for Platform — snapshotted in `src/lib/default-plugins.ts`.
 
 Detection never hides tools on a guess. If the server cannot be reached or the result is inconclusive, all tools allowed by your configuration are shown. Calling a tool whose plugin is missing returns an error that names the plugin and the detected edition. `get_version` also reports the detected edition.
 

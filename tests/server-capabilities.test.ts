@@ -7,6 +7,7 @@ import {
   ServerCapabilitiesCache,
   type ServerCapabilities,
 } from '../src/lib/server-capabilities.js';
+import { ENTERPRISE_DEFAULT_PLUGINS, LITE_DEFAULT_PLUGINS, PLATFORM_DEFAULT_PLUGINS } from '../src/lib/default-plugins.js';
 import { filterToolsByServer, isToolSupported, loadToolsConfig } from '../src/lib/tools-config.js';
 
 type Reply = { status: number; data: any; headers?: Record<string, string> };
@@ -67,9 +68,9 @@ describe('server capability detection', () => {
       '/o?method=drill_bookmarks': json(400, { result: 'Invalid method' }),
     });
     const caps = await detectServerCapabilities(client, 'token');
-    expect(caps).toMatchObject({ architecture: 'legacy', flavor: 'lite', plugins: null });
-    expect(caps.unavailablePlugins).toContain('drill');
-    expect(caps.unavailablePlugins).toContain('cohorts');
+    expect(caps).toMatchObject({ architecture: 'legacy', flavor: 'lite', pluginsAssumed: true });
+    expect(caps.plugins).toEqual(LITE_DEFAULT_PLUGINS);
+    expect(caps.plugins).not.toContain('drill');
   });
 
   it('falls back to a drill probe when a non-admin cannot list plugins (Enterprise)', async () => {
@@ -79,7 +80,8 @@ describe('server capability detection', () => {
       '/o?method=drill_bookmarks': json(200, []),
     });
     const caps = await detectServerCapabilities(client, 'token');
-    expect(caps).toMatchObject({ architecture: 'legacy', flavor: 'enterprise', plugins: null, unavailablePlugins: [] });
+    expect(caps).toMatchObject({ architecture: 'legacy', flavor: 'enterprise', pluginsAssumed: true });
+    expect(caps.plugins).toEqual(ENTERPRISE_DEFAULT_PLUGINS);
   });
 
   it('detects Platform from the /v2 API and reads plugins for non-admins', async () => {
@@ -99,7 +101,7 @@ describe('server capability detection', () => {
       '/v2/plugins/enabled': json(400, { error: { code: 'BAD_REQUEST', message: 'Missing parameter' } }),
     });
     const caps = await detectServerCapabilities(client, 'bad');
-    expect(caps).toMatchObject({ architecture: 'platform', flavor: 'platform', plugins: null });
+    expect(caps).toMatchObject({ architecture: 'platform', flavor: 'platform', pluginsAssumed: true });
   });
 
   it('detects Platform without the /v2 API from Platform-only plugins (admin)', async () => {
@@ -115,7 +117,9 @@ describe('server capability detection', () => {
       '/o/system/observability': json(200, [{ provider: 'mutation', healthy: true }]),
     });
     const caps = await detectServerCapabilities(client, 'token');
-    expect(caps).toMatchObject({ architecture: 'platform', flavor: 'platform', plugins: null, unavailablePlugins: ['errorlogs'] });
+    expect(caps).toMatchObject({ architecture: 'platform', flavor: 'platform', pluginsAssumed: true });
+    expect(caps.plugins).toEqual(PLATFORM_DEFAULT_PLUGINS);
+    expect(caps.plugins).not.toContain('errorlogs');
   });
 
   it('does not treat a JSON "Invalid path" on /v2 as Platform', () => {
@@ -128,7 +132,7 @@ describe('server capability detection', () => {
  throw new Error('ECONNREFUSED'); 
 }) } as any;
     const caps = await detectServerCapabilities(client, 'token');
-    expect(caps).toMatchObject({ architecture: 'unknown', flavor: 'unknown', plugins: null, unavailablePlugins: [] });
+    expect(caps).toMatchObject({ architecture: 'unknown', flavor: 'unknown', plugins: null, pluginsAssumed: false });
   });
 
   it('reports unknown flavor for a rejected legacy token', async () => {
@@ -153,8 +157,7 @@ describe('tool filtering by server', () => {
   const tools = ['ping', 'apps_list', 'cohorts_list', 'journeys_list', 'server_logs_files_list', 'sdk_stats_get', 'filtering_rules_list']
     .map((name) => ({ name }));
   const config = loadToolsConfig({});
-  const names = (plugins: string[] | null, unavailable: string[] = []) =>
-    filterToolsByServer(tools, config, plugins, unavailable).map((t) => t.name);
+  const names = (plugins: string[] | null) => filterToolsByServer(tools, config, plugins).map((t) => t.name);
 
   it('hides enterprise tools on Lite', () => {
     expect(names(LITE_PLUGINS)).toEqual(['ping', 'apps_list', 'server_logs_files_list', 'sdk_stats_get']);
@@ -173,9 +176,11 @@ describe('tool filtering by server', () => {
     expect(names(null)).toHaveLength(tools.length);
   });
 
-  it('respects known-missing plugins when the list is unknown', () => {
-    expect(isToolSupported('cohorts_list', null, ['cohorts'])).toBe(false);
-    expect(isToolSupported('apps_list', null, ['cohorts'])).toBe(true);
+  it('checks a single tool against the plugin list', () => {
+    expect(isToolSupported('cohorts_list', LITE_DEFAULT_PLUGINS)).toBe(false);
+    expect(isToolSupported('cohorts_list', ENTERPRISE_DEFAULT_PLUGINS)).toBe(true);
+    expect(isToolSupported('apps_list', LITE_DEFAULT_PLUGINS)).toBe(true);
+    expect(isToolSupported('cohorts_list', null)).toBe(true);
   });
 });
 
@@ -184,7 +189,7 @@ describe('ServerCapabilitiesCache', () => {
     architecture,
     flavor: architecture === 'platform' ? 'platform' : 'unknown',
     plugins: null,
-    unavailablePlugins: [],
+    pluginsAssumed: false,
     detectedAt: Date.now(),
   });
 

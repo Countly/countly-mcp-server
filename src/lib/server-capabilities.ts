@@ -17,6 +17,8 @@ import { createHash } from 'crypto';
 
 import { AxiosInstance, AxiosResponse } from 'axios';
 
+import { ENTERPRISE_DEFAULT_PLUGINS, LITE_DEFAULT_PLUGINS, PLATFORM_DEFAULT_PLUGINS } from './default-plugins.js';
+
 export type ServerArchitecture = 'legacy' | 'platform' | 'unknown';
 export type ServerFlavor = 'lite' | 'enterprise' | 'platform' | 'unknown';
 
@@ -25,13 +27,13 @@ export interface ServerCapabilities {
   flavor: ServerFlavor;
   /** Version string from /o/system/version, when readable */
   version?: string;
-  /** Enabled plugin codes, or null when the token is not allowed to list them */
+  /** Enabled plugin codes; null only when the flavor itself is unknown */
   plugins: string[] | null;
   /**
-   * Plugin-gated categories known to be unavailable even though the full
-   * plugin list is unknown (e.g. Lite detected through a drill probe).
+   * True when `plugins` is the flavor's default plugin set because the token
+   * may not read the real list (non-admin on countly-server)
    */
-  unavailablePlugins: string[];
+  pluginsAssumed: boolean;
   detectedAt: number;
 }
 
@@ -48,14 +50,25 @@ export const ENTERPRISE_ONLY_PLUGINS = [
 /** Plugins that only exist on Countly Platform (new architecture) */
 export const PLATFORM_ONLY_PLUGINS = ['kafka', 'clickhouse'];
 
-/** countly-server plugins that Platform no longer ships */
-export const PLATFORM_MISSING_PLUGINS = ['errorlogs'];
+const DEFAULT_PLUGINS: Record<Exclude<ServerFlavor, 'unknown'>, string[]> = {
+  lite: LITE_DEFAULT_PLUGINS,
+  enterprise: ENTERPRISE_DEFAULT_PLUGINS,
+  platform: PLATFORM_DEFAULT_PLUGINS,
+};
+
+/** Real plugin list when readable, otherwise the flavor's default set */
+function resolvePlugins(flavor: ServerFlavor, plugins: string[] | null): Pick<ServerCapabilities, 'plugins' | 'pluginsAssumed'> {
+  if (plugins || flavor === 'unknown') {
+    return { plugins, pluginsAssumed: false };
+  }
+  return { plugins: [...DEFAULT_PLUGINS[flavor]], pluginsAssumed: true };
+}
 
 const UNKNOWN: Omit<ServerCapabilities, 'detectedAt'> = {
   architecture: 'unknown',
   flavor: 'unknown',
   plugins: null,
-  unavailablePlugins: [],
+  pluginsAssumed: false,
 };
 
 function isJsonObject(response: AxiosResponse | undefined): boolean {
@@ -134,8 +147,7 @@ export async function detectServerCapabilities(
       architecture: 'platform',
       flavor: 'platform',
       version,
-      plugins,
-      unavailablePlugins: plugins ? [] : [...PLATFORM_MISSING_PLUGINS],
+      ...resolvePlugins('platform', plugins),
       detectedAt: Date.now(),
     };
   }
@@ -163,8 +175,7 @@ export async function detectServerCapabilities(
       architecture: 'platform',
       flavor: 'platform',
       version,
-      plugins,
-      unavailablePlugins: plugins ? [] : [...PLATFORM_MISSING_PLUGINS],
+      ...resolvePlugins('platform', plugins),
       detectedAt: Date.now(),
     };
   }
@@ -182,8 +193,7 @@ export async function detectServerCapabilities(
     architecture: 'legacy',
     flavor,
     version,
-    plugins,
-    unavailablePlugins: !plugins && flavor === 'lite' ? [...ENTERPRISE_ONLY_PLUGINS] : [],
+    ...resolvePlugins(flavor, plugins),
     detectedAt: Date.now(),
   };
 }
