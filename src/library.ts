@@ -16,7 +16,7 @@
  *   parameter, so it does not end up in access logs.
  * - Listing and calling tools go through the same pipeline as the standalone
  *   modes (lib/tool-pipeline.ts): the grant's operations become a tools
- *   configuration, the server's capabilities are detected once per grant (so
+ *   configuration, the server's capabilities are detected once per token (so
  *   tools take their Platform /v2 paths), and each call is checked against
  *   the operations its arguments need (TOOL_OPERATION_RULES). Library mode
  *   adds admin-only tools, the host's plugin check, and never exposes an
@@ -35,6 +35,7 @@
 
 import { HostAnalytics, type HostAnalyticsOptions } from './lib/host-analytics.js';
 import type { IncomingMessage, ServerResponse } from 'http';
+import { createHash } from 'crypto';
 import { createRequire } from 'module';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -428,7 +429,7 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
   // Per grant, bounded: a long-running host keeps at most MAX_CACHED_GRANTS.
   const appCaches = new BoundedCache<string, AppCache>(MAX_CACHED_GRANTS);
   // What the server is (Platform /v2 or not), its enabled plugins and the
-  // member's permissions, detected once per grant as the standalone modes do,
+  // member's permissions, detected once per token as the standalone modes do,
   // so tools take their /v2 paths on Platform and unsupported ones are hidden.
   const capabilitiesCache = new ServerCapabilitiesCache(undefined, MAX_CACHED_GRANTS);
   const hostAnalytics = options.analytics ? new HostAnalytics(options.analytics) : null;
@@ -477,18 +478,21 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
   const buildServer = (context: McpRequestContext): Server => {
     const state = getCatalogState();
     const grant = context.grantId;
+    // Keyed by grant and token: a refreshed token (or changed rights) starts
+    // a fresh app list instead of serving the previous token's.
+    const cacheKey = `${grant}\n${createHash('sha256').update(context.upstreamToken).digest('hex')}`;
     const appCache = (() => {
-      let cache = appCaches.get(grant);
+      let cache = appCaches.get(cacheKey);
       if (!cache) {
         cache = new AppCache();
-        appCaches.set(grant, cache);
+        appCaches.set(cacheKey, cache);
       }
       return cache;
     })();
     let capabilities: Promise<ServerCapabilities | null> | undefined;
     const getCapabilities = (): Promise<ServerCapabilities | null> => {
       capabilities ??= capabilitiesCache
-        .get(countlyUrl, grant, () => detectServerCapabilities(createClient(context.upstreamToken, () => {}), undefined))
+        .get(countlyUrl, context.upstreamToken, () => detectServerCapabilities(createClient(context.upstreamToken, () => {}), undefined))
         .catch(() => null);
       return capabilities;
     };

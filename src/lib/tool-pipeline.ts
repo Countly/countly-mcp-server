@@ -176,6 +176,18 @@ export async function callTool(
   if (!isOffered(request, name)) {
     throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
   }
+  // The local checks come first: a call the configuration or grant does not
+  // allow is refused without any request to Countly (not even detection).
+  // Some arguments change what an allowed tool does (formulas_run with mode
+  // "saved" persists the formula), so check them against the configuration.
+  const argumentRefusal = getArgumentRefusal(name, args, request.config);
+  if (argumentRefusal) {
+    return refusal(argumentRefusal);
+  }
+  if (!isToolCallAllowed(name, args, request.config)) {
+    return refusal(`Tool ${name} with these arguments needs an operation this connection does not allow.`);
+  }
+
   const caps = await request.capabilities();
   if (caps && !isToolPermitted(name, caps.member, caps.v2)) {
     return refusal(
@@ -198,15 +210,6 @@ export async function callTool(
           '(this token cannot list the server\'s plugins).'
         : `which is not enabled on this server (${describeCapabilities(caps)}).`)
     );
-  }
-  // Some arguments change what an allowed tool does (formulas_run with mode
-  // "saved" persists the formula), so check them against the configuration.
-  const argumentRefusal = getArgumentRefusal(name, args, request.config);
-  if (argumentRefusal) {
-    return refusal(argumentRefusal);
-  }
-  if (!isToolCallAllowed(name, args, request.config)) {
-    return refusal(`Tool ${name} with these arguments needs an operation this connection does not allow.`);
   }
 
   const route = findRoute(name)!;

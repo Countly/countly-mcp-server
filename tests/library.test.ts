@@ -554,6 +554,25 @@ describe('server capabilities', () => {
     expect(detectionRequests.filter((r) => r.url.startsWith('/v2/countly_version'))).toHaveLength(1);
   });
 
+  it('refuses a call the grant does not allow before any request, detection included', async () => {
+    currentContext = context({ grantId: 'grant-local-refusal-' + Date.now(), operations: ['R'] });
+    const res = await callTool('formulas_run', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', formula: '[]', mode: 'saved', formulaMeta: '{}' });
+    expect(res.result?.isError).toBe(true);
+    expect(countlyRequests).toHaveLength(0);
+    expect(detectionRequests).toHaveLength(0);
+  });
+
+  it('reads the app list again when the grant\'s token changes', async () => {
+    const grantId = 'grant-token-change-' + Date.now();
+    currentContext = context({ grantId, upstreamToken: 'token-a' });
+    await callTool('apps_list');
+    await callTool('apps_list');
+    currentContext = context({ grantId, upstreamToken: 'token-b' });
+    const res = await callTool('apps_list');
+    expect(countlyRequests.filter((r) => r.url.startsWith('/o/apps/mine'))).toHaveLength(2);
+    expect(res.result.content[0].text).toContain('Gamma');
+  });
+
   it('lists tools with their annotations, as the standalone modes do', async () => {
     currentContext = context({ grantId: 'grant-annotations-' + Date.now() });
     const res = await rpc('tools/list');
