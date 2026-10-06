@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **161 Tools** across 33 categories for comprehensive Countly operations
+- **178 Tools** across 42 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (161 available)
+### Tools (178 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -301,7 +301,7 @@ COUNTLY_TOOLS_ALERTS=NONE      # Alerts: Completely disabled
 COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
-**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 33):
+**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 42):
 - `CORE` - Core tools (ping, get_version, get_plugins) (3 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
@@ -574,7 +574,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 161 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 178 tools across 42 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -637,6 +637,7 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 - **`crashes_get`** - View crash details
 - **`crash_group_breakdown`** (Platform) - Distribution of a crash group over a field (OS version, device, app version, …)
 - **`crash_group_users`** (Platform) - Users affected by a crash group
+- **`crash_jira_issues`** (Platform, requires `crashes-jira` plugin) - Jira issues linked to crash groups
 - **`crashes_resolve`** - Mark crash as resolved
 - **`uncrashes_resolve`** - Mark crash as unresolved
 - **`crashes_hide`** - Hide crash from view
@@ -802,6 +803,34 @@ On Countly Platform with the new UI, the dashboard tools work with the new-UI da
 - **`content_assets_update`** - Update an asset's name and/or tags.
 - **`content_assets_delete`** - Delete an uploaded content asset.
 - **`content_langs_list`** - List languages eligible for content translations.
+
+### Flows (requires `flows` plugin)
+- **`flows_list`** (Platform) - List saved user flows with anchor, direction, period and status
+- **`flows_get`** (Platform) - Definition of one saved flow
+- **`flows_data`** (Platform) - Top events per step from the anchor event, with the strongest transitions
+- **`flows_dropoff`** (Platform) - What users did instead of an expected next step
+
+### Ratings (requires `star-rating` plugin)
+- **`ratings_widgets_list`** (Platform) - Rating widgets with status, times shown, responses and average rating
+- **`ratings_stats`** (Platform) - Responses, average and 1-5 distribution of one widget for a period
+- **`ratings_comments`** (Platform) - Individual responses (rating, comment, email, user) of one widget
+
+### Campaigns (requires `campaigns` plugin)
+- **`campaigns_list`** (Platform) - Push, in-app, survey and rating campaigns with status and delivery counters
+- **`campaigns_get`** (Platform) - Full definition of one campaign
+- **`campaigns_results`** (Platform) - Delivery funnel of one campaign (events and users per stage)
+
+### AI Assistants (requires `ai-assistants` plugin)
+- **`ai_assistants_analytics`** (Platform) - LLM assistant analytics: overview, conversations, tools, models, quality, cost, performance, adoption
+
+### Tasks & Notifications
+- **`tasks_list`** (Platform) - Background tasks and long-running reports with status and timing
+- **`task_result`** (Platform) - Stored result of a finished background task
+- **`notifications_list`** (Platform) - The connected user's dashboard notifications and unread count
+
+### Geo, Revenue
+- **`geo_locations_list`** (Platform, requires `geo` plugin) - Saved geo locations (geofences)
+- **`revenue_iap_events`** (Platform, requires `revenue` plugin) - Events configured as in-app purchases
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

@@ -388,6 +388,76 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     requiresPlugin: 'content',
     availableByDefault: false,
   },
+  // Platform /v2 only categories
+  flows: {
+    operations: {
+      'flows_list': 'R',
+      'flows_get': 'R',
+      'flows_data': 'R',
+      'flows_dropoff': 'R',
+    },
+    requiresPlugin: 'flows',
+    availableByDefault: false,
+  },
+  ratings: {
+    operations: {
+      'ratings_widgets_list': 'R',
+      'ratings_stats': 'R',
+      'ratings_comments': 'R',
+    },
+    requiresPlugin: 'star-rating',
+    availableByDefault: false,
+  },
+  campaigns: {
+    operations: {
+      'campaigns_list': 'R',
+      'campaigns_get': 'R',
+      'campaigns_results': 'R',
+    },
+    requiresPlugin: 'campaigns',
+    availableByDefault: false,
+  },
+  ai_assistants: {
+    operations: {
+      'ai_assistants_analytics': 'R',
+    },
+    requiresPlugin: 'ai-assistants',
+    availableByDefault: false,
+  },
+  notifications: {
+    operations: {
+      'notifications_list': 'R',
+    },
+    availableByDefault: true,
+  },
+  tasks: {
+    operations: {
+      'tasks_list': 'R',
+      'task_result': 'R',
+    },
+    availableByDefault: true,
+  },
+  geo: {
+    operations: {
+      'geo_locations_list': 'R',
+    },
+    requiresPlugin: 'geo',
+    availableByDefault: false,
+  },
+  revenue: {
+    operations: {
+      'revenue_iap_events': 'R',
+    },
+    requiresPlugin: 'revenue',
+    availableByDefault: false,
+  },
+  crashes_jira: {
+    operations: {
+      'crash_jira_issues': 'R',
+    },
+    requiresPlugin: 'crashes-jira',
+    availableByDefault: false,
+  },
 };
 
 /**
@@ -614,6 +684,15 @@ export const V2_ONLY_TOOLS = new Set([
   'crash_group_breakdown', 'crash_group_users',
   'funnels_breakdown', 'funnels_trends', 'funnels_user_progress',
   'drill_query',
+  'flows_list', 'flows_get', 'flows_data', 'flows_dropoff',
+  'ratings_widgets_list', 'ratings_stats', 'ratings_comments',
+  'campaigns_list', 'campaigns_get', 'campaigns_results',
+  'ai_assistants_analytics',
+  'notifications_list',
+  'tasks_list', 'task_result',
+  'geo_locations_list',
+  'revenue_iap_events',
+  'crash_jira_issues',
 ]);
 
 /**
