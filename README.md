@@ -217,6 +217,7 @@ The server supports multiple authentication methods (in priority order):
 | `COUNTLY_AUTH_TOKEN_FILE` | No* | - | Path to file containing auth token |
 | `COUNTLY_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
 | `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics (set to `true` to opt in) |
+| `COUNTLY_AUTO_DETECT` | No | `true` | Detect Countly Lite / Enterprise / Platform and hide tools the server doesn't support (set to `false` to always show all configured tools) |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
 | `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). |
@@ -685,7 +686,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 ### Logger (requires `logger` plugin)
 - **`sdk_logs_list`** - List incoming data logs sent by SDK to the server for debugging and monitoring
 
-### SDKs (requires `sdks` plugin)
+### SDKs (requires `sdk` plugin)
 - **`sdk_stats_get`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
 - **`sdk_config_get`** - Get SDK configuration settings controlling SDK behavior and enabled features
 
@@ -694,7 +695,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`consents_list`** - List specific users and their consent status
 - **`consents_history_search`** - Search consent history records with detailed audit trail
 
-### Filtering Rules (requires `blocks` plugin)
+### Filtering Rules (requires `block` plugin, Enterprise)
 - **`filtering_rules_list`** - List all blocking rules that filter incoming requests
 - **`filtering_rules_create`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
 - **`filtering_rules_update`** - Update existing blocking rule configuration

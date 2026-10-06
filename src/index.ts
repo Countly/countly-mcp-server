@@ -51,7 +51,22 @@ import {
   resolveCorsOrigin,
   sanitizeForLog,
 } from './lib/http-security.js';
-import { loadToolsConfig, filterTools, getConfigSummary, TOOL_CATEGORIES, type ToolsConfig } from './lib/tools-config.js';
+import {
+  describeCapabilities,
+  detectServerCapabilities,
+  ServerCapabilitiesCache,
+  type ServerCapabilities,
+} from './lib/server-capabilities.js';
+import {
+  loadToolsConfig,
+  filterTools,
+  filterToolsByServer,
+  getConfigSummary,
+  getToolRequiredPlugin,
+  isToolSupported,
+  TOOL_CATEGORIES,
+  type ToolsConfig,
+} from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
@@ -198,6 +213,12 @@ class CountlyMCPServer {
    */
   private appCacheRegistry: AppCacheRegistry;
   private toolsConfig: ToolsConfig;
+  /**
+   * Detected backend flavor + plugin set per server URL and token. Used to
+   * hide tools the connected Countly (Lite / Enterprise / Platform) lacks.
+   */
+  private capabilitiesCache = new ServerCapabilitiesCache();
+  private autoDetect = (process.env.COUNTLY_AUTO_DETECT || '').toLowerCase() !== 'false';
   private loopDetector: LoopDetector;
   private lastTokenInUrlWarnAt: number = 0;
   /**
@@ -316,11 +337,20 @@ class CountlyMCPServer {
   }
 
   private setupToolHandlers() {
-    // Use the modular tool definitions from tools/index.ts and filter by configuration
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    // Use the modular tool definitions from tools/index.ts, filter by
+    // configuration, then by what the connected Countly server supports
+    this.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
       const allTools = getAllToolDefinitions();
       const filteredTools = filterTools(allTools, this.toolsConfig);
-      return { tools: filteredTools };
+      const { client, authToken } = this.buildPerRequestClient(request);
+      const serverUrl = this.requestContext.getStore()?.serverUrl || this.config.serverUrl;
+      const caps = await this.getServerCapabilities(client, serverUrl, authToken);
+      if (!caps) {
+        return { tools: filteredTools };
+      }
+      return {
+        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins, caps.unavailablePlugins),
+      };
     });
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -373,8 +403,27 @@ class CountlyMCPServer {
           appCache: perTenantAppCache,
           getApps: async () =>
             await this.getAppsWithContext(perReqHttpClient, perTenantAppCache, authToken),
+          getServerCapabilities: async () =>
+            await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken),
         };
-        
+
+        // Refuse tools whose plugin the connected server doesn't have, with
+        // an explanation the model can act on (instead of a raw 400 later).
+        const requiredPlugin = getToolRequiredPlugin(name);
+        if (requiredPlugin) {
+          const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
+          if (caps && !isToolSupported(name, caps.plugins, caps.unavailablePlugins)) {
+            return {
+              content: [{
+                type: 'text',
+                text: `Tool "${name}" is not available: it requires the "${requiredPlugin}" plugin, ` +
+                  `which is not enabled on this server (${describeCapabilities(caps)}).`,
+              }],
+              isError: true,
+            };
+          }
+        }
+
         // Get all tool metadata and filter based on tools configuration
         const toolMetadataList = getAllToolMetadata();
         const allowedToolNames = new Set(
@@ -705,6 +754,33 @@ class CountlyMCPServer {
   ): Promise<string> {
     const apps = await this.getAppsWithContext(client, cache, authToken);
     return resolveAppIdentifier(args, apps);
+  }
+
+  /**
+   * Detect (or return cached) flavor + plugins of the Countly server behind
+   * this server URL and token. Returns null when detection is disabled or
+   * impossible, in which case callers must not hide any tools.
+   */
+  private async getServerCapabilities(
+    client: AxiosInstance,
+    serverUrl: string | undefined,
+    authToken: string | undefined
+  ): Promise<ServerCapabilities | null> {
+    if (!this.autoDetect || !serverUrl || !authToken) {
+      return null;
+    }
+    try {
+      return await this.capabilitiesCache.get(serverUrl, authToken, async () => {
+        const caps = await detectServerCapabilities(client, authToken);
+        console.error(
+          `Detected ${describeCapabilities(caps)} (architecture: ${caps.architecture}, ` +
+          `plugins: ${caps.plugins ? caps.plugins.length : 'unknown'})`
+        );
+        return caps;
+      });
+    } catch {
+      return null;
+    }
   }
 
   async run(transportType: 'stdio' | 'http' = 'stdio', httpConfig?: HttpConfig) {

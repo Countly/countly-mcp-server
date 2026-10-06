@@ -248,7 +248,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'sdk_stats_get': 'R',
       'sdk_config_get': 'R',
     },
-    requiresPlugin: 'sdks',
+    requiresPlugin: 'sdk',
     availableByDefault: false,
   },
   compliance_hub: {
@@ -268,7 +268,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'filtering_rules_delete': 'D',
       'filtering_rules_toggle_status': 'U',
     },
-    requiresPlugin: 'blocks',
+    requiresPlugin: 'block',
     availableByDefault: false,
   },
   datapoint: {
@@ -577,4 +577,50 @@ export function getPluginRequirements(): Record<string, string> {
   }
   
   return requirements;
+}
+
+/**
+ * Plugin required by a tool, or undefined when the tool works on any server
+ */
+export function getToolRequiredPlugin(toolName: string): string | undefined {
+  for (const categoryData of Object.values(TOOL_CATEGORIES)) {
+    if (toolName in categoryData.operations) {
+      return categoryData.availableByDefault === false ? categoryData.requiresPlugin : undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Whether a tool can run on a server with the given plugin knowledge.
+ * `plugins === null` means the plugin list is unknown: only plugins listed in
+ * `unavailablePlugins` are treated as missing, everything else stays visible.
+ */
+export function isToolSupported(
+  toolName: string,
+  plugins: string[] | null,
+  unavailablePlugins: string[] = []
+): boolean {
+  const required = getToolRequiredPlugin(toolName);
+  if (!required) {
+    return true;
+  }
+  if (plugins) {
+    return plugins.includes(required);
+  }
+  return !unavailablePlugins.includes(required);
+}
+
+/**
+ * Filter tool definitions by configuration and by what the server supports
+ */
+export function filterToolsByServer<T extends { name: string }>(
+  tools: T[],
+  config: ToolsConfig,
+  plugins: string[] | null,
+  unavailablePlugins: string[] = []
+): T[] {
+  return tools.filter(
+    (tool) => isToolAllowed(tool.name, config) && isToolSupported(tool.name, plugins, unavailablePlugins)
+  );
 }
