@@ -8,6 +8,7 @@
 
 import { jsonResult, v2ErrorResult, v2Request } from '../lib/v2-api.js';
 import type { ToolContext, ToolResult } from './types.js';
+import { drillQueryToolDefinition, handleDrillQuery } from './v2/drill.js';
 
 const appProps = {
   app_id: {
@@ -159,6 +160,7 @@ export const platformInsightsToolDefinitions = [
   funnelsBreakdownTool,
   funnelsTrendsTool,
   funnelsUserProgressTool,
+  drillQueryToolDefinition,
 ];
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -240,6 +242,10 @@ export class PlatformInsightsTools {
       funnel: args.funnel_id,
       period: periodParam(args.period) ?? '30days',
     }, 'Funnel trends', 'get funnel trends');
+  }
+
+  async drill_query(args: any): Promise<ToolResult> {
+    return handleDrillQuery(this.context, args);
   }
 
   async funnels_user_progress(args: any): Promise<ToolResult> {

@@ -302,6 +302,7 @@ import { dashboardsV2ToolDefinitions } from './dashboards-v2.js';
 import { crashesV2ToolDefinitions } from './v2/crashes.js';
 import { funnelsV2ToolDefinitions } from './v2/funnels.js';
 import { loggerV2ToolDefinitions } from './v2/logger.js';
+import { drillV2ToolDefinitions } from './v2/drill.js';
 
 /**
  * Tool definitions that replace the legacy ones when the connected server
@@ -313,5 +314,6 @@ export function getV2ToolDefinitionOverrides(): Record<string, any> {
     ...crashesV2ToolDefinitions,
     ...funnelsV2ToolDefinitions,
     ...loggerV2ToolDefinitions,
+    ...drillV2ToolDefinitions,
   };
 }

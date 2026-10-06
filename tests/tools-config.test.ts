@@ -69,7 +69,7 @@ describe('Tools Configuration', () => {
       database: 6,
       dashboard_users: 1,
       app_users: 3,
-      drill: 4,
+      drill: 5,
       user_profiles: 3,
       cohorts: 5,
       funnels: 10,
@@ -108,12 +108,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 160 tools', () => {
+    it('should have total of 161 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(160);
+      expect(totalTools).toBe(161);
     });
   });
 

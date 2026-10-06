@@ -96,3 +96,67 @@ describe('sdk_logs_list on Platform', () => {
     expect(text(res)).not.toContain('x-forwarded-for');
   });
 });
+
+describe('drill_query', () => {
+  it('maps custom events to [CLY]_custom + eventNames and keeps system events', async () => {
+    const { toSlimMetrics } = await import('../src/tools/v2/drill.js');
+    const [m] = toSlimMetrics([{ events: ['Purchase', '[CLY]_session'], aggregation: 'count' }], undefined);
+    expect(m).toMatchObject({ id: 'A', events: ['[CLY]_session', '[CLY]_custom'], eventNames: ['Purchase'] });
+    const [sys] = toSlimMetrics([{ events: ['[CLY]_view'] }], undefined);
+    expect(sys.events).toEqual(['[CLY]_view']);
+    expect(sys.eventNames).toBeUndefined();
+  });
+
+  it('assigns ids around explicit ones, defaults unique to uid and ANDs filters', async () => {
+    const { toSlimMetrics } = await import('../src/tools/v2/drill.js');
+    const out = toSlimMetrics([
+      { events: ['E'], aggregation: 'unique', filter: { 'up.cc': 'DE' } },
+      { id: 'A', events: ['E'] },
+      { cohort_id: 'c1' },
+      { formula: 'A / B', name: 'ratio' },
+    ], { 'up.p': 'iOS' });
+    expect(out.map((m: any) => m.id)).toEqual(['B', 'A', 'C', 'D']);
+    expect(out[0]).toMatchObject({ field: 'uid', filter: { $and: [{ 'up.p': 'iOS' }, { 'up.cc': 'DE' }] } });
+    expect(out[1].filter).toEqual({ 'up.p': 'iOS' });
+    expect(out[2]).toMatchObject({ cohortId: 'c1', filter: { 'up.p': 'iOS' } });
+    expect(out[3]).toEqual({ id: 'D', formula: 'A / B', name: 'ratio' });
+  });
+
+  it('rejects metrics without events, cohort or formula', async () => {
+    const { toSlimMetrics } = await import('../src/tools/v2/drill.js');
+    expect(() => toSlimMetrics([{ aggregation: 'count' }], undefined)).toThrow(/give "events"/);
+    expect(() => toSlimMetrics([], undefined)).toThrow(/non-empty/);
+  });
+
+  it('sends calendar days, outputs, sort and cursor', async () => {
+    const { handleDrillQuery } = await import('../src/tools/v2/drill.js');
+    const { context, request } = platformContext(() => ok({ results: { total: [{ A: 1 }] }, meta: { hasMore: true, nextCursor: 'N' } }));
+    const res = await handleDrillQuery(context, {
+      app_id: 'app', period: '[1767225600000,1769817600000]', metrics: [{ events: ['E'] }],
+      output: ['total', 'daily'], sort: { by: 'A' }, limit: 5, cursor: 'C', breakdowns: ['up.cc'],
+    });
+    const body = request.mock.calls[0][0].data;
+    expect(body.scope).toEqual({ appIds: ['app'], dateRange: { from: '2026-01-01', to: '2026-01-31' } });
+    expect(body).toMatchObject({ outputs: ['total', 'daily'], sort: { by: 'A', dir: 'desc' }, page: { limit: 5, cursor: 'C' }, breakdowns: ['up.cc'] });
+    expect(text(res)).toContain('"nextCursor": "N"');
+  });
+});
+
+describe('user_profiles_query on Platform', () => {
+  it('searches, sorts and pages profiles', async () => {
+    const { UserProfilesTools } = await import('../src/tools/user-profiles.js');
+    const { context, request } = platformContext(() => ok({ rows: [{ uid: 'u1' }], meta: { total: 42, hasMore: true } }));
+    const res = await new UserProfilesTools(context).user_profiles_query({ app_id: 'app', query: '{"cc":"US"}', search: 'ann', sort_by: 'sc', offset: 20 });
+    expect(request.mock.calls[0][0].data).toMatchObject({
+      profileFilter: { cc: 'US' }, search: 'ann', sort: { column: 'sc', dir: 'desc' }, offset: 20, limit: 20,
+    });
+    expect(text(res)).toContain('42 total');
+  });
+
+  it('falls back to legacy when profiles are unavailable', async () => {
+    const { UserProfilesTools } = await import('../src/tools/user-profiles.js');
+    const { context, get } = platformContext(() => ({ status: 503, data: { error: { code: 'SERVICE_UNAVAILABLE', message: 'x' } } }));
+    await new UserProfilesTools(context).user_profiles_query({ app_id: 'app', query: '{}' });
+    expect(get).toHaveBeenCalled();
+  });
+});
