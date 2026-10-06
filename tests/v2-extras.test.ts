@@ -130,6 +130,25 @@ describe('campaigns', () => {
     expect(json(res).push.campaigns[0]).toEqual({ id: 'c', name: 'P', channel: 'push', status: 'sent', trigger: 'one-time', result: { sent: 2 } });
   });
 
+  it('keeps the legacy flag on unmigrated widget rows', async () => {
+    const { context } = platformContext(() => ok({
+      items: [{ _id: 'w', name: 'Old survey', channel: 'survey', status: 'active', trigger: { kind: 'always-on' }, legacy: true }],
+      total: 1,
+      page: 1,
+    }));
+    const res = await new PlatformExtrasTools(context).campaigns_list({ app_id: 'a', channel: 'survey' });
+    expect(json(res).campaigns[0]).toMatchObject({ id: 'w', legacy: true });
+  });
+
+  it.each(['campaigns_get', 'campaigns_results'] as const)('%s explains a 404 for a legacy widget id', async (tool) => {
+    const { context } = platformContext(() => ({ status: 404, data: { error: { code: 'NOT_FOUND', message: 'Campaign not found' } } }));
+    const res: any = await new PlatformExtrasTools(context)[tool]({ app_id: 'a', campaign_id: 'w' });
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('Campaign not found');
+    expect(text(res)).toContain('legacy: true');
+    expect(text(res)).toContain('ratings_stats');
+  });
+
   it('does not retry a filtered list', async () => {
     const { context, request } = platformContext(() => ({ status: 500, data: { error: { code: 'INTERNAL_ERROR', message: 'boom' } } }));
     const res: any = await new PlatformExtrasTools(context).campaigns_list({ app_id: 'a', channel: 'rating' });

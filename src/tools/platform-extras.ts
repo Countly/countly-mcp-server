@@ -262,7 +262,9 @@ const CAMPAIGN_CHANNELS = ['push', 'in-app', 'survey', 'rating'];
 
 export const campaignsListTool = {
   name: 'campaigns_list',
-  description: 'List messaging campaigns of an app (push, in-app, survey, rating) with status, trigger type, send date and delivery counters, plus status counts. Countly Platform only.',
+  description: 'List messaging campaigns of an app (push, in-app, survey, rating) with status, trigger type, send date and delivery counters, plus status counts. '
+    + 'Survey and rating lists also include old-dashboard widgets that have not been migrated to campaigns yet, marked legacy: true: '
+    + 'they cannot be opened with campaigns_get or campaigns_results until migrated in the dashboard (for a legacy rating, use ratings_stats / ratings_comments with its id as widget_id). Countly Platform only.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -283,7 +285,7 @@ export const campaignsListTool = {
 
 export const campaignsGetTool = {
   name: 'campaigns_get',
-  description: 'Full definition of one campaign: audience, trigger, platforms, delivery result and, for push, recent delivery schedules. Countly Platform only.',
+  description: 'Full definition of one campaign: audience, trigger, platforms, delivery result and, for push, recent delivery schedules. Not for campaigns_list rows marked legacy: true. Countly Platform only.',
   inputSchema: {
     type: 'object',
     properties: { ...appProps, campaign_id: { type: 'string', description: 'Campaign id from campaigns_list.' } },
@@ -293,7 +295,7 @@ export const campaignsGetTool = {
 
 export const campaignsResultsTool = {
   name: 'campaigns_results',
-  description: 'Delivery funnel of one campaign: events and unique users per stage (e.g. targeted, sent, failed, clicked for push; shown, interacted for in-app). Countly Platform only.',
+  description: 'Delivery funnel of one campaign: events and unique users per stage (e.g. targeted, sent, failed, clicked for push; shown, interacted for in-app). Not for campaigns_list rows marked legacy: true. Countly Platform only.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -529,7 +531,28 @@ function compactCampaign(c: any): any {
     created: iso(c.createdAt),
     createdBy: c.createdByName,
     result,
+    // An unmigrated old-dashboard widget: listed so it can be migrated, not
+    // readable through campaigns_get / campaigns_results until it is.
+    legacy: c.legacy ? true : undefined,
   });
+}
+
+/**
+ * The server answers 404 for an id campaigns_list returned when that row is an
+ * unmigrated legacy widget (listed for migration only, deliberately unreadable),
+ * so say that instead of a bare "Campaign not found".
+ */
+function explainLegacyNotFound(error: unknown, campaignId: string): unknown {
+  if (!(error instanceof V2ApiError) || error.status !== 404) {
+    return error;
+  }
+  return new V2ApiError(
+    `${error.message}. If campaigns_list marked ${campaignId} legacy: true, it is an old-dashboard survey or rating widget `
+    + 'that has not been migrated to a campaign, and it cannot be read as one until it is migrated in the dashboard. '
+    + 'For a legacy rating widget, use ratings_stats / ratings_comments with this id as widget_id.',
+    error.status,
+    error.code,
+  );
 }
 
 function compactTask(t: any): any {
@@ -746,7 +769,10 @@ export class PlatformExtrasTools {
   async campaigns_get(args: any): Promise<ToolResult> {
     return run('get campaign', async () => {
       const app_id = await this.context.resolveAppId(args);
-      const c = await v2Request<any>(this.context, 'get', `/v2/campaigns/${enc(args.campaign_id)}`, { params: { app_id } });
+      const c = await v2Request<any>(this.context, 'get', `/v2/campaigns/${enc(args.campaign_id)}`, { params: { app_id } })
+        .catch((error: unknown) => {
+ throw explainLegacyNotFound(error, args.campaign_id); 
+});
       const { _id, app: _app, createdBy: _cb, updatedBy: _ub, deletedAt: _d, ...rest } = c || {};
       return jsonResult(`Campaign ${args.campaign_id}`, { id: _id, ...rest });
     });
@@ -758,7 +784,9 @@ export class PlatformExtrasTools {
       const filter = args.filter && typeof args.filter !== 'string' ? JSON.stringify(args.filter) : args.filter;
       const data = await v2Request<any>(this.context, 'get', `/v2/campaigns/${enc(args.campaign_id)}/results`, {
         params: clean({ app_id, platform: args.platform, filter }),
-      });
+      }).catch((error: unknown) => {
+ throw explainLegacyNotFound(error, args.campaign_id); 
+});
       return jsonResult(`Delivery funnel of campaign ${args.campaign_id}`, clean({
         stages: data.stages,
         errors: data.errors && Object.keys(data.errors).length ? data.errors : undefined,
