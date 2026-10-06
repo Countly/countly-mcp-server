@@ -160,11 +160,12 @@ async function getAppsForCache(
     if (authHeader) {
       params.auth_token = authHeader;
     }
+    const generation = appCache.currentGeneration();
     const response = await httpClient.get('/o/apps/mine', { params });
-    
+
     const apps = parseAppsMineResponse(response.data);
-    
-    appCache.update(apps);
+
+    appCache.update(apps, generation);
     return apps;
   } catch (error: any) {
     // Provide more detailed error information

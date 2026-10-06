@@ -12,7 +12,38 @@ export interface ToolsConfig {
   [category: string]: Set<CrudOperation>;
 }
 
+/**
+ * User-facing grouping of tool categories. Hosts that embed the server (see
+ * src/library.ts) show these to people granting access and use them to group
+ * usage stats, so they name product areas rather than internal categories.
+ */
+export type ToolArea =
+  | 'Events'
+  | 'Funnels'
+  | 'Retention'
+  | 'Users'
+  | 'Crashes'
+  | 'Dashboards'
+  | 'Remote config'
+  | 'Content'
+  | 'Settings'
+  | 'Other';
+
+export const TOOL_AREAS: readonly ToolArea[] = [
+  'Events',
+  'Funnels',
+  'Retention',
+  'Users',
+  'Crashes',
+  'Dashboards',
+  'Remote config',
+  'Content',
+  'Settings',
+  'Other',
+];
+
 export interface ToolCategoryConfig {
+  area: ToolArea; // User-facing grouping, see ToolArea
   operations: Record<string, CrudOperation>;
   requiresPlugin?: string; // Optional plugin name required for this category
   availableByDefault?: boolean; // If false, requires plugin check (default: true)
@@ -27,6 +58,7 @@ export interface ToolCategoryConfig {
  */
 export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   core: {
+    area: 'Other',
     operations: {
       'ping': 'R',
       'get_version': 'R',
@@ -35,6 +67,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   apps: {
+    area: 'Settings',
     operations: {
       'apps_list': 'R',
       'apps_get_by_name': 'R',
@@ -46,6 +79,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   analytics: {
+    area: 'Users',
     operations: {
       'query_data': 'R',
       'app_analytics_summary': 'R',
@@ -57,6 +91,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   crashes: {
+    area: 'Crashes',
     operations: {
       'crash_groups_list': 'R',
       'crashes_stats_get': 'R',
@@ -75,6 +110,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   notes: {
+    area: 'Other',
     operations: {
       'notes_list': 'R',
       'notes_create': 'C',
@@ -84,6 +120,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   events: {
+    area: 'Events',
     operations: {
       'events_create': 'C',
       'events_list': 'R',
@@ -95,6 +132,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   alerts: {
+    area: 'Other',
     operations: {
       'alerts_list': 'R',
       'alerts_create': 'C', // Also handles updates
@@ -104,6 +142,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   views: {
+    area: 'Events',
     operations: {
       'views_table': 'R',
       'views_data': 'R',
@@ -113,6 +152,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   database: {
+    area: 'Settings',
     operations: {
       'databases_query': 'R',
       'databases_list': 'R',
@@ -124,12 +164,14 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   dashboard_users: {
+    area: 'Settings',
     operations: {
       'dashboard_users': 'R',
     },
     availableByDefault: true,
   },
   app_users: {
+    area: 'Users',
     operations: {
       'app_users_create': 'C',
       'app_users_update': 'U',
@@ -138,6 +180,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   drill: {
+    area: 'Events',
     operations: {
       'drill_bookmarks_list': 'R',
       'drill_bookmarks_create': 'C',
@@ -151,6 +194,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   metadata: {
+    area: 'Events',
     operations: {
       // metadata_get returns event definitions, built-in event segments,
       // and system fields even without the drill plugin (drill just adds
@@ -162,6 +206,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   user_profiles: {
+    area: 'Users',
     operations: {
       'user_profiles_query': 'R',
       'user_profiles_breakdown': 'R',
@@ -171,6 +216,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   cohorts: {
+    area: 'Users',
     operations: {
       'cohorts_list': 'R',
       'cohorts_data': 'R',
@@ -182,6 +228,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   funnels: {
+    area: 'Funnels',
     operations: {
       'funnels_list': 'R',
       'funnels_data': 'R',
@@ -198,6 +245,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   formulas: {
+    area: 'Events',
     operations: {
       'formulas_run': 'R',
       'formulas_list': 'R',
@@ -208,6 +256,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   live: {
+    area: 'Users',
     operations: {
       'live_users': 'R',
       'live_metrics': 'R',
@@ -220,6 +269,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   retention: {
+    area: 'Retention',
     operations: {
       'retention': 'R',
     },
@@ -227,6 +277,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   remote_config: {
+    area: 'Remote config',
     operations: {
       'remote_configs_list': 'R',
       'remote_config_conditions_add': 'C',
@@ -240,6 +291,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   ab_testing: {
+    area: 'Remote config',
     operations: {
       'ab_experiments_list': 'R',
       'ab_experiments_details': 'R',
@@ -252,6 +304,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   logger: {
+    area: 'Settings',
     operations: {
       'sdk_logs_list': 'R',
     },
@@ -259,6 +312,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   sdks: {
+    area: 'Settings',
     operations: {
       'sdk_stats_get': 'R',
       'sdk_config_get': 'R',
@@ -267,6 +321,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   compliance_hub: {
+    area: 'Users',
     operations: {
       'consents_stats': 'R',
       'consents_list': 'R',
@@ -276,6 +331,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   filtering_rules: {
+    area: 'Settings',
     operations: {
       'filtering_rules_list': 'R',
       'filtering_rules_create': 'C',
@@ -287,6 +343,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   datapoint: {
+    area: 'Settings',
     operations: {
       'datapoints_stats': 'R',
       'datapoints_top_apps': 'R',
@@ -296,6 +353,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   server_logs: {
+    area: 'Settings',
     operations: {
       'server_logs_files_list': 'R',
       'server_logs_contents': 'R',
@@ -304,6 +362,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   email_reports: {
+    area: 'Dashboards',
     operations: {
       'email_reports_list': 'R',
       'email_reports_core_create': 'C',
@@ -317,6 +376,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   dashboards: {
+    area: 'Dashboards',
     operations: {
       'dashboards_list': 'R',
       'dashboards_data': 'R',
@@ -331,6 +391,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   times_of_day: {
+    area: 'Users',
     operations: {
       'times_of_day': 'R',
     },
@@ -338,6 +399,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   hooks: {
+    area: 'Settings',
     operations: {
       'hooks_list': 'R',
       // 'C', not 'R': /i/hook/test does not simulate the effects, it runs them.
@@ -356,6 +418,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   journeys: {
+    area: 'Content',
     operations: {
       'journeys_list': 'R',
       'journeys_get': 'R',
@@ -380,6 +443,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   content: {
+    area: 'Content',
     operations: {
       'content_blocks_list': 'R',
       'content_blocks_get': 'R',
@@ -398,6 +462,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
   },
   // Platform /v2 only categories
   flows: {
+    area: 'Funnels',
     operations: {
       'flows_list': 'R',
       'flows_get': 'R',
@@ -408,6 +473,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   ratings: {
+    area: 'Content',
     operations: {
       'ratings_widgets_list': 'R',
       'ratings_stats': 'R',
@@ -417,6 +483,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   campaigns: {
+    area: 'Content',
     operations: {
       'campaigns_list': 'R',
       'campaigns_get': 'R',
@@ -426,6 +493,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   ai_assistants: {
+    area: 'Events',
     operations: {
       'ai_assistants_analytics': 'R',
     },
@@ -433,12 +501,14 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   notifications: {
+    area: 'Other',
     operations: {
       'notifications_list': 'R',
     },
     availableByDefault: true,
   },
   tasks: {
+    area: 'Other',
     operations: {
       'tasks_list': 'R',
       'task_result': 'R',
@@ -446,6 +516,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: true,
   },
   geo: {
+    area: 'Settings',
     operations: {
       'geo_locations_list': 'R',
     },
@@ -453,6 +524,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   revenue: {
+    area: 'Events',
     operations: {
       'revenue_iap_events': 'R',
     },
@@ -460,6 +532,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
   crashes_jira: {
+    area: 'Crashes',
     operations: {
       'crash_jira_issues': 'R',
     },
@@ -467,6 +540,255 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     availableByDefault: false,
   },
 };
+
+/**
+ * Tools that need Countly global-admin rights (or act server-wide rather than
+ * on one app). Used only by the embedded library entry point (src/library.ts),
+ * which hides them unless the caller's grant allows admin tools. Stdio and
+ * standalone HTTP modes do not read this; Countly itself still enforces the
+ * rights on every call.
+ *
+ * Decided from what each Countly endpoint requires:
+ * - apps_create, apps_delete, apps_reset: /i/apps/create|delete|reset are
+ *   validateUserForGlobalAdmin.
+ * - apps_update: /i/apps/update needs app-admin with an app_id and global
+ *   admin without one; it changes app settings (name, timezone, country) for
+ *   everyone using the app, so it is treated as administration.
+ * - get_plugins: /o/system/plugins is validateUserForGlobalAdmin (the list of
+ *   installed modules is treated as sensitive).
+ * - dashboard_users: /o/users/all is validateUserForGlobalAdmin.
+ * - databases_* and collections_* (dbviewer /o/db): raw database and
+ *   collection browsing, outside any per-app scope a host may apply.
+ * - server_logs_* (errorlogs /o/errorlogs): global admin only.
+ * - datapoints_* (server-stats): server-wide usage and billing metrics; a
+ *   non-admin sees their own apps, but the data is not limited to the apps a
+ *   host grant names, so it is kept with the other server administration.
+ */
+export const ADMIN_ONLY_TOOLS: ReadonlySet<string> = new Set<string>([
+  'apps_create',
+  'apps_update',
+  'apps_delete',
+  'apps_reset',
+  'get_plugins',
+  'dashboard_users',
+  'databases_query',
+  'databases_list',
+  'databases_document',
+  'collections_aggregate',
+  'collections_indexes',
+  'databases_stats',
+  'server_logs_files_list',
+  'server_logs_contents',
+  'datapoints_stats',
+  'datapoints_top_apps',
+  'datapoints_punch_card',
+]);
+
+/**
+ * How a tool call's arguments change the operation it performs.
+ *
+ * TOOL_CATEGORIES gives every tool one static operation. That is the whole
+ * story for most tools, but a few do something else depending on their
+ * arguments: a read that also persists, a create that also updates. For those
+ * tools the rule below derives the operation(s) a given call needs, and every
+ * caller that enforces CRUD (library mode per call, the standalone modes per
+ * call, the host via `requiredOperations`) checks the EFFECTIVE operations,
+ * not the static one.
+ *
+ * `possible` is every operation the tool can perform. A rule that throws is
+ * treated as needing all of them (fail closed), and a rule must only return
+ * the read-only answer when the arguments prove the call does not write.
+ *
+ * Audit of every handler in src/tools/*.ts (2026-10) for argument-dependent
+ * behaviour - save/persist flags, upsert by id, modes, actions, delete flags:
+ *
+ * Argument-dependent, ruled below:
+ * - formulas_run: `mode` other than "unsaved" (the schema also offers "saved",
+ *   documented as persisting the formula with formulaMeta) and `report_name`
+ *   (names a stored report) need C as well as R. Only an absent/empty or
+ *   "unsaved" mode with no report_name is a pure read.
+ * - retention: a truthy `save_report` dispatches the calculation to the report
+ *   manager as a saved report (Countly treats any truthy value as "save"), so
+ *   it needs C as well as R.
+ * - alerts_create: /i/alert/save updates the alert named by
+ *   `alert_config._id` and creates one otherwise, so an `_id` needs U and no
+ *   `_id` needs C. `alert_config` may arrive as a JSON string; if it cannot be
+ *   parsed the call needs both.
+ * - events_create: /i/events/edit_map overwrites the name, description and
+ *   category of an event key that already exists, and the arguments cannot
+ *   prove the key is new, so every call needs C and U.
+ *
+ * Checked and not argument-dependent (static operation is accurate):
+ * - dashboards_data `action` is a "refresh" hint for /o/dashboards, a read.
+ * - drill_bookmarks_list `app_level`/`global`, journeys_stats_* `status` and
+ *   `task_id`, query_data `query_type`/`method`, views_* and funnels_* filter
+ *   options only select what is read.
+ * - crashes_get: Countly clears the group's "new" flag when it is viewed; it
+ *   authorizes that endpoint as a read and no argument changes it.
+ * - collections_aggregate / databases_query: dbviewer rejects pipeline stages
+ *   outside its operator allow-list (no $out/$merge), so they stay reads.
+ * - email_reports_preview renders without sending; email_reports_send (C)
+ *   sends.
+ * - email_reports_update `report_data` merges extra fields into the same
+ *   update (U); journeys_publish `status`, filtering_rules_toggle_status and
+ *   *_update `enabled`/`status` flags are all updates (U).
+ * - app_users_delete `force` only skips a safety check on a delete (D).
+ * - hooks_test is already C: it really runs the hook's effects.
+ * - dashboards_create `send_email_invitation`, notes_create `emails` and
+ *   email_reports_* recipients are part of the create/update itself.
+ * - formulas_save, notes_create, content_blocks_create, journeys_create,
+ *   cohorts_create, funnels_create, drill_bookmarks_create and the other
+ *   *_create tools build their payload from named fields and never pass an
+ *   id, so they cannot be turned into an update; the *_update tools always
+ *   address an existing record (U).
+ */
+export interface OperationRule {
+  /** Every operation the tool can perform. */
+  possible: readonly CrudOperation[];
+  /**
+   * The smallest operation sets a call can need: the tool is offered to a
+   * caller allowed any one of them (each call is still checked against its
+   * own arguments).
+   */
+  callShapes: readonly (readonly CrudOperation[])[];
+  /** The operations this call needs, derived from its arguments. */
+  operationsFor: (args: Record<string, unknown>) => CrudOperation[];
+}
+
+function parseMaybeJson(value: unknown): { ok: boolean; value: unknown } {
+  if (typeof value !== 'string') {
+    return { ok: true, value };
+  }
+  try {
+    return { ok: true, value: JSON.parse(value) };
+  } catch {
+    return { ok: false, value: undefined };
+  }
+}
+
+function isTruthyFlag(value: unknown): boolean {
+  if (value === undefined || value === null || value === false || value === 0 || value === '') {
+    return false;
+  }
+  if (typeof value === 'string' && ['false', '0'].includes(value.trim().toLowerCase())) {
+    return false;
+  }
+  return true;
+}
+
+export const TOOL_OPERATION_RULES: Readonly<Record<string, OperationRule>> = {
+  formulas_run: {
+    possible: ['R', 'C'],
+    callShapes: [['R'], ['R', 'C']],
+    operationsFor: (args) => {
+      const mode = args.mode;
+      const readOnlyMode = mode === undefined || mode === null || mode === '' || mode === 'unsaved';
+      const namesReport = args.report_name !== undefined && args.report_name !== null && args.report_name !== '';
+      return readOnlyMode && !namesReport ? ['R'] : ['R', 'C'];
+    },
+  },
+  retention: {
+    possible: ['R', 'C'],
+    callShapes: [['R'], ['R', 'C']],
+    operationsFor: (args) => (isTruthyFlag(args.save_report) ? ['R', 'C'] : ['R']),
+  },
+  alerts_create: {
+    possible: ['C', 'U'],
+    // create a new alert, or update an existing one (alert_config._id)
+    callShapes: [['C'], ['U']],
+    operationsFor: (args) => {
+      const parsed = parseMaybeJson(args.alert_config);
+      if (!parsed.ok) {
+        return ['C', 'U'];
+      }
+      const config = parsed.value;
+      if (config === undefined || config === null) {
+        return ['C'];
+      }
+      if (typeof config !== 'object' || Array.isArray(config)) {
+        return ['C', 'U'];
+      }
+      const id = (config as Record<string, unknown>)._id;
+      return id === undefined || id === null || id === '' ? ['C'] : ['U'];
+    },
+  },
+  events_create: {
+    possible: ['C', 'U'],
+    callShapes: [['C', 'U']],
+    operationsFor: () => ['C', 'U'],
+  },
+};
+
+const ALL_CRUD: readonly CrudOperation[] = ['C', 'R', 'U', 'D'];
+
+/** The static operation of a tool from TOOL_CATEGORIES, or undefined. */
+export function getToolOperation(toolName: string): CrudOperation | undefined {
+  for (const data of Object.values(TOOL_CATEGORIES)) {
+    if (Object.prototype.hasOwnProperty.call(data.operations, toolName)) {
+      return data.operations[toolName];
+    }
+  }
+  return undefined;
+}
+
+/** Every operation a tool can perform, whatever its arguments. */
+export function getPossibleOperations(toolName: string): CrudOperation[] | undefined {
+  const base = getToolOperation(toolName);
+  if (!base) {
+    return undefined;
+  }
+  const rule = Object.prototype.hasOwnProperty.call(TOOL_OPERATION_RULES, toolName)
+    ? TOOL_OPERATION_RULES[toolName]
+    : undefined;
+  return rule ? ALL_CRUD.filter((op) => rule.possible.includes(op)) : [base];
+}
+
+/**
+ * The operations one call of `toolName` with `args` needs (all of them must
+ * be granted). Undefined for an unknown tool. Fails closed: if the tool's
+ * rule throws or returns nothing usable, every possible operation is needed.
+ */
+/**
+ * The operation sets the tool's calls can need, smallest first: one set for a
+ * tool whose every call needs the same operations.
+ * @param toolName - the tool
+ * @returns the sets, or undefined for an unknown tool
+ */
+export function getCallShapes(toolName: string): CrudOperation[][] | undefined {
+  const possible = getPossibleOperations(toolName);
+  if (!possible) {
+    return undefined;
+  }
+  const rule = Object.prototype.hasOwnProperty.call(TOOL_OPERATION_RULES, toolName)
+    ? TOOL_OPERATION_RULES[toolName]
+    : undefined;
+  return rule ? rule.callShapes.map((shape) => ALL_CRUD.filter((op) => shape.includes(op))) : [possible];
+}
+
+export function getEffectiveOperations(toolName: string, args: unknown): CrudOperation[] | undefined {
+  const possible = getPossibleOperations(toolName);
+  if (!possible) {
+    return undefined;
+  }
+  const rule = Object.prototype.hasOwnProperty.call(TOOL_OPERATION_RULES, toolName)
+    ? TOOL_OPERATION_RULES[toolName]
+    : undefined;
+  if (!rule) {
+    return possible;
+  }
+  const input = args && typeof args === 'object' && !Array.isArray(args)
+    ? (args as Record<string, unknown>)
+    : {};
+  try {
+    const ops = rule.operationsFor(input);
+    if (!Array.isArray(ops) || ops.length === 0 || ops.some((op) => !ALL_CRUD.includes(op))) {
+      return possible;
+    }
+    return ALL_CRUD.filter((op) => ops.includes(op));
+  } catch {
+    return possible;
+  }
+}
 
 /**
  * Parse CRUD permissions from environment variable
@@ -540,15 +862,34 @@ export function loadToolsConfig(env: NodeJS.ProcessEnv = process.env): ToolsConf
  * Check if a specific tool is allowed based on configuration
  */
 export function isToolAllowed(toolName: string, config: ToolsConfig): boolean {
-  // Find which category this tool belongs to
+  // A tool is listed when at least one kind of its calls is allowed (see
+  // getCallShapes: COUNTLY_TOOLS_ALERTS=U still offers alerts_create, for
+  // updating an existing alert); isToolCallAllowed then checks each call
+  // against what its own arguments need.
   for (const [category, categoryData] of Object.entries(TOOL_CATEGORIES)) {
-    if (toolName in categoryData.operations) {
-      const requiredOperation = categoryData.operations[toolName];
+    if (Object.prototype.hasOwnProperty.call(categoryData.operations, toolName)) {
       const allowedOperations = config[category];
-      return allowedOperations.has(requiredOperation);
+      const shapes = getCallShapes(toolName) ?? [[categoryData.operations[toolName]]];
+      return !!allowedOperations && shapes.some((shape) => shape.every((op) => allowedOperations.has(op)));
     }
   }
-  
+  return true;
+}
+
+/**
+ * Check one call: every operation the call needs, given its arguments (see
+ * TOOL_OPERATION_RULES), must be allowed for the tool's category.
+ */
+export function isToolCallAllowed(toolName: string, args: unknown, config: ToolsConfig): boolean {
+  // Find which category this tool belongs to
+  for (const [category, categoryData] of Object.entries(TOOL_CATEGORIES)) {
+    if (Object.prototype.hasOwnProperty.call(categoryData.operations, toolName)) {
+      const required = getEffectiveOperations(toolName, args) ?? [categoryData.operations[toolName]];
+      const allowedOperations = config[category];
+      return !!allowedOperations && required.every((op) => allowedOperations.has(op));
+    }
+  }
+
   // If tool is not in any category, allow it by default
   return true;
 }

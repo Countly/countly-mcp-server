@@ -4,6 +4,7 @@
  */
 
 import { createHash } from 'crypto';
+import { BoundedCache } from './bounded-cache.js';
 
 export interface CountlyApp {
   _id: string;
@@ -20,6 +21,11 @@ export interface CountlyApp {
 export class AppCache {
   private apps: CountlyApp[] = [];
   private expiryTime: number = 0;
+  /**
+   * Bumped by clear(): a fetch that started before the cache was cleared
+   * (e.g. while an app was created) must not put its older list back.
+   */
+  private generation = 0;
   private readonly cacheDuration: number;
 
   constructor(cacheDurationMs = 300000) {
@@ -37,9 +43,17 @@ export class AppCache {
   /**
    * Update cache with new apps list
    */
-  update(apps: CountlyApp[]): void {
+  update(apps: CountlyApp[], fetchedInGeneration = this.generation): void {
+    if (fetchedInGeneration !== this.generation) {
+      return; // cleared since this list was requested: it may be stale
+    }
     this.apps = apps;
     this.expiryTime = Date.now() + this.cacheDuration;
+  }
+
+  /** The current generation, to pass back to update() with a fetched list. */
+  currentGeneration(): number {
+    return this.generation;
   }
 
   /**
@@ -87,6 +101,7 @@ export class AppCache {
   clear(): void {
     this.apps = [];
     this.expiryTime = 0;
+    this.generation += 1;
   }
 
   /**
@@ -113,11 +128,14 @@ export class AppCache {
  * it cannot collide with authenticated callers.
  */
 export class AppCacheRegistry {
-  private readonly caches = new Map<string, AppCache>();
+  // Bounded: a multi-tenant HTTP server that sees many tokens keeps the most
+  // recently used ones only; a dropped tenant just reads its apps again.
+  private readonly caches: BoundedCache<string, AppCache>;
   private readonly cacheDurationMs: number;
 
-  constructor(cacheDurationMs = 300000) {
+  constructor(cacheDurationMs = 300000, maxTenants = 1000) {
     this.cacheDurationMs = cacheDurationMs;
+    this.caches = new BoundedCache(maxTenants);
   }
 
   /**

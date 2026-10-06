@@ -59,8 +59,10 @@ export async function handleGetRetention(context: ToolContext, args: any): Promi
     params.range = args.range;
   }
 
-  if (args.save_report !== undefined) {
-    params.save_report = args.save_report ? 1 : 0;
+  // Only sent when saving: Countly treats any non-empty save_report as "save",
+  // so sending 0 for false (as this used to) saved the report anyway.
+  if (args.save_report === true) {
+    params.save_report = 1;
   }
 
   // Add timestamp to prevent caching

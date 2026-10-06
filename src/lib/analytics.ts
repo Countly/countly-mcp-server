@@ -1,7 +1,21 @@
 /**
  * Analytics tracking module using Countly SDK
  * Provides comprehensive product and usage analytics.
- * Disabled by default — opt in with ENABLE_ANALYTICS=true.
+ * Enabled by default — opt out with ENABLE_ANALYTICS=false.
+ *
+ * Events are reported under the Countly server's domain as the device id,
+ * derived exactly the way the Countly platform derives its own telemetry
+ * device id (scheme and trailing slashes stripped, host[:port][/path] kept),
+ * so the MCP data on stats.count.ly lines up with the server's own
+ * telemetry. In multi-tenant HTTP mode each request reports under its own
+ * server's domain. No domain (or "localhost"): nothing is reported — that
+ * includes page visits, health checks and startup in multi-tenant mode with
+ * no configured server.
+ *
+ * Every event, session, view and crash is sent as an explicit request carrying
+ * its own device id. The SDK's global device id is never used: the SDK
+ * prefers a device id stored on disk over the one passed to init, so relying
+ * on it would keep reporting under an old id.
  */
 
 // @ts-ignore - countly-sdk-nodejs doesn't have TypeScript definitions
@@ -9,10 +23,16 @@ import Countly from 'countly-sdk-nodejs';
 import { createHash } from 'crypto';
 import { createRequire } from 'module';
 
-import { redactSensitiveInMessage } from './error-handler.js';
+import { stripTrailingSlashes } from './url.js';
+
+export { stripTrailingSlashes };
 
 const ANALYTICS_URL = 'https://stats.count.ly';
-const ANALYTICS_APP_KEY = '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7';
+/**
+ * The Countly server telemetry app on stats.count.ly: the same app (and, via
+ * the domain device id, the same device) the Countly platform reports to.
+ */
+const ANALYTICS_APP_KEY = '9c28c347849f2c03caf1b091ec7be8def435e85e';
 /**
  * Length of the server-URL hash that accompanies every analytics event.
  * 16 hex chars = 64 bits of entropy — enough to distinguish several billion
@@ -57,17 +77,49 @@ export function normalizeServerUrlForHash(url: string): string {
       (parsed.protocol === 'http:' && parsed.port === '80') ||
       (parsed.protocol === 'https:' && parsed.port === '443');
     const port = parsed.port && !isDefaultPort ? `:${parsed.port}` : '';
-    const pathname = parsed.pathname.replace(/\/+$/, '');
+    const pathname = stripTrailingSlashes(parsed.pathname);
     // Preserve search + hash (rare on Countly URLs but keep case).
     return `${hostname}${port}${pathname}${parsed.search}${parsed.hash}`;
   } catch {
     // Non-URL input (malformed, unexpected scheme, etc.): minimal best-
     // effort normalization — strip scheme prefix and trailing slashes,
     // preserve path case.
-    return trimmed
-      .replace(/^[a-z][a-z\d+.-]*:\/\//i, '')
-      .replace(/\/+$/, '');
+    return stripTrailingSlashes(trimmed.replace(/^[a-z][a-z\d+.-]*:\/\//i, ''));
   }
+}
+
+/**
+ * The device id a Countly server reports telemetry under: its host (with any
+ * non-default port) and path, without scheme or trailing slashes, the way the
+ * Countly platform's tracker derives it from `api.domain`
+ * (api/parts/mgmt/tracker.js), so the same server gets the same device id
+ * from both. Nothing is sent when it is empty or exactly "localhost", the
+ * platform's own check. Anything else is reported, local addresses included:
+ * it only has to tell servers apart. Credentials, query and fragment are
+ * never part of it, so a secret written into the server URL stays here.
+ * @param url - the Countly server URL
+ * @returns the device id, or undefined when there is none
+ */
+export function deviceIdFromServerUrl(url: string | undefined | null): string | undefined {
+  if (typeof url !== 'string' || !url.trim()) {
+    return undefined;
+  }
+  // The standard URL parser, not string splitting: it separates the scheme,
+  // credentials, host, path, query and fragment correctly whatever they hold.
+  // Only host (with port) and path are kept, so no credential, query or
+  // fragment ever leaves the process. A bare host gets a scheme to parse.
+  const raw = url.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+  } catch {
+    return undefined;
+  }
+  const id = stripTrailingSlashes(parsed.host + parsed.pathname);
+  if (!id || id === 'localhost') {
+    return undefined;
+  }
+  return id;
 }
 
 /**
@@ -101,7 +153,8 @@ type ServerUrlResolver = () => string | undefined;
 class Analytics {
   private enabled: boolean = false;
   private initialized: boolean = false;
-  private deviceId: string = 'mcp';
+  private startedAt: number = Date.now();
+  private sessionStartedAt: number = Date.now();
   private getServerUrl?: ServerUrlResolver;
 
   /**
@@ -119,7 +172,7 @@ class Analytics {
     this.getServerUrl = getServerUrl;
 
     if (!this.enabled) {
-      console.error('📊 Analytics: Disabled (set ENABLE_ANALYTICS=true to opt in)');
+      console.error('📊 Analytics: Disabled (ENABLE_ANALYTICS=false)');
       return;
     }
 
@@ -127,7 +180,9 @@ class Analytics {
       Countly.init({
         app_key: ANALYTICS_APP_KEY,
         url: ANALYTICS_URL,
-        device_id: this.deviceId,
+        // Never reported under: every request names its own device id.
+        device_id: 'countly-mcp-server',
+        clear_stored_device_id: true,
         debug: false,
         // Collect basic metrics
         metrics: {
@@ -138,7 +193,7 @@ class Analytics {
       });
 
       this.initialized = true;
-      console.error('📊 Analytics: Enabled and initialized');
+      console.error('📊 Analytics: Enabled — usage is reported to stats.count.ly under your Countly server\'s domain. Set ENABLE_ANALYTICS=false to opt out.');
 
       // Track session start
       this.trackServerStart();
@@ -289,24 +344,18 @@ class Analytics {
   /**
    * Track error occurrence
    */
-  trackError(errorType: string, errorMessage: string, toolName?: string): void {
+  trackError(errorType: string, toolName?: string): void {
     if (!this.isEnabled()) {
       return;
     }
 
-    // Defence-in-depth: redact anything that looks like a bearer token /
-    // API key before it leaves the process for stats.count.ly or the
-    // Countly crash-log endpoint.
-    const redacted = redactSensitiveInMessage(errorMessage);
-
+    // A fixed classification only. Error messages can carry what the caller
+    // sent (a query, an app name, the list of app names), so neither the
+    // message nor a crash report built from it leaves the process.
     this.trackEvent('error_occurred', {
       error_type: errorType,
-      error_message: redacted.substring(0, 100), // Limit length
       tool: toolName || 'unknown',
     });
-
-    // Also record as crash for visibility
-    Countly.log_error(new Error(`${errorType}: ${redacted}`));
   }
 
   /**
@@ -318,9 +367,20 @@ class Analytics {
     }
 
     if (action === 'begin') {
-      Countly.begin_session();
+      this.sessionStartedAt = Date.now();
+      this.request({
+        begin_session: 1,
+        metrics: JSON.stringify({
+          _os: process.platform,
+          _os_version: process.version,
+          _app_version: this.getAppVersion(),
+        }),
+      });
     } else {
-      Countly.end_session();
+      this.request({
+        end_session: 1,
+        session_duration: Math.round((Date.now() - this.sessionStartedAt) / 1000),
+      });
     }
   }
 
@@ -335,7 +395,7 @@ class Analytics {
     }
 
     try {
-      Countly.add_event({
+      this.send({
         key: eventName,
         count: 1,
         segmentation: this.withServerSegment(segmentation),
@@ -355,7 +415,7 @@ class Analytics {
     }
 
     try {
-      Countly.add_event({
+      this.send({
         key: eventName,
         count: 1,
         dur: duration,
@@ -367,6 +427,28 @@ class Analytics {
   }
 
   /**
+   * Sends one event under the current request's server domain. The SDK's own
+   * device id takes it through the SDK queue; another server's domain (a
+   * multi-tenant HTTP request) goes as a request with that device id, the way
+   * the Countly platform reports bulk server events. No domain: not sent.
+   */
+  private send(event: { key: string; count: number; dur?: number; segmentation?: Record<string, string | number> }): void {
+    this.request({ events: JSON.stringify([{ ...event, timestamp: Date.now() }]) });
+  }
+
+  /**
+   * Queues one request to stats.count.ly under the current server's domain.
+   * No domain: nothing is sent.
+   */
+  private request(params: Record<string, string | number>): void {
+    const deviceId = deviceIdFromServerUrl(this.getServerUrl?.());
+    if (!deviceId) {
+      return;
+    }
+    Countly.request({ ...params, app_key: ANALYTICS_APP_KEY, device_id: deviceId });
+  }
+
+  /**
    * Track user property (non-sensitive)
    */
   trackUserProperty(key: string, value: string | number): void {
@@ -375,11 +457,7 @@ class Analytics {
     }
 
     try {
-      Countly.user_details({
-        custom: {
-          [key]: value,
-        },
-      });
+      this.request({ user_details: JSON.stringify({ custom: { [key]: value } }) });
     } catch (error) {
       console.error('📊 Analytics: Failed to track user property:', error);
     }
@@ -394,7 +472,7 @@ class Analytics {
     }
 
     try {
-      Countly.track_view(viewName);
+      this.send({ key: '[CLY]_view', count: 1, segmentation: { name: viewName, visit: 1, segment: process.platform } });
     } catch (error) {
       console.error('📊 Analytics: Failed to track view:', error);
     }
