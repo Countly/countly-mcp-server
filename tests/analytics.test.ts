@@ -909,6 +909,8 @@ describe('Analytics', () => {
       expect(deviceIdFromServerUrl('https://user:secret@localhost')).toBeUndefined();
       expect(deviceIdFromServerUrl('http://localhost:3001')).toBe('localhost:3001');
       expect(deviceIdFromServerUrl('http://127.0.0.1:3001')).toBe('127.0.0.1:3001');
+      expect(deviceIdFromServerUrl('https://countly.example.com?auth_token=https://supersecret')).toBe('countly.example.com');
+      expect(deviceIdFromServerUrl('https://countly.example.com/c#x=https://secret')).toBe('countly.example.com/c');
       expect(deviceIdFromServerUrl('https://user:secret@countly.example.com/')).toBe('countly.example.com');
       expect(deviceIdFromServerUrl('https://user@countly.example.com:8443/c')).toBe('countly.example.com:8443/c');
       expect(deviceIdFromServerUrl('https://countly.example.com/path@x')).toBe('countly.example.com/path@x');

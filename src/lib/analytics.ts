@@ -104,11 +104,14 @@ export function deviceIdFromServerUrl(url: string | undefined | null): string | 
   if (typeof url !== 'string') {
     return undefined;
   }
-  let id = url.trim().split('://').pop() ?? '';
+  // The query and fragment go first, before the scheme: a query can itself
+  // hold a URL (?auth_token=https://...), which the scheme split would pick.
+  let id = url.trim();
   const cut = id.search(/[?#]/);
   if (cut >= 0) {
     id = id.slice(0, cut);
   }
+  id = id.split('://').pop() ?? '';
   const slash = id.indexOf('/');
   const at = id.lastIndexOf('@', slash < 0 ? id.length : slash);
   if (at >= 0) {
