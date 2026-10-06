@@ -130,7 +130,7 @@ export interface CreateMcpHandlerOptions {
    */
   isPluginEnabled?: (plugin: string) => boolean;
   /**
-   * Optional usage analytics to the MCP app on stats.count.ly, driven by the
+   * Optional usage analytics to the Countly server telemetry app on stats.count.ly, driven by the
    * host (src/lib/host-analytics.ts): the host decides when reporting is
    * allowed and which device id to report under. Without it, nothing is
    * reported. The standalone modes' own analytics module is never loaded.

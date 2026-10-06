@@ -232,7 +232,9 @@ The server supports multiple authentication methods (in priority order):
 
 The MCP server reports usage analytics to `stats.count.ly` to help improve the product, the same way the Countly platform reports its own server telemetry. Analytics are **enabled by default**; opt out with `ENABLE_ANALYTICS=false`.
 
-**Device ID: your Countly server's domain.** Events are reported under the domain of the Countly server the MCP server talks to (`COUNTLY_SERVER_URL`, or the per-request server URL in multi-tenant HTTP mode), with the scheme and trailing slashes removed, e.g. `countly.example.com` or `countly.example.com:8443/countly`. This is the same device ID the Countly platform uses for its own telemetry, so both line up on the stats server. When there is no usable domain (no server URL, or `localhost`), nothing is reported.
+**Device ID: your Countly server's domain.** Events are reported under the domain of the Countly server the MCP server talks to (`COUNTLY_SERVER_URL`, or the per-request server URL in multi-tenant HTTP mode), with the scheme and trailing slashes removed, e.g. `countly.example.com` or `countly.example.com:8443/countly`. This is the same device ID the Countly platform uses for its own telemetry, so both line up on the stats server. Usage goes to the Countly server telemetry app on stats.count.ly (the app the Countly platform itself reports to), so MCP usage and the server's own telemetry sit under one device.
+
+When there is no usable domain (no server URL, or `localhost`), nothing is reported. In multi-tenant HTTP mode with no `COUNTLY_SERVER_URL`, that means visits to the welcome page, health checks, favicon and manifest requests, server start and the session are not reported; only MCP requests, which carry their server URL, are.
 
 **What is tracked:**
 - Your Countly server's domain (as the device ID, above)
@@ -799,7 +801,7 @@ Some tools write depending on their arguments: `formulas_run` with a `mode` othe
 
 With an `apps` allow-list, every app id in a call's arguments is checked, at any depth and inside JSON-string arguments (`app_id`, `apps`, `selectedApps`, `widget.apps`, `<appId>***event` keys, ...), and an every-app wildcard (`"*"`, `"all"`) is refused. Tools that are not provably limited to the named app (`appScope: "unscoped"`, e.g. dashboards, which are not per app) are hidden while an allow-list is set.
 
-Usage analytics in library mode are driven by the host. Pass `analytics` to report tool usage to the MCP app on stats.count.ly, with the same events the standalone modes send (`server_started`, `transport_used`, `tool_executed`, `tool_execution_time`, `tool_category_used`, `error_occurred`):
+Usage analytics in library mode are driven by the host. Pass `analytics` to report tool usage to the Countly server telemetry app on stats.count.ly, with the same events the standalone modes send (`server_started`, `transport_used`, `tool_executed`, `tool_execution_time`, `tool_category_used`, `error_occurred`):
 
 ```ts
 createMcpHandler({

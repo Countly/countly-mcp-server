@@ -17,10 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **`retention` saved a report when `save_report` was false** — the handler sent `save_report=0`, and Countly treats any non-empty value as "save", so asking not to save dispatched the calculation to the report manager anyway. It is now sent only when true.
 
-- **Host-driven usage analytics in library mode** — an optional `analytics: { isEnabled, deviceId, host? }` option reports tool usage to the MCP app on stats.count.ly with the standalone event names, under the host's device id and only while the host allows it. Library mode never initializes the global Countly SDK.
+- **Host-driven usage analytics in library mode** — an optional `analytics: { isEnabled, deviceId, host? }` option reports tool usage to the Countly server telemetry app on stats.count.ly with the standalone event names, under the host's device id and only while the host allows it. Library mode never initializes the global Countly SDK.
 
 ### Changed
 - **Usage analytics are on by default and report under your Countly server's domain** — like the Countly platform's own telemetry. The device ID is the domain of `COUNTLY_SERVER_URL` (per request in multi-tenant HTTP mode), derived exactly as the platform does; nothing is sent without a usable domain. Opt out with `ENABLE_ANALYTICS=false`. Previously analytics were opt-in and reported under the fixed device ID `"mcp"`.
+- **Usage goes to the Countly server telemetry app** (`9c28c347…`) on stats.count.ly, the app the Countly platform reports to, instead of the separate MCP app. Every event, session, view and crash is sent with its own domain device ID; the SDK's stored device ID is no longer used, and anything without a domain (page visits, health checks and startup in multi-tenant mode with no configured server) is not reported. The `/mcp` request event now reports under the request's own server.
 
 ## [1.6.0] - 2026-09-21
 

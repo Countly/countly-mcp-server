@@ -968,7 +968,6 @@ class CountlyMCPServer {
         
         // MCP endpoint - ONLY endpoint that handles MCP protocol requests
         if (pathname === mcpEndpoint) {
-          analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
 
           // Per-IP rate limiting. Configurable via COUNTLY_RATE_LIMIT_RPM
           // (default 120 requests per minute). Set to 0 to disable. IP is
@@ -1113,6 +1112,9 @@ class CountlyMCPServer {
               serverUrlFromCaller: !!serverUrl,
             },
             async () => {
+              // Inside the request scope, so it reports under this request's
+              // server domain (multi-tenant) rather than the configured one.
+              analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
               // Pass the body we already buffered so the SDK doesn't try to
               // re-read the (now consumed) request stream. undefined for
               // bodyless methods, matching the SDK's optional parsedBody arg.

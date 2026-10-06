@@ -24,7 +24,16 @@ vi.mock('countly-sdk-nodejs', () => {
     log_error: vi.fn(),
     user_details: vi.fn(),
     track_view: vi.fn(),
-    request: vi.fn(),
+    // Every analytics call now goes as Countly.request with its own device id;
+    // replay the events through add_event so event-content assertions read as before.
+    request: vi.fn((params: any) => {
+      if (params && params.events) {
+        for (const e of JSON.parse(params.events)) {
+          const { timestamp: _ts, ...rest } = e;
+          mockCountly.add_event(rest);
+        }
+      }
+    }),
   };
   return { default: mockCountly };
 });
@@ -63,9 +72,9 @@ describe('Analytics', () => {
       
       expect(Countly.init).toHaveBeenCalledWith(
         expect.objectContaining({
-          app_key: '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7',
+          app_key: '9c28c347849f2c03caf1b091ec7be8def435e85e',
           url: 'https://stats.count.ly',
-          device_id: 'countly.example.com',
+          clear_stored_device_id: true,
           debug: false,
         })
       );
@@ -452,7 +461,9 @@ describe('Analytics', () => {
         })
       );
       
-      expect(Countly.log_error).toHaveBeenCalled();
+      const crash = (Countly as any).request.mock.calls.map((c: any[]) => c[0]).find((p: any) => p.crash);
+      expect(crash.device_id).toBe('countly.example.com');
+      expect(JSON.parse(crash.crash)).toEqual(expect.objectContaining({ _error: 'ValidationError: Invalid input', _nonfatal: true }));
     });
 
     it('should truncate long error messages', async () => {
@@ -497,7 +508,7 @@ describe('Analytics', () => {
       
       analytics.trackSession('begin');
       
-      expect(Countly.begin_session).toHaveBeenCalled();
+      expect((Countly as any).request).toHaveBeenCalledWith(expect.objectContaining({ begin_session: 1, device_id: 'countly.example.com' }));
     });
 
     it('should end session', async () => {
@@ -507,7 +518,7 @@ describe('Analytics', () => {
       
       analytics.trackSession('end');
       
-      expect(Countly.end_session).toHaveBeenCalled();
+      expect((Countly as any).request).toHaveBeenCalledWith(expect.objectContaining({ end_session: 1, device_id: 'countly.example.com' }));
     });
 
     it('should not track session when disabled', async () => {
@@ -516,7 +527,7 @@ describe('Analytics', () => {
       
       analytics.trackSession('begin');
       
-      expect(Countly.begin_session).not.toHaveBeenCalled();
+      expect((Countly as any).request).not.toHaveBeenCalled();
     });
   });
 
@@ -596,9 +607,9 @@ describe('Analytics', () => {
       
       analytics.trackUserProperty('plan', 'premium');
       
-      expect(Countly.user_details).toHaveBeenCalledWith({
-        custom: { plan: 'premium' },
-      });
+      expect((Countly as any).request).toHaveBeenCalledWith(expect.objectContaining({
+        user_details: JSON.stringify({ custom: { plan: 'premium' } }),
+      }));
     });
 
     it('should track numeric user property', async () => {
@@ -608,15 +619,15 @@ describe('Analytics', () => {
       
       analytics.trackUserProperty('login_count', 42);
       
-      expect(Countly.user_details).toHaveBeenCalledWith({
-        custom: { login_count: 42 },
-      });
+      expect((Countly as any).request).toHaveBeenCalledWith(expect.objectContaining({
+        user_details: JSON.stringify({ custom: { login_count: 42 } }),
+      }));
     });
 
     it('should handle user property errors gracefully', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, SERVER);
-      Countly.user_details.mockImplementationOnce(() => {
+      (Countly as any).request.mockImplementationOnce(() => {
         throw new Error('User details failed');
       });
       
@@ -632,13 +643,16 @@ describe('Analytics', () => {
       
       analytics.trackView('welcome_page');
       
-      expect(Countly.track_view).toHaveBeenCalledWith('welcome_page');
+      expect(Countly.add_event).toHaveBeenCalledWith(expect.objectContaining({
+        key: '[CLY]_view',
+        segmentation: expect.objectContaining({ name: 'welcome_page', visit: 1 }),
+      }));
     });
 
     it('should handle view tracking errors gracefully', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, SERVER);
-      Countly.track_view.mockImplementationOnce(() => {
+      (Countly as any).request.mockImplementationOnce(() => {
         throw new Error('View tracking failed');
       });
       
@@ -808,20 +822,19 @@ describe('Analytics', () => {
       currentUrl = 'https://tenant-b.count.ly';
       analytics.trackEvent('e2');
 
-      // tenant-a is the SDK's own device id; tenant-b goes as a request under its domain
-      const segA = (Countly.add_event as any).mock.calls[0][0].segmentation;
-      const req = ((Countly as any).request as any).mock.calls[0][0];
-      expect(req.device_id).toBe('tenant-b.count.ly');
-      const segB = JSON.parse(req.events)[0].segmentation;
+      const [reqA, reqB] = (Countly as any).request.mock.calls.map((c: any[]) => c[0]);
+      expect(reqA.device_id).toBe('tenant-a.count.ly');
+      expect(reqB.device_id).toBe('tenant-b.count.ly');
+      const segA = JSON.parse(reqA.events)[0].segmentation;
+      const segB = JSON.parse(reqB.events)[0].segmentation;
       expect(segA.server).not.toBe(segB.server);
     });
 
     it('uses the server domain as device_id, like the Countly platform', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, () => 'https://api.count.ly');
-      expect(Countly.init).toHaveBeenCalledWith(
-        expect.objectContaining({ device_id: 'api.count.ly' })
-      );
+      // server_started fires from init
+      expect((Countly as any).request).toHaveBeenCalledWith(expect.objectContaining({ device_id: 'api.count.ly' }));
     });
 
     it('includes the hash on the server_started event (fired from within init)', async () => {
@@ -917,10 +930,13 @@ describe('Analytics', () => {
       expect(deviceIdFromServerUrl(undefined)).toBeUndefined();
     });
 
-    it('initializes the SDK under the server domain', async () => {
+    it('never relies on the SDK device id (a stored id would win over init)', async () => {
       const Countly = await getCountlyMock();
       analytics.init(true, SERVER);
-      expect(Countly.init).toHaveBeenCalledWith(expect.objectContaining({ device_id: 'countly.example.com' }));
+      expect(Countly.init).toHaveBeenCalledWith(expect.objectContaining({ clear_stored_device_id: true }));
+      for (const call of (Countly as any).request.mock.calls) {
+        expect(call[0].device_id).toBe('countly.example.com');
+      }
     });
 
     it("reports another tenant's events under that tenant's domain", async () => {
@@ -930,8 +946,19 @@ describe('Analytics', () => {
       vi.clearAllMocks();
       current = 'https://other.example.org';
       analytics.trackEvent('tool_executed', { tool: 'apps_list' });
-      expect(Countly.add_event).not.toHaveBeenCalled();
       expect(Countly.request).toHaveBeenCalledWith(expect.objectContaining({ device_id: 'other.example.org' }));
+    });
+
+    it('drops sessions, views and crashes too without a domain (e.g. page visits in multi-tenant mode)', async () => {
+      const Countly = await getCountlyMock();
+      analytics.init(true, () => undefined);
+      vi.clearAllMocks();
+      analytics.trackSession('begin');
+      analytics.trackView('welcome_page');
+      analytics.trackHttpRequest('/health', 'GET');
+      analytics.trackError('Error', 'boom');
+      analytics.trackSession('end');
+      expect((Countly as any).request).not.toHaveBeenCalled();
     });
 
     it('reports nothing without a usable domain', async () => {

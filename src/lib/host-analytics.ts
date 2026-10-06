@@ -1,8 +1,8 @@
 /**
  * Usage analytics for library mode, driven by the host.
  *
- * The standalone modes report to the MCP app on stats.count.ly through the
- * Countly SDK (src/lib/analytics.ts), under a fixed device id. An embedding
+ * The standalone modes report to the Countly server telemetry app on
+ * stats.count.ly (src/lib/analytics.ts), under the Countly server's domain. An embedding
  * host such as Countly already reports its own server telemetry to
  * stats.count.ly through the same SDK, so library mode never touches that
  * global SDK instance (initializing it again would replace the host's).
@@ -11,12 +11,12 @@
  *   - `isEnabled()`: whether the host allows usage reporting right now
  *     (Countly: its tracker is on and `tracking.server_events` is set);
  *   - `deviceId()`: the identity to report under (Countly: the same device id
- *     its server telemetry uses), so the MCP app's data lines up with the
+ *     its server telemetry uses), so MCP usage lines up with the
  *     host's own telemetry.
  *
  * Events and segments mirror the standalone ones (server_started,
  * transport_used, tool_executed, tool_execution_time, tool_category_used,
- * error_occurred), so the MCP app's views keep working. No raw URLs, tokens,
+ * error_occurred).  No raw URLs, tokens,
  * arguments or error messages are sent. Events are batched and sent in the
  * background over plain HTTP; a failure drops the batch and never affects a
  * tool call.
@@ -27,8 +27,8 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 export const DEFAULT_ANALYTICS_URL = 'https://stats.count.ly';
-/** The MCP app on stats.count.ly; the same key the standalone modes use. */
-export const DEFAULT_ANALYTICS_APP_KEY = '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7';
+/** The Countly server telemetry app on stats.count.ly; the same key the standalone modes use. */
+export const DEFAULT_ANALYTICS_APP_KEY = '9c28c347849f2c03caf1b091ec7be8def435e85e';
 
 const FLUSH_EVERY_MS = 10_000;
 const FLUSH_AT = 50;
@@ -42,7 +42,7 @@ export interface HostAnalyticsOptions {
   deviceId: () => string | undefined | null;
   /** Stats server base URL. Default https://stats.count.ly. */
   url?: string;
-  /** App key on the stats server. Default: the MCP app. */
+  /** App key on the stats server. Default: the Countly server telemetry app. */
   appKey?: string;
   /** Label for the embedding host, sent as a segment (e.g. "countly"). */
   host?: string;

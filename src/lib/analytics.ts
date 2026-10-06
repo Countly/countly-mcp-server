@@ -6,9 +6,16 @@
  * Events are reported under the Countly server's domain as the device id,
  * derived exactly the way the Countly platform derives its own telemetry
  * device id (scheme and trailing slashes stripped, host[:port][/path] kept),
- * so the MCP app's data on stats.count.ly lines up with the server's own
+ * so the MCP data on stats.count.ly lines up with the server's own
  * telemetry. In multi-tenant HTTP mode each request reports under its own
- * server's domain. No domain (or "localhost"): nothing is reported.
+ * server's domain. No domain (or "localhost"): nothing is reported — that
+ * includes page visits, health checks and startup in multi-tenant mode with
+ * no configured server.
+ *
+ * Every event, session, view and crash is sent as an explicit request carrying
+ * its own device id. The SDK's global device id is never used: the SDK
+ * prefers a device id stored on disk over the one passed to init, so relying
+ * on it would keep reporting under an old id.
  */
 
 // @ts-ignore - countly-sdk-nodejs doesn't have TypeScript definitions
@@ -19,7 +26,11 @@ import { createRequire } from 'module';
 import { redactSensitiveInMessage } from './error-handler.js';
 
 const ANALYTICS_URL = 'https://stats.count.ly';
-const ANALYTICS_APP_KEY = '5a106dec46bf2e2d4d23c2cd3cf7490b12c22fc7';
+/**
+ * The Countly server telemetry app on stats.count.ly: the same app (and, via
+ * the domain device id, the same device) the Countly platform reports to.
+ */
+const ANALYTICS_APP_KEY = '9c28c347849f2c03caf1b091ec7be8def435e85e';
 /**
  * Length of the server-URL hash that accompanies every analytics event.
  * 16 hex chars = 64 bits of entropy — enough to distinguish several billion
@@ -127,8 +138,8 @@ type ServerUrlResolver = () => string | undefined;
 class Analytics {
   private enabled: boolean = false;
   private initialized: boolean = false;
-  /** The SDK's own device id (sessions, user details, crashes). */
-  private deviceId: string = 'mcp';
+  private startedAt: number = Date.now();
+  private sessionStartedAt: number = Date.now();
   private getServerUrl?: ServerUrlResolver;
 
   /**
@@ -150,13 +161,13 @@ class Analytics {
       return;
     }
 
-    this.deviceId = deviceIdFromServerUrl(getServerUrl?.()) ?? 'mcp';
-
     try {
       Countly.init({
         app_key: ANALYTICS_APP_KEY,
         url: ANALYTICS_URL,
-        device_id: this.deviceId,
+        // Never reported under: every request names its own device id.
+        device_id: 'countly-mcp-server',
+        clear_stored_device_id: true,
         debug: false,
         // Collect basic metrics
         metrics: {
@@ -334,8 +345,18 @@ class Analytics {
       tool: toolName || 'unknown',
     });
 
-    // Also record as crash for visibility
-    Countly.log_error(new Error(`${errorType}: ${redacted}`));
+    // Also record as a non-fatal crash for visibility: the redacted message
+    // only, no stack (it would carry the install's file paths).
+    this.request({
+      crash: JSON.stringify({
+        _os: process.platform,
+        _os_version: process.version,
+        _app_version: this.getAppVersion(),
+        _error: `${errorType}: ${redacted}`,
+        _nonfatal: true,
+        _run: Math.round((Date.now() - this.startedAt) / 1000),
+      }),
+    });
   }
 
   /**
@@ -347,9 +368,20 @@ class Analytics {
     }
 
     if (action === 'begin') {
-      Countly.begin_session();
+      this.sessionStartedAt = Date.now();
+      this.request({
+        begin_session: 1,
+        metrics: JSON.stringify({
+          _os: process.platform,
+          _os_version: process.version,
+          _app_version: this.getAppVersion(),
+        }),
+      });
     } else {
-      Countly.end_session();
+      this.request({
+        end_session: 1,
+        session_duration: Math.round((Date.now() - this.sessionStartedAt) / 1000),
+      });
     }
   }
 
@@ -402,19 +434,19 @@ class Analytics {
    * the Countly platform reports bulk server events. No domain: not sent.
    */
   private send(event: { key: string; count: number; dur?: number; segmentation?: Record<string, string | number> }): void {
+    this.request({ events: JSON.stringify([{ ...event, timestamp: Date.now() }]) });
+  }
+
+  /**
+   * Queues one request to stats.count.ly under the current server's domain.
+   * No domain: nothing is sent.
+   */
+  private request(params: Record<string, string | number>): void {
     const deviceId = deviceIdFromServerUrl(this.getServerUrl?.());
     if (!deviceId) {
       return;
     }
-    if (deviceId === this.deviceId) {
-      Countly.add_event(event);
-      return;
-    }
-    Countly.request({
-      app_key: ANALYTICS_APP_KEY,
-      device_id: deviceId,
-      events: JSON.stringify([{ ...event, timestamp: Date.now() }]),
-    });
+    Countly.request({ ...params, app_key: ANALYTICS_APP_KEY, device_id: deviceId });
   }
 
   /**
@@ -426,11 +458,7 @@ class Analytics {
     }
 
     try {
-      Countly.user_details({
-        custom: {
-          [key]: value,
-        },
-      });
+      this.request({ user_details: JSON.stringify({ custom: { [key]: value } }) });
     } catch (error) {
       console.error('📊 Analytics: Failed to track user property:', error);
     }
@@ -445,7 +473,7 @@ class Analytics {
     }
 
     try {
-      Countly.track_view(viewName);
+      this.send({ key: '[CLY]_view', count: 1, segmentation: { name: viewName, visit: 1, segment: process.platform } });
     } catch (error) {
       console.error('📊 Analytics: Failed to track view:', error);
     }
