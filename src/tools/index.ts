@@ -306,6 +306,8 @@ import { drillV2ToolDefinitions } from './v2/drill.js';
 import { notesV2ToolDefinitions } from './v2/notes.js';
 import { eventsV2ToolDefinitions } from './v2/events.js';
 import { usersV2ToolDefinitions } from './v2/users.js';
+import { journeysV2ToolDefinitions } from './v2/journeys.js';
+import { contentV2ToolDefinitions } from './v2/content.js';
 
 /**
  * Tool definitions that replace the legacy ones when the connected server
@@ -321,5 +323,7 @@ export function getV2ToolDefinitionOverrides(): Record<string, any> {
     ...notesV2ToolDefinitions,
     ...eventsV2ToolDefinitions,
     ...usersV2ToolDefinitions,
+    ...journeysV2ToolDefinitions,
+    ...contentV2ToolDefinitions,
   };
 }

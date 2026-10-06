@@ -52,6 +52,7 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
   - `drill_query` (requires the drill plugin): ad-hoc metrics over raw events. Supports count, unique, sum, avg, min, max and percentile; cohort and formula metrics; filters, breakdowns, time series, sorting and cursor paging. Custom event keys are mapped to drill's storage format automatically.
   - `notes_update`: edit a graph note (owner or global admin). Editing a legacy note moves it to the new format, which the legacy dashboard no longer shows.
+  - `journeys_complete`, `journeys_stats_blocks`, `journeys_stats_content`, `journeys_stats_active_users`, `journeys_templates` (require the journey_engine plugin): end a journey for good, per-block funnel, in-app content engagement, active users, and ready-made journey templates
 - **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
   - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
   - `funnels_list`: paging with totals
@@ -67,6 +68,8 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `dashboard_users`: `/v2/members`, compacted to identity, role, app access and login times
 
   Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API. Also legacy: `crashes_stats_get` (no v2 stats endpoint), `apps_create` (`/v2/apps/create` skips the country/timezone/category validation and defaults), `apps_update`/`apps_delete`/`apps_reset`, `events_create`/`events_delete`, `user_profiles_get` and `app_users_*` (no v2 equivalent).
+- **Journeys** (`journeys_*`): all journey tools use `/v2/journey_engine`. This is required for writes: a journey written through `/v2` belongs to the new UI and the legacy write endpoints refuse it. The first `/v2` write on a journey created in the old dashboard moves it to the new UI for good. Block graphs keep the same JSON format. `journeys_list` gains status/search/sort/paging, `journeys_create`/`journeys_update` a description and conversion goal, `journeys_stats_uids` the `goal_converted` metric, and `journeys_stats_table` lists journey instances. `journeys_publish` cannot unpublish to draft on Platform (use `journeys_pause` or `journeys_complete`). Stats default to the last 30 days.
+- **Content** (`content_blocks_*`, `content_assets_*`): Platform replaces content blocks with content messages (popup, banner, carousel, survey, push; slides of typed blocks). `content_blocks_list` returns native messages and legacy blocks (flagged `legacy`); get, preview and delete accept both, falling back to the classic API for legacy ids. `content_blocks_create`/`content_blocks_update` take the message format (`message_format`, `platform`, `slides`, ...); legacy blocks are read-only. Assets use the shared `/v2` asset store (PNG/JPEG/GIF/WebP/SVG, max 10MB) that native messages reference. `content_langs_list` stays on the classic API.
 - **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).
 
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.
@@ -582,9 +585,9 @@ async function funnelExamples() {
 ```
 
 ### journeys
-**Tools**: `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`, `journeys_block_reference`, `journeys_stats_summary`, `journeys_stats_table`, `journeys_stats_performance`, `journeys_stats_uids`
+**Tools**: `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`, `journeys_block_reference`, `journeys_stats_summary`, `journeys_stats_table`, `journeys_stats_performance`, `journeys_stats_uids`, and on Countly Platform also `journeys_complete`, `journeys_stats_blocks`, `journeys_stats_content`, `journeys_stats_active_users`, `journeys_templates`
 
-**Requires plugin**: `journey_engine` (Countly Enterprise)
+**Requires plugin**: `journey_engine` (Countly Enterprise / Platform)
 
 Manage user journeys - automated multi-step engagement flows built from trigger, logical, engagement, and data-pipeline blocks. A journey consists of a definition and one or more versions; each version holds the block graph. New journeys start as drafts and must be published to run.
 
@@ -645,7 +648,9 @@ async function journeyExamples() {
 ### content
 **Tools**: `content_blocks_list`, `content_blocks_get`, `content_blocks_preview`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`, `content_assets_list`, `content_assets_upload`, `content_assets_update`, `content_assets_delete`, `content_langs_list`
 
-**Requires plugin**: `content` (Countly Enterprise)
+**Requires plugin**: `content` (Countly Enterprise / Platform)
+
+On Countly Platform these tools manage the new content messages; see [Countly Platform /v2 API](#countly-platform-v2-api).
 
 Manage content blocks - reusable in-app content (banners, modals, surveys) delivered to users, typically through journey "in-app-content" engagement blocks.
 
