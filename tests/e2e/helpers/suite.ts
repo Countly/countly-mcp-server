@@ -46,9 +46,11 @@ const VISIBLE_FOR_ADMIN: Record<Edition, string[]> = {
  * Tools backed only by Platform's /v2 API (exported once PR #196 lands; empty
  * before that, which skips the check).
  */
-const V2_ONLY_TOOLS: string[] = [
-  ...((toolsConfig as unknown as { V2_ONLY_TOOLS?: Set<string> }).V2_ONLY_TOOLS ?? []),
-];
+const optionalToolSet = (name: string): string[] =>
+  [...((toolsConfig as unknown as Record<string, Set<string> | undefined>)[name] ?? [])];
+const V2_ONLY_TOOLS = optionalToolSet('V2_ONLY_TOOLS');
+/** Tools Platform can't run at all (e.g. databases_stats); also from PR #196 */
+const NOT_ON_PLATFORM_TOOLS = optionalToolSet('NOT_ON_PLATFORM_TOOLS');
 
 /** Write tools a read-only user must never see */
 const HIDDEN_FOR_READ_ONLY = ['notes_create', 'notes_delete', 'crashes_resolve', 'apps_create', 'apps_delete', 'events_create'];
@@ -166,6 +168,11 @@ export function defineLiveSuite(edition: Edition): void {
         }
         for (const { tool } of HIDDEN_FOR_ADMIN[edition]) {
           expect(listed, `${tool} should be hidden`).not.toContain(tool);
+        }
+        if (edition === 'platform') {
+          for (const tool of NOT_ON_PLATFORM_TOOLS) {
+            expect(listed, `${tool} should be hidden on Platform`).not.toContain(tool);
+          }
         }
       });
 
