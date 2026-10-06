@@ -203,6 +203,7 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   hooks_update: f('hooks', 'c'),
   hooks_delete: f('hooks', 'd'),
   hooks_test: f('hooks', 'c'),
+  hooks_get: f('hooks', 'r'),
 
   // journeys
   journeys_list: f('journey_engine', 'r'),

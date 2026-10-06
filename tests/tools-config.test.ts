@@ -87,7 +87,7 @@ describe('Tools Configuration', () => {
       email_reports: 7,
       dashboards: 8,
       times_of_day: 1,
-      hooks: 5,
+      hooks: 6,
       journeys: 13,
       content: 11,
       metadata: 1,
@@ -108,12 +108,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 161 tools', () => {
+    it('should have total of 162 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(161);
+      expect(totalTools).toBe(162);
     });
   });
 

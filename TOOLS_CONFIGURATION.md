@@ -50,6 +50,7 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `views_top`: top views per metric
   - `crash_group_breakdown`, `crash_group_users`: crash distribution over a field, and affected users
   - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
+  - `hooks_get` (requires the hooks plugin): one hook with its configuration, run counters and the last failed runs with error messages
   - `drill_query` (requires the drill plugin): ad-hoc metrics over raw events. Supports count, unique, sum, avg, min, max and percentile; cohort and formula metrics; filters, breakdowns, time series, sorting and cursor paging. Custom event keys are mapped to drill's storage format automatically.
 - **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
   - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
@@ -58,6 +59,11 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `funnels_step_users`, `funnels_dropoff_users`: full user profiles, paginated (they fall back to legacy uids when drill profiles are unavailable or a filter is used)
   - `sdk_logs_list`: paging, plus filters by request type, SDK, time range, text and problem requests
   - `user_profiles_query`: free-text search, sorting, paging and total count (it falls back to legacy when drill profiles are unavailable)
+  - `hooks_list`: hooks of one app or all apps, filters by enabled state and text, paging with totals, lean rows
+  - `hooks_create`, `hooks_update`, `hooks_delete`, `hooks_test`: same arguments, sent to `/v2/hooks`. `hooks_update` changes only the supplied fields, and uses the status route when only `enabled` changes
+  - `email_reports_list`: reports you own, receive or can see, optionally filtered by app and title, with a readable schedule
+  - `email_reports_core_create`, `email_reports_dashboard_create`, `email_reports_update`, `email_reports_send`, `email_reports_delete`: same arguments, sent to `/v2/reports`. Reports created there are hidden from the legacy dashboard, and dashboard reports reference new-UI dashboards (the ids `dashboards_list` returns on Platform). `email_reports_update` keeps the stored schedule fields it is not asked to change
+  - `email_reports_preview`: the rendered email reduced to readable text (one line per table row) instead of raw HTML
 
   Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API.
 - **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).

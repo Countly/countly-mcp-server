@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **161 Tools** across 33 categories for comprehensive Countly operations
+- **162 Tools** across 33 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (161 available)
+### Tools (162 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -574,7 +574,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 161 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 162 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -738,13 +738,13 @@ The server provides 161 tools across 33 categories for comprehensive Countly int
 - **`server_logs_contents`** - Get contents of a specific server log file for debugging and monitoring (only available in non-Docker deployments)
 
 ### Email Reports (requires `reports` plugin)
-- **`email_reports_list`** - List all email reports configured for an app
-- **`email_reports_core_create`** - Create a core email report with metrics like analytics, events, crashes, and star-rating
-- **`email_reports_dashboard_create`** - Create a dashboard email report for specific dashboards
-- **`email_reports_update`** - Update an existing email report configuration
-- **`email_reports_preview`** - Preview an email report to see what it will look like before sending
-- **`email_reports_send`** - Manually trigger sending an email report immediately
-- **`email_reports_delete`** - Delete an email report configuration
+- **`email_reports_list`** (v2 on Platform) - List all email reports configured for an app; on Platform across apps with an optional app and title filter
+- **`email_reports_core_create`** (v2 on Platform) - Create a core email report with metrics like analytics, events, crashes, and star-rating
+- **`email_reports_dashboard_create`** (v2 on Platform) - Create a dashboard email report for specific dashboards; on Platform for new-UI dashboards
+- **`email_reports_update`** (v2 on Platform) - Update an existing email report configuration
+- **`email_reports_preview`** (v2 on Platform) - Preview an email report to see what it will look like before sending; on Platform as readable text
+- **`email_reports_send`** (v2 on Platform) - Manually trigger sending an email report immediately
+- **`email_reports_delete`** (v2 on Platform) - Delete an email report configuration
 
 ### Views (requires `views` plugin)
 - **`views_table`** - Per-view metrics table (views, users, duration, bounces, exits)
@@ -768,11 +768,12 @@ On Countly Platform with the new UI, the dashboard tools work with the new-UI da
 - **`times_of_day`** - Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.
 
 ### Hooks (requires `hooks` plugin)
-- **`hooks_list`** - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.
-- **`hooks_test`** - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
-- **`hooks_create`** - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
-- **`hooks_update`** - Update an existing webhook/hook configuration.
-- **`hooks_delete`** - Delete a webhook/hook by its ID.
+- **`hooks_list`** (v2 on Platform) - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details. On Platform also across apps, with enabled/text filters, paging and run counters.
+- **`hooks_get`** (Platform) - Get one hook with its configuration, run counters and its last failed runs with error messages.
+- **`hooks_test`** (v2 on Platform) - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
+- **`hooks_create`** (v2 on Platform) - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
+- **`hooks_update`** (v2 on Platform) - Update an existing webhook/hook configuration.
+- **`hooks_delete`** (v2 on Platform) - Delete a webhook/hook by its ID.
 - **`hooks_internal_triggers_get`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
 
 ### Journeys (requires `journey_engine` plugin, Countly Enterprise)

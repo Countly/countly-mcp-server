@@ -348,6 +348,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'hooks_create': 'C',
       'hooks_update': 'U',
       'hooks_delete': 'D',
+      'hooks_get': 'R',
     },
     requiresPlugin: 'hooks',
     availableByDefault: false,
@@ -614,6 +615,7 @@ export const V2_ONLY_TOOLS = new Set([
   'crash_group_breakdown', 'crash_group_users',
   'funnels_breakdown', 'funnels_trends', 'funnels_user_progress',
   'drill_query',
+  'hooks_get',
 ]);
 
 /**
