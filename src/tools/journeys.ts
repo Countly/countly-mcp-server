@@ -356,6 +356,7 @@ export async function handleUpdateJourney(
   if (error || !version) {
     return {
       content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+      isError: true,
     };
   }
 
@@ -513,6 +514,7 @@ export async function handlePublishJourney(
     if (error || !version) {
       return {
         content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+        isError: true,
       };
     }
     resolvedVersionId = version._id;
@@ -583,6 +585,7 @@ export async function handlePauseJourney(
     if (error || !version) {
       return {
         content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+        isError: true,
       };
     }
     resolvedVersionId = version._id;
@@ -652,6 +655,7 @@ export async function handleResumeJourney(
     if (error || !version) {
       return {
         content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+        isError: true,
       };
     }
     resolvedVersionId = version._id;

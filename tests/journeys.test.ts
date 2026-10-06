@@ -229,6 +229,8 @@ describe('Journeys Tools', () => {
       });
 
       expect(result.content[0].text).toContain('Provide version_id explicitly');
+
+      expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('version1');
       expect(result.content[0].text).toContain('version2');
       expect(mockContext.httpClient.post).not.toHaveBeenCalled();
@@ -244,6 +246,8 @@ describe('Journeys Tools', () => {
       });
 
       expect(result.content[0].text).toContain('not found on this journey');
+
+      expect(result.isError).toBe(true);
       expect(mockContext.httpClient.post).not.toHaveBeenCalled();
     });
 
@@ -376,6 +380,8 @@ describe('Journeys Tools', () => {
       });
 
       expect(result.content[0].text).toContain('No version with status "active"');
+
+      expect(result.isError).toBe(true);
       expect(mockContext.httpClient.post).not.toHaveBeenCalled();
     });
   });
