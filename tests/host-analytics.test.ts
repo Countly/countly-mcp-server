@@ -20,6 +20,27 @@ function fakeFetch() {
 const call = { tool: 'apps_list', category: 'apps', outcome: 'success' as const, durationMs: 120 };
 
 describe('HostAnalytics', () => {
+  it('keeps each event under the device id it was recorded with, one request per id', async () => {
+    const f = fakeFetch();
+    let current: string | null = 'tenant-a.example.com';
+    const a = new HostAnalytics({ isEnabled: () => true, deviceId: () => current }, f.fn);
+    a.toolCall(call);
+    current = 'tenant-b.example.com';
+    a.toolCall({ ...call, tool: 'events_list' });
+    current = null; // the request scope has ended by the time the batch flushes
+    await a.flush();
+    expect(f.calls).toHaveLength(2);
+    const sent = new Map(f.calls.map((c) => [c.body.get('device_id'), JSON.parse(c.body.get('events') as string)]));
+    expect([...sent.keys()].sort()).toEqual(['tenant-a.example.com', 'tenant-b.example.com']);
+    const tools = (id: string) => sent.get(id).filter((e: any) => e.key === 'tool_executed').map((e: any) => e.segmentation.tool);
+    expect(tools('tenant-a.example.com')).toEqual(['apps_list']);
+    expect(tools('tenant-b.example.com')).toEqual(['events_list']);
+    for (const events of sent.values()) {
+      expect(events.filter((e: any) => e.key === 'server_started')).toHaveLength(1);
+      expect(JSON.stringify(events)).not.toContain('deviceId');
+    }
+  });
+
   it('sends nothing while the host does not allow it', async () => {
     const f = fakeFetch();
     const a = new HostAnalytics({ isEnabled: () => false, deviceId: () => 'countly.example.com' }, f.fn);

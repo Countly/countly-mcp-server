@@ -51,6 +51,8 @@ export interface HostAnalyticsOptions {
 }
 
 interface QueuedEvent {
+  /** The identity the event was recorded under (deviceId() at that moment). */
+  deviceId: string;
   key: string;
   count: number;
   dur?: number;
@@ -78,7 +80,7 @@ export class HostAnalytics {
   private readonly fetchImpl: Fetch;
   private queue: QueuedEvent[] = [];
   private timer: NodeJS.Timeout | null = null;
-  private started = false;
+  private started = new Set<string>();
 
   constructor(options: HostAnalyticsOptions, fetchImpl?: Fetch) {
     this.options = options;
@@ -87,17 +89,21 @@ export class HostAnalytics {
     this.fetchImpl = fetchImpl ?? (globalThis.fetch as unknown as Fetch);
   }
 
-  /** @returns whether an event may be recorded now */
-  private allowed(): boolean {
+  /** @returns the device id to record an event under now, or null when none may be recorded */
+  private currentDeviceId(): string | null {
     try {
-      return this.options.isEnabled() === true && !!this.options.deviceId();
+      if (this.options.isEnabled() !== true) {
+        return null;
+      }
+      const id = this.options.deviceId();
+      return id ? String(id) : null;
     } catch {
-      return false;
+      return null;
     }
   }
 
-  private push(key: string, segmentation: Record<string, string | number>, dur?: number): void {
-    const event: QueuedEvent = { key, count: 1, timestamp: Date.now(), segmentation };
+  private push(deviceId: string, key: string, segmentation: Record<string, string | number>, dur?: number): void {
+    const event: QueuedEvent = { deviceId, key, count: 1, timestamp: Date.now(), segmentation };
     if (dur !== undefined) {
       event.dur = dur;
     }
@@ -113,21 +119,21 @@ export class HostAnalytics {
     }
   }
 
-  /** server_started and transport_used, once per process, on the first event. */
-  private ensureStarted(): void {
-    if (this.started) {
+  /** server_started and transport_used, once per device id, on its first event. */
+  private ensureStarted(deviceId: string): void {
+    if (this.started.has(deviceId)) {
       return;
     }
-    this.started = true;
+    this.started.add(deviceId);
     const host = this.options.host ?? 'embedded';
-    this.push('server_started', {
+    this.push(deviceId, 'server_started', {
       platform: process.platform,
       node_version: process.version,
       transport: 'library',
       host,
       version: packageVersion(),
     });
-    this.push('transport_used', { type: 'library', host });
+    this.push(deviceId, 'transport_used', { type: 'library', host });
   }
 
   /**
@@ -136,20 +142,24 @@ export class HostAnalytics {
    */
   toolCall(call: { tool: string; category: string; outcome: 'success' | 'failed' | 'no_access'; durationMs: number }): void {
     try {
-      if (!this.allowed()) {
+      // The identity is taken now and kept with each event: a host whose
+      // deviceId() follows the request (one tenant per request) must not have
+      // a batch sent under whichever tenant is current when it flushes.
+      const deviceId = this.currentDeviceId();
+      if (!deviceId) {
         return;
       }
-      this.ensureStarted();
+      this.ensureStarted(deviceId);
       const success = call.outcome === 'success';
       const duration = Math.max(0, Math.round(call.durationMs));
-      this.push('tool_executed', { tool: call.tool, success: success ? 1 : 0, duration });
+      this.push(deviceId, 'tool_executed', { tool: call.tool, success: success ? 1 : 0, duration });
       if (duration) {
-        this.push('tool_execution_time', { tool: call.tool }, duration);
+        this.push(deviceId, 'tool_execution_time', { tool: call.tool }, duration);
       }
-      this.push('tool_category_used', { category: call.category });
+      this.push(deviceId, 'tool_category_used', { category: call.category });
       if (!success) {
         // The outcome only: no error message leaves the host.
-        this.push('error_occurred', { error_type: call.outcome, error_message: call.outcome, tool: call.tool });
+        this.push(deviceId, 'error_occurred', { error_type: call.outcome, error_message: call.outcome, tool: call.tool });
       }
     } catch {
       // Analytics must never affect a tool call.
@@ -157,7 +167,7 @@ export class HostAnalytics {
   }
 
   /**
-   * Sends everything queued, in one request. Never throws.
+   * Sends everything queued, one request per device id. Never throws.
    */
   async flush(): Promise<void> {
     if (this.timer) {
@@ -168,15 +178,25 @@ export class HostAnalytics {
       return;
     }
     const events = this.queue.splice(0, this.queue.length);
-    let deviceId: string | undefined | null;
+    let enabled: boolean;
     try {
-      deviceId = this.options.isEnabled() === true ? this.options.deviceId() : null;
+      enabled = this.options.isEnabled() === true;
     } catch {
-      deviceId = null;
+      enabled = false;
     }
-    if (!deviceId) {
-      return; // opted out (or lost identity) since the events were queued
+    if (!enabled) {
+      return; // opted out since the events were queued
     }
+    const byDevice = new Map<string, Omit<QueuedEvent, 'deviceId'>[]>();
+    for (const { deviceId, ...event } of events) {
+      const list = byDevice.get(deviceId) ?? [];
+      list.push(event);
+      byDevice.set(deviceId, list);
+    }
+    await Promise.all([...byDevice].map(([deviceId, list]) => this.send(deviceId, list)));
+  }
+
+  private async send(deviceId: string, events: Omit<QueuedEvent, 'deviceId'>[]): Promise<void> {
     const body = new URLSearchParams({
       app_key: this.appKey,
       device_id: deviceId,

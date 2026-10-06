@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool classification** — every tool category now has a user-facing `area`, and global-admin tools are listed in `ADMIN_ONLY_TOOLS`. A unit test fails if a registered tool is missing a category, operation, area or app scope.
 
 ### Fixed
+- **Library analytics keep each event's device id** — events are batched for up to 10 seconds; each now keeps the device id it was recorded under and a batch is sent per id, so a host whose `deviceId()` follows the request (one tenant per request) never has one tenant's calls sent under another's id, or dropped when the request has ended.
 - **Library mode uses the Platform /v2 API** — tools got no server capabilities in library mode, so on Countly Platform they always took their legacy paths and `/v2`-only tools answered "needs Countly Platform". The handler now detects the server once per grant (as the standalone modes do), hands the result to the tools and hides tools the server does not support.
 - **App list refreshed after app changes** — in library mode `apps_create`, `apps_update` and `apps_delete` clear the grant's app cache, so a new or renamed app resolves by name at once.
 - **Every loopback spelling counts as no domain** — the telemetry host is normalised before the loopback check, so `[0:0:0:0:0:0:0:1]`, `[::ffff:127.0.0.1]`, `127.1` and `0x7f.1` send nothing.
