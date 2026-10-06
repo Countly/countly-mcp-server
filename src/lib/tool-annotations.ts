@@ -7,7 +7,7 @@
  * overrides where the label alone gives the wrong hint.
  */
 
-import { TOOL_CATEGORIES, hasRestrictedArguments, type CrudOperation, type ToolsConfig } from './tools-config.js';
+import { TOOL_CATEGORIES, getCallShapes, hasRestrictedArguments, type CrudOperation, type ToolsConfig } from './tools-config.js';
 
 export interface ToolAnnotations {
   readOnlyHint?: boolean;
@@ -98,7 +98,23 @@ export function getToolAnnotations(toolName: string, config?: ToolsConfig): Tool
   if (config && hasRestrictedArguments(toolName, config)) {
     return { ...BY_OPERATION[operation] };
   }
-  return { ...BY_OPERATION[operation], ...OVERRIDES[toolName] };
+  return { ...BY_OPERATION[operation], ...writesByArguments(toolName, operation, config), ...OVERRIDES[toolName] };
+}
+
+/**
+ * A tool labelled as a read whose arguments can make it write (see
+ * TOOL_OPERATION_RULES: retention with save_report, formulas_run saving) is
+ * not read-only while the configuration allows that write.
+ */
+function writesByArguments(toolName: string, operation: CrudOperation, config?: ToolsConfig): ToolAnnotations {
+  if (operation !== 'R') {
+    return {};
+  }
+  const category = Object.entries(TOOL_CATEGORIES).find(([, data]) => toolName in data.operations)?.[0];
+  const allowed = category && config ? config[category] : undefined;
+  const writes = (getCallShapes(toolName) ?? []).some((shape) =>
+    shape.some((op) => op !== 'R') && (!config || (!!allowed && shape.every((op) => allowed.has(op)))));
+  return writes ? { readOnlyHint: false, idempotentHint: false } : {};
 }
 
 /** Copy of the tool definition with its annotations attached */

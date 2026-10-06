@@ -20,6 +20,7 @@ describe('Resources', () => {
     mockAppCache = {
       getAll: vi.fn(),
       update: vi.fn(),
+      currentGeneration: vi.fn().mockReturnValue(0),
       size: vi.fn(),
       isExpired: vi.fn(),
       get: vi.fn(),
@@ -218,6 +219,7 @@ describe('Resources: auth token is never logged', () => {
       isExpired: vi.fn().mockReturnValue(true),
       getAll: vi.fn().mockReturnValue([]),
       update: vi.fn(),
+      currentGeneration: vi.fn().mockReturnValue(0),
     };
 
     await readResource('countly://app/app1/config', httpClient, appCache, () => ({}));

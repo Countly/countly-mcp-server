@@ -75,9 +75,10 @@ export async function getApps(request: ToolRequest): Promise<CountlyApp[]> {
   if (!request.appCache.isExpired()) {
     return request.appCache.getAll();
   }
+  const generation = request.appCache.currentGeneration();
   const response = await request.client.get('/o/apps/mine', { params: request.authParams() });
   const apps = parseAppsMineResponse(response.data);
-  request.appCache.update(apps);
+  request.appCache.update(apps, generation);
   return apps;
 }
 

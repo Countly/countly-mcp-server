@@ -75,3 +75,17 @@ describe('AppCacheRegistry', () => {
     expect(registry.size()).toBe(20);
   });
 });
+
+describe('AppCache generation', () => {
+  it('ignores a list fetched before the cache was cleared', async () => {
+    const { AppCache } = await import('../src/lib/app-cache.js');
+    const cache = new AppCache();
+    const before = cache.currentGeneration();
+    cache.clear(); // an app was created while the fetch was in flight
+    cache.update([{ _id: 'old', name: 'Old' } as any], before);
+    expect(cache.isExpired()).toBe(true);
+    expect(cache.getAll()).toEqual([]);
+    cache.update([{ _id: 'new', name: 'New' } as any], cache.currentGeneration());
+    expect(cache.getAll().map((a) => a._id)).toEqual(['new']);
+  });
+});
