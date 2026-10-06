@@ -35,6 +35,19 @@ const welcomePage = (() => {
 })();
 
 describe('welcome page', () => {
+  describe('caller-controlled values', () => {
+    it('HTML-escapes the endpoint URL built from the Host header', () => {
+      // pageEndpointUrl is derived from req.headers.host (and X-Forwarded-Proto
+      // behind a trusted proxy). Unescaped, a forged Host reflected markup
+      // straight into the page.
+      expect(indexSource).toMatch(/const pageEndpointUrl = escapeHtml\(/);
+    });
+
+    it('accepts only http or https from X-Forwarded-Proto', () => {
+      expect(indexSource).toMatch(/forwardedProto === 'http' \|\| forwardedProto === 'https'/);
+    });
+  });
+
   describe('install instructions', () => {
     it('never references a scoped @countly/ package', () => {
       // The published package is unscoped. `npx -y @countly/countly-mcp-server`

@@ -341,6 +341,22 @@ export function readLimitedBody(
 }
 
 /**
+ * Escape a string for interpolation into HTML text or a quoted attribute.
+ *
+ * The welcome page builds its copy-pasteable endpoint URL from the request's
+ * `Host` header (and `X-Forwarded-Proto` behind a trusted proxy), both of
+ * which the caller controls, so they must never reach the markup raw.
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Make a potentially-attacker-controlled string safe to concatenate into a
  * stderr log line. Strips control characters (LF, CR, ESC, etc.) that would
  * otherwise let a caller inject fake log entries or smuggle ANSI escapes,

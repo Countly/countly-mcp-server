@@ -5,6 +5,7 @@ import { assertSafeServerHost, assertSafeServerUrl, safeLookup } from '../src/li
 import { redactSensitiveInMessage } from '../src/lib/error-handler.js';
 import {
   ConcurrencyLimiter,
+  escapeHtml,
   extractClientIp,
   formatRequestLog,
   parseContentLength,
@@ -433,6 +434,23 @@ describe('resolveCorsOrigin', () => {
   });
   it('returns null when allowlist is specific and no Origin header is sent', () => {
     expect(resolveCorsOrigin(['https://a.com'], undefined)).toBeNull();
+  });
+});
+
+describe('escapeHtml', () => {
+  it('neutralises markup in a forged Host header', () => {
+    expect(escapeHtml('test.com</pre><script>alert(1)</script>')).toBe(
+      'test.com&lt;/pre&gt;&lt;script&gt;alert(1)&lt;/script&gt;'
+    );
+  });
+  it('escapes quotes so attribute breakouts fail', () => {
+    expect(escapeHtml(`a" onmouseover='x'`)).toBe('a&quot; onmouseover=&#39;x&#39;');
+  });
+  it('escapes ampersands first so entities are not double-decoded', () => {
+    expect(escapeHtml('&lt;')).toBe('&amp;lt;');
+  });
+  it('leaves an ordinary host:port untouched', () => {
+    expect(escapeHtml('https://mcp.example.com:3000/mcp')).toBe('https://mcp.example.com:3000/mcp');
   });
 });
 

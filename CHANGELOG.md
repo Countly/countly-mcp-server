@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **Welcome page escapes the request's `Host` header** — the copy-pasteable endpoint URL on `/` was built from `req.headers.host` (and `X-Forwarded-Proto` behind a trusted proxy) and interpolated into the HTML raw, so a forged `Host` reflected markup into the page. A browser cannot be made to send a forged `Host`, so this needed a caching proxy that does not key on `Host` to reach anyone else, but it is now HTML-escaped regardless, and `X-Forwarded-Proto` is accepted only as `http` or `https`.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added

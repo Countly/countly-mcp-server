@@ -43,6 +43,7 @@ import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
 import { FAVICON_SVG } from './lib/favicon.js';
 import {
   ConcurrencyLimiter,
+  escapeHtml,
   extractClientIp,
   formatRequestLog,
   parseCorsAllowed,
@@ -1142,11 +1143,13 @@ class CountlyMCPServer {
           // otherwise assume TLS for anything that isn't a local address.
           const pageHost = (req.headers.host || `${hostname}:${port}`).trim();
           const forwardedProto = trustProxy
-            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim()
+            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim().toLowerCase()
             : undefined;
-          const pageProto = forwardedProto
+          const pageProto = (forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : undefined)
             || (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(pageHost) ? 'http' : 'https');
-          const pageEndpointUrl = `${pageProto}://${pageHost}${mcpEndpoint}`;
+          // Host and X-Forwarded-Proto are caller-controlled; escape before
+          // the URL goes into the markup below.
+          const pageEndpointUrl = escapeHtml(`${pageProto}://${pageHost}${mcpEndpoint}`);
 
           const pageTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
           const pageToolNames = new Set(pageTools.map((t: { name: string }) => t.name));
