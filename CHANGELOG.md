@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **Browser requests refused while the server holds its own token** — with `COUNTLY_AUTH_TOKEN` or `COUNTLY_AUTH_TOKEN_FILE` set in HTTP mode, any caller that reaches `/mcp` without a token acts with the configured one, and CORS defaults to `*`. A web page open in the operator's browser could therefore call a localhost server and read the responses, and DNS rebinding reaches it even under a CORS allowlist because the page then looks same-origin. `/mcp` now answers 403 to any request carrying an `Origin` header while a server-side token is configured, unless that origin is listed explicitly in `COUNTLY_CORS_ALLOWED_ORIGINS` (`*` does not count). MCP clients send no `Origin` and are unaffected, and servers without a configured token, where each caller brings its own, behave exactly as before. The server also logs a startup warning when it runs HTTP mode with a server-side token.
+
+### Changed
+- **Docs: server-side tokens in HTTP mode** — README and `DOCKER.md` now state that the HTTP transport does not authenticate its callers, so a server-side token belongs only on a trusted network, and the Docker quick-starts that pass a token publish the port on `127.0.0.1` instead of all interfaces.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added

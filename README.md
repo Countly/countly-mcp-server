@@ -96,7 +96,7 @@ COUNTLY_SERVER_URL=https://your-countly-instance.com \
 COUNTLY_AUTH_TOKEN=your-countly-auth-token \
 npx -y countly-mcp-server
 
-# HTTP mode
+# HTTP mode (binds localhost; see "Server-side token in HTTP mode" before exposing it)
 COUNTLY_SERVER_URL=https://your-countly-instance.com \
 COUNTLY_AUTH_TOKEN=your-countly-auth-token \
 npx -y countly-mcp-server --http
@@ -219,7 +219,7 @@ The server supports multiple authentication methods (in priority order):
 | `ENABLE_ANALYTICS` | No | `false` | Enable anonymous usage analytics (set to `true` to opt in) |
 | `COUNTLY_TOOLS_{CATEGORY}` | No | `ALL` | Control available tools per category (see below) |
 | `COUNTLY_TOOLS_ALL` | No | `ALL` | Default permission for all categories |
-| `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). |
+| `COUNTLY_CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins (HTTP transport). Leave unset or `*` for wide-open; use specific origins in production (e.g. `https://app.example.com,https://dash.example.com`). When a server-side token is configured, browser requests to `/mcp` are refused unless their origin is listed here explicitly; `*` does not count. |
 | `COUNTLY_RATE_LIMIT_RPM` | No | `120` | Per-IP requests per minute on the `/mcp` endpoint (HTTP transport). Set to `0` to disable. |
 | `COUNTLY_TRUST_PROXY` | No | `false` | When `true`, use `X-Forwarded-For` for the rate-limit client IP. Only enable when the server is behind a trusted reverse proxy that sets this header. |
 | `COUNTLY_MAX_BODY_BYTES` | No | `1048576` | Maximum request-body size accepted on `/mcp` (HTTP transport). Requests over the limit get `413 Payload Too Large`. Set to `0` to disable. |
@@ -372,6 +372,31 @@ COUNTLY_CORS_ALLOWED_ORIGINS="https://dash.example.com,https://ops.example.com"
 The server will then echo only allowed origins and add `Vary: Origin`.
 Pre-flight requests from disallowed origins get a 403.
 
+When the server holds its own token (`COUNTLY_AUTH_TOKEN` or
+`COUNTLY_AUTH_TOKEN_FILE`), `/mcp` refuses every request that carries an
+`Origin` header with a 403, unless that origin is listed explicitly in
+`COUNTLY_CORS_ALLOWED_ORIGINS` (the `*` default does not count). MCP
+clients such as Claude Desktop, Claude Code, VS Code and Cursor send no
+`Origin` header and are unaffected. This stops a web page open in the
+operator's browser, including one using DNS rebinding, from driving a
+server that holds a token. Servers without a configured token, where every
+caller brings its own, are not affected by this rule.
+
+### Server-side token in HTTP mode
+
+`COUNTLY_AUTH_TOKEN` and `COUNTLY_AUTH_TOKEN_FILE` exist for stdio mode,
+where the MCP client launches the server as its own child process. In HTTP
+mode the server does **not** authenticate its callers: when one is set,
+any caller that reaches `/mcp` without supplying its own token acts with
+the configured one, with all the permissions that token carries.
+
+Only configure a server-side token in HTTP mode when the endpoint is
+reachable from a trusted network alone: bound to localhost, behind a
+firewall, or behind a reverse proxy that authenticates callers. The server
+logs a warning at startup when it runs this way. For a shared or
+internet-facing deployment, leave both variables unset and have each
+client send its own token in the `X-Countly-Auth-Token` header.
+
 ### Self-hosted single-tenant deployments
 
 If you're running this as a single-tenant server (e.g. `docker run` on a
@@ -387,7 +412,8 @@ The default Dockerfile binds to `0.0.0.0:3000` so it works inside a
 container without extra flags. This means `docker run -p 3000:3000 ...`
 exposes the MCP endpoint to the public internet — use an explicit local
 bind, a reverse proxy, or an external firewall if that's not what you
-want.
+want. This matters most when the container is given a server-side token:
+see [Server-side token in HTTP mode](#server-side-token-in-http-mode).
 
 ### Telemetry
 

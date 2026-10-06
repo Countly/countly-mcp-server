@@ -7,6 +7,7 @@ import {
   ConcurrencyLimiter,
   extractClientIp,
   formatRequestLog,
+  isOriginPermitted,
   parseContentLength,
   parseCorsAllowed,
   RateLimiter,
@@ -433,6 +434,29 @@ describe('resolveCorsOrigin', () => {
   });
   it('returns null when allowlist is specific and no Origin header is sent', () => {
     expect(resolveCorsOrigin(['https://a.com'], undefined)).toBeNull();
+  });
+});
+
+describe('isOriginPermitted: browser requests while the server holds a token', () => {
+  it('refuses a browser origin when the server holds a token and CORS is "*"', () => {
+    expect(isOriginPermitted('*', 'https://evil.example', true)).toBe(false);
+  });
+  it('refuses the opaque "null" origin (sandboxed iframes, file://)', () => {
+    expect(isOriginPermitted('*', 'null', true)).toBe(false);
+  });
+  it('refuses an origin that is not on an explicit allowlist', () => {
+    expect(isOriginPermitted(['https://app.example'], 'https://evil.example', true)).toBe(false);
+  });
+  it('permits an origin listed explicitly', () => {
+    expect(isOriginPermitted(['https://app.example'], 'https://app.example', true)).toBe(true);
+  });
+  it('permits requests without an Origin header (MCP clients)', () => {
+    expect(isOriginPermitted('*', undefined, true)).toBe(true);
+    expect(isOriginPermitted(['https://app.example'], undefined, true)).toBe(true);
+  });
+  it('permits any origin when the server holds no token (callers bring their own)', () => {
+    expect(isOriginPermitted('*', 'https://evil.example', false)).toBe(true);
+    expect(isOriginPermitted(['https://app.example'], 'https://evil.example', false)).toBe(true);
   });
 });
 
