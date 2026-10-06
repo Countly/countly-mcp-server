@@ -346,6 +346,7 @@ export async function handleUpdateHook(
           text: `Error: Hook with ID ${hook_id} not found`,
         },
       ],
+      isError: true,
     };
   }
 

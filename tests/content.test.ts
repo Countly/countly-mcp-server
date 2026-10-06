@@ -164,6 +164,8 @@ describe('Content Tools', () => {
       });
 
       expect(result.content[0].text).toContain('Invalid blocks JSON');
+
+      expect(result.isError).toBe(true);
       expect(mockContext.httpClient.post).not.toHaveBeenCalled();
     });
 
@@ -242,6 +244,8 @@ describe('Content Tools', () => {
       });
 
       expect(result.content[0].text).toContain('Invalid blocks JSON');
+
+      expect(result.isError).toBe(true);
       expect(mockContext.httpClient.post).not.toHaveBeenCalled();
     });
 

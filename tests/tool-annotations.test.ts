@@ -46,6 +46,14 @@ describe('tool annotations', () => {
     expect(getToolAnnotations('alerts_create')).toMatchObject({ destructiveHint: true });
     // events_create overwrites an existing event key's metadata
     expect(getToolAnnotations('events_create')).toMatchObject({ destructiveHint: true });
+    // a new filtering rule is enabled by default and drops incoming data
+    expect(getToolAnnotations('filtering_rules_create')).toMatchObject({ destructiveHint: true });
+  });
+
+  it('does not mark deletes of data that keeps arriving as idempotent', () => {
+    expect(getToolAnnotations('apps_delete')).toMatchObject({ idempotentHint: true });
+    expect(getToolAnnotations('apps_reset')).toMatchObject({ idempotentHint: false });
+    expect(getToolAnnotations('app_users_delete')).toMatchObject({ idempotentHint: false });
   });
 
   it('flags tools that send emails or call webhooks as open-world', () => {

@@ -264,6 +264,7 @@ export async function handleCreateJourney(
         type: 'text',
         text: `Error: Invalid blocks JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
       }],
+      isError: true,
     };
   }
 
@@ -371,6 +372,7 @@ export async function handleUpdateJourney(
           type: 'text',
           text: `Error: Invalid blocks JSON - ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
         }],
+        isError: true,
       };
     }
   }

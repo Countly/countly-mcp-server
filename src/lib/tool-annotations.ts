@@ -50,6 +50,12 @@ const OVERRIDES: Record<string, ToolAnnotations> = {
   // alert_config._id is given, an event key's name/description/category
   alerts_create: { destructiveHint: true, ...SENDS_OUTSIDE },
   events_create: { destructiveHint: true },
+  // Rules are enabled by default, so creating one starts dropping incoming data
+  filtering_rules_create: { destructiveHint: true },
+  // Deletes whatever data matches at call time, so a retry removes records
+  // that arrived (or started matching) since the first call
+  apps_reset: { idempotentHint: false },
+  app_users_delete: { idempotentHint: false },
   // Not a dry run: the configured effects really execute (emails, webhooks, custom code)
   hooks_test: { destructiveHint: true, ...SENDS_OUTSIDE },
   hooks_create: SENDS_OUTSIDE,
