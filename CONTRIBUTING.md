@@ -55,6 +55,49 @@ We welcome contributions to the Countly MCP Server project! This document provid
 - Test both success and error cases
 - Include integration tests for new tools
 
+### Live end-to-end tests
+
+`npm test` is hermetic: no network, no real Countly server. A separate live suite in `tests/e2e/` (`npm run test:e2e`, config `vitest.e2e.config.ts`) builds the server, spawns `build/index.js` over stdio and drives it against real Countly dev servers. Per server it checks:
+
+- edition detection (`get_version` and the `Detected ...` log line)
+- which tools `tools/list` shows a global admin and a read-only user
+- that hidden tools are refused with a missing-plugin or missing-permission message
+- that every visible read-only tool can be called without `isError`
+- a create, read back and delete round-trip of a note and a dashboard (with a widget on Platform), named `mcp-e2e-<timestamp>`
+
+It runs nightly and on manual dispatch (`.github/workflows/e2e-nightly.yml`), which opens or updates one `e2e-failure` issue when it fails. The release workflow also runs it before publishing to npm or Docker. It never runs on pull requests, because fork and Dependabot PRs get no secrets and the dev servers change daily.
+
+| Server key   | Default URL               | Edition                     |
+|--------------|---------------------------|-----------------------------|
+| `LITE`       | https://ce.count.ly       | Countly Lite 25.03          |
+| `ENTERPRISE` | https://arturs.count.ly   | Countly Enterprise 25.03    |
+| `PLATFORM`   | https://master.count.ly   | Countly Platform 26.01 (/v2) |
+
+Environment variables per server (the same names are the GitHub Actions secrets):
+
+| Variable                     | Required | Value |
+|------------------------------|----------|-------|
+| `MCP_E2E_<KEY>_ADMIN_TOKEN`  | yes      | token of the `mcp-detect-admin` user (global admin) |
+| `MCP_E2E_<KEY>_APP_ID`       | yes      | the app `mcp-detect-user` can read. The write round-trip uses this app too. |
+| `MCP_E2E_<KEY>_USER_TOKEN`   | no       | token of `mcp-detect-user` (read-only on that one app). The read-only checks are skipped without it. |
+| `MCP_E2E_<KEY>_URL`          | no       | another server URL (a repository *variable* in CI) |
+
+Servers without their required variables are skipped. `MCP_E2E_REQUIRE_SECRETS=1`, which the release gate sets, turns a missing secret into a failure instead.
+
+Mint a non-expiring token while logged in as the user (pass that user's API key):
+
+```bash
+curl "https://<server>/i/token/create?api_key=<API_KEY>&ttl=0&multi=true&purpose=mcp-e2e"
+```
+
+Run against a single server locally:
+
+```bash
+MCP_E2E_ENTERPRISE_ADMIN_TOKEN=... MCP_E2E_ENTERPRISE_USER_TOKEN=... MCP_E2E_ENTERPRISE_APP_ID=... npm run test:e2e
+```
+
+The suite asserts behaviour and structure only, never data values. Objects it creates are deleted in `afterAll`. Leftovers older than an hour from crashed runs are swept at the start of the next run.
+
 ## Submitting Changes
 
 ### Pull Request Process

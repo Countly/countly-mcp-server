@@ -1,0 +1,103 @@
+# Nightly run of the live e2e suite (see e2e.yml). On failure it opens one
+# issue labelled `e2e-failure`, or comments on the open one instead of filing
+# duplicates. When the suite passes again, the open issue is closed.
+name: E2E nightly
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    uses: ./.github/workflows/e2e.yml
+    secrets: inherit
+
+  report-failure:
+    name: Report failure
+    needs: e2e
+    if: always() && needs.e2e.result == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      - name: Download results
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: e2e-results
+
+      - name: Build issue body
+        run: |
+          {
+            echo "The live e2e suite failed on \`${GITHUB_REF_NAME}\` (${GITHUB_SHA::7})."
+            echo
+            echo "Run: ${RUN_URL}"
+            echo
+            if [[ -f e2e-results.json ]]; then
+              # Failing tests grouped by error (a server outage fails every
+              # test with the same message), plus files that failed without a
+              # failing test. Stack frames are dropped to keep it readable.
+              jq -r '
+                def clean: split("\n") | map(select(test("^\\s+at ") | not)) | join("\n") | .[0:4000];
+                [ (.testResults[]
+                    | select(.status == "failed" and ([.assertionResults[]? | select(.status == "failed")] | length) == 0)
+                    | {name: (.name | sub(".*/tests/"; "tests/")),
+                       msg: ((.message // "") | if . == "" then "failed outside a test, see the run log" else clean end)}),
+                  (.testResults[].assertionResults[]?
+                    | select(.status == "failed")
+                    | {name: .fullName, msg: ((.failureMessages // []) | join("\n") | clean)}) ]
+                | group_by(.msg)
+                | .[]
+                | "### \(.[0].msg | split("\n")[0] | .[0:200])\n\n\(map("- \(.name)") | join("\n"))\n\n```\n\(.[0].msg)\n```\n"
+              ' e2e-results.json
+            else
+              echo "No test results were produced; the job failed before or during setup. See the run log."
+            fi
+          } | head -c 60000 > body.md
+          cat body.md
+
+      - name: Open or update the e2e-failure issue
+        run: |
+          gh label create e2e-failure --color B60205 \
+            --description "The nightly live e2e suite is failing" 2>/dev/null || true
+          number="$(gh issue list --label e2e-failure --state open --limit 1 --json number --jq '.[0].number // empty')"
+          if [[ -n "$number" ]]; then
+            gh issue comment "$number" --body-file body.md
+          else
+            gh issue create --title "Live e2e suite is failing" --label e2e-failure --body-file body.md
+          fi
+
+  close-on-recovery:
+    name: Close failure issue
+    needs: e2e
+    if: needs.e2e.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      - name: Close the open e2e-failure issue
+        run: |
+          number="$(gh issue list --label e2e-failure --state open --limit 1 --json number --jq '.[0].number // empty' || true)"
+          if [[ -n "$number" ]]; then
+            gh issue close "$number" --comment "The live e2e suite passes again: ${RUN_URL}"
+          fi
