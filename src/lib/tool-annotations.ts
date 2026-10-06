@@ -26,19 +26,25 @@ const BY_OPERATION: Record<CrudOperation, ToolAnnotations> = {
   D: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 };
 
-/** Status setters that are undone by their counterpart tool */
-const REVERSIBLE_STATUS: ToolAnnotations = { destructiveHint: false, idempotentHint: true };
-/** Tools that deliver emails or call webhooks, now or on a schedule/trigger */
+/**
+ * Status setters: repeating the call changes nothing more. They stay
+ * destructive, since destructiveHint: false means "only additive updates"
+ * and these overwrite state (pausing a journey also clears queued content).
+ */
+const SETS_STATUS: ToolAnnotations = { idempotentHint: true };
+/** Tools that deliver emails or call webhooks, now or on a schedule/trigger/activation */
 const SENDS_OUTSIDE: ToolAnnotations = { openWorldHint: true };
 
 const OVERRIDES: Record<string, ToolAnnotations> = {
-  crashes_resolve: REVERSIBLE_STATUS,
-  crashes_unresolve: REVERSIBLE_STATUS,
-  crashes_hide: REVERSIBLE_STATUS,
-  crashes_show: REVERSIBLE_STATUS,
-  journeys_pause: REVERSIBLE_STATUS,
-  journeys_resume: REVERSIBLE_STATUS,
-  filtering_rules_toggle_status: REVERSIBLE_STATUS,
+  crashes_resolve: SETS_STATUS,
+  crashes_unresolve: SETS_STATUS,
+  crashes_hide: SETS_STATUS,
+  crashes_show: SETS_STATUS,
+  journeys_pause: SETS_STATUS,
+  filtering_rules_toggle_status: SETS_STATUS,
+  // Activating a journey lets its call-webhook blocks (Platform) call arbitrary URLs
+  journeys_publish: SENDS_OUTSIDE,
+  journeys_resume: { ...SETS_STATUS, ...SENDS_OUTSIDE },
 
   // Labelled 'C' but also update an existing record: an alert when
   // alert_config._id is given, an event key's name/description/category

@@ -49,7 +49,7 @@ describe('tool annotations', () => {
   });
 
   it('flags tools that send emails or call webhooks as open-world', () => {
-    for (const name of ['hooks_test', 'email_reports_send', 'hooks_create', 'alerts_create', 'notes_create', 'dashboards_create']) {
+    for (const name of ['hooks_test', 'email_reports_send', 'hooks_create', 'alerts_create', 'notes_create', 'dashboards_create', 'journeys_publish', 'journeys_resume']) {
       expect({ name, ...getToolAnnotations(name) }).toMatchObject({ name, openWorldHint: true });
     }
     expect(getToolAnnotations('apps_delete')).toMatchObject({ openWorldHint: false });
@@ -57,8 +57,10 @@ describe('tool annotations', () => {
     expect(getToolAnnotations('hooks_test')).toMatchObject({ readOnlyHint: false, destructiveHint: true });
   });
 
-  it('treats reversible status changes as non-destructive', () => {
-    expect(getToolAnnotations('crashes_resolve')).toMatchObject({ destructiveHint: false, idempotentHint: true });
+  it('keeps status changes destructive, since they are not additive', () => {
+    expect(getToolAnnotations('crashes_resolve')).toMatchObject({ destructiveHint: true, idempotentHint: true });
+    // pausing clears queued content that resuming cannot restore
+    expect(getToolAnnotations('journeys_pause')).toMatchObject({ destructiveHint: true, idempotentHint: true });
   });
 
   it('attaches annotations without mutating the definition', () => {
