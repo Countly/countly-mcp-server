@@ -45,6 +45,11 @@ If `/o/users/me` cannot be read (e.g. tokens restricted to specific apps), no to
 
 When the server serves the Platform `/v2` API (Platform with the new UI), some tools switch to it, keeping their names. Their definitions in `tools/list` change accordingly. The legacy `/o` and `/i` implementation stays for Lite, Enterprise and Platform builds without `/v2`.
 
+- **Platform-only insight tools**, listed only when the server serves `/v2`:
+  - `events_summary`, `events_top`, `events_movers`: event totals, rankings, and growers/newcomers vs. the previous period
+  - `views_top`: top views per metric
+  - `crash_group_breakdown`, `crash_group_users`: crash distribution over a field, and affected users
+  - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
 - **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).
 
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.

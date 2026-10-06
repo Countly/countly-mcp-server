@@ -61,18 +61,18 @@ describe('Tools Configuration', () => {
       core: 3,
       apps: 6,
       analytics: 6,
-      crashes: 10,
+      crashes: 12,
       notes: 3,
-      events: 3,
+      events: 6,
       alerts: 3,
-      views: 2,
+      views: 3,
       database: 6,
       dashboard_users: 1,
       app_users: 3,
       drill: 4,
       user_profiles: 3,
       cohorts: 5,
-      funnels: 7,
+      funnels: 10,
       formulas: 4,
       live: 6,
       retention: 1,
@@ -108,12 +108,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 151 tools', () => {
+    it('should have total of 160 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(151);
+      expect(totalTools).toBe(160);
     });
   });
 

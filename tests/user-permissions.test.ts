@@ -106,7 +106,7 @@ describe('tool guards', () => {
 
   it('hides write and admin tools from a read-only user', () => {
     const member = parseMember(readOnlyUser);
-    const names = filterToolsByServer(allTools, loadToolsConfig({}), null, member).map((t) => t.name);
+    const names = filterToolsByServer(allTools, loadToolsConfig({}), { plugins: null, member }).map((t) => t.name);
     expect(names).toContain('crash_groups_list');
     expect(names).toContain('dashboards_create'); // any user may create dashboards
     expect(names).not.toContain('notes_create');
@@ -116,7 +116,7 @@ describe('tool guards', () => {
   });
 
   it('keeps everything when the member is unknown', () => {
-    expect(filterToolsByServer(allTools, loadToolsConfig({}), null, null)).toHaveLength(allTools.length);
+    expect(filterToolsByServer(allTools, loadToolsConfig({}), { plugins: null, member: null, v2: true })).toHaveLength(allTools.length);
     expect(isToolPermitted('apps_delete', null)).toBe(true);
   });
 

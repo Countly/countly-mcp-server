@@ -163,6 +163,11 @@ import { contentToolDefinitions, contentToolHandlers, contentToolMetadata, Conte
 
 export { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools };
 
+// Platform insights (Countly Platform /v2 only)
+import { platformInsightsToolDefinitions, platformInsightsToolHandlers, platformInsightsToolMetadata, PlatformInsightsTools } from './platform-insights.js';
+
+export { platformInsightsToolDefinitions, platformInsightsToolHandlers, platformInsightsToolMetadata, PlatformInsightsTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -204,6 +209,7 @@ export function getAllToolDefinitions() {
     ...hooksToolDefinitions,
     ...journeysToolDefinitions,
     ...contentToolDefinitions,
+    ...platformInsightsToolDefinitions,
   ];
 }
 
@@ -245,6 +251,7 @@ export function getAllToolHandlers() {
     ...hooksToolHandlers,
     ...journeysToolHandlers,
     ...contentToolHandlers,
+    ...platformInsightsToolHandlers,
   };
 }
 
@@ -286,6 +293,7 @@ export function getAllToolMetadata() {
     hooksToolMetadata,
     journeysToolMetadata,
     contentToolMetadata,
+    platformInsightsToolMetadata,
   ];
 }
 

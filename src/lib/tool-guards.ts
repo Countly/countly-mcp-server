@@ -231,6 +231,17 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   content_assets_update: f('content', 'u'),
   content_assets_delete: f('content', 'd'),
   content_langs_list: f('content', 'r'),
+
+  // Platform /v2 insights
+  events_summary: f('core', 'r'),
+  events_top: f('core', 'r'),
+  events_movers: f('core', 'r'),
+  views_top: f('views', 'r'),
+  crash_group_breakdown: f('crashes', 'r'),
+  crash_group_users: f('crashes', 'r'),
+  funnels_breakdown: f('funnels', 'r'),
+  funnels_trends: f('funnels', 'r'),
+  funnels_user_progress: f('funnels', 'r'),
 };
 
 /**

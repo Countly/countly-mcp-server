@@ -65,6 +65,7 @@ import {
   getConfigSummary,
   getToolRequiredPlugin,
   isToolSupported,
+  V2_ONLY_TOOLS,
   TOOL_CATEGORIES,
   type ToolsConfig,
 } from './lib/tools-config.js';
@@ -348,11 +349,12 @@ class CountlyMCPServer {
       const serverUrl = this.requestContext.getStore()?.serverUrl || this.config.serverUrl;
       const caps = await this.getServerCapabilities(client, serverUrl, authToken);
       if (!caps) {
-        return { tools: filteredTools };
+        // Unknown server: hide only tools that certainly need the Platform /v2 API
+        return { tools: filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null }) };
       }
       const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
       return {
-        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins, caps.member)
+        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps)
           .map((tool) => overrides[tool.name] ?? tool),
       };
     });
@@ -425,8 +427,18 @@ class CountlyMCPServer {
             isError: true,
           };
         }
+        if (V2_ONLY_TOOLS.has(name) && !caps?.v2) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Tool "${name}" is not available: it needs the Countly Platform /v2 API, ` +
+                `which this server does not serve${caps ? ` (${describeCapabilities(caps)})` : ''}.`,
+            }],
+            isError: true,
+          };
+        }
         if (requiredPlugin) {
-          if (caps && !isToolSupported(name, caps.plugins)) {
+          if (caps && !isToolSupported(name, caps.plugins, caps.v2)) {
             return {
               content: [{
                 type: 'text',

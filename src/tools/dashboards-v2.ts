@@ -39,8 +39,8 @@ export const dashboardsV2ToolDefinitions: Record<string, any> = {
       properties: {
         dashboard_id: { type: 'string', description: 'Dashboard id from dashboards_list.' },
         period: {
-          description: 'Board period: "today", "yesterday", "7days", "30days" (default), "60days", "90days", "month", or [startMs, endMs].',
-          oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }],
+          type: 'string',
+          description: 'Board period: "today", "yesterday", "7days", "30days" (default), "60days", "90days", "month", or a custom range as "[startMs,endMs]".',
         },
         include_data: { type: 'boolean', description: 'Fetch widget results. Default true; false returns only the layout and widget definitions.' },
         widget_ids: { type: 'array', items: { type: 'string' }, description: 'Only fetch results for these widget ids.' },
@@ -133,8 +133,21 @@ export const dashboardsV2ToolDefinitions: Record<string, any> = {
 
 const DAY_MS = 86_400_000;
 
+/** "[startMs,endMs]" strings become arrays; everything else is returned as is */
+function parseRangeString(period: unknown): unknown {
+  if (typeof period === 'string' && period.trim().startsWith('[')) {
+    try {
+      return JSON.parse(period);
+    } catch {
+      return period;
+    }
+  }
+  return period;
+}
+
 /** Resolve a period keyword or range to epoch-ms bounds (UTC days) */
 export function periodToRange(period: unknown, now = Date.now()): { from: number; to: number } {
+  period = parseRangeString(period);
   if (Array.isArray(period) && period.length === 2) {
     return { from: Number(period[0]), to: Number(period[1]) };
   }
@@ -162,7 +175,7 @@ export function periodToRange(period: unknown, now = Date.now()): { from: number
 
 /** The time envelope the widget-data endpoint expects for each widget kind */
 export function widgetWindow(widget: any, boardPeriod: unknown): Record<string, unknown> {
-  const period = widget.period ?? boardPeriod ?? '30days';
+  const period = parseRangeString(widget.period ?? boardPeriod ?? '30days');
   const isCustom = typeof period !== 'string';
   switch (widget.kind) {
   case 'drill': {

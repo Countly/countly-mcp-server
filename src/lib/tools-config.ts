@@ -68,6 +68,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'crashes_unresolve': 'U',
       'crashes_hide': 'U',
       'crashes_show': 'U',
+      'crash_group_breakdown': 'R',  // Platform /v2 only
+      'crash_group_users': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'crashes',
     availableByDefault: false,
@@ -85,6 +87,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'events_create': 'C',
       'events_list': 'R',
       'events_delete': 'D',
+      'events_summary': 'R',  // Platform /v2 only
+      'events_top': 'R',  // Platform /v2 only
+      'events_movers': 'R',  // Platform /v2 only
     },
     availableByDefault: true,
   },
@@ -101,6 +106,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     operations: {
       'views_table': 'R',
       'views_data': 'R',
+      'views_top': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'views',
     availableByDefault: false,
@@ -181,6 +187,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'funnels_create': 'C',
       'funnels_update': 'U',
       'funnels_delete': 'D',
+      'funnels_breakdown': 'R',  // Platform /v2 only
+      'funnels_trends': 'R',  // Platform /v2 only
+      'funnels_user_progress': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'funnels',
     availableByDefault: false,
@@ -595,10 +604,24 @@ export function getToolRequiredPlugin(toolName: string): string | undefined {
 }
 
 /**
- * Whether a tool can run on a server with the given enabled plugins.
+ * Tools backed only by Countly Platform's /v2 API. Hidden unless the server
+ * is known to serve /v2.
+ */
+export const V2_ONLY_TOOLS = new Set([
+  'events_summary', 'events_top', 'events_movers',
+  'views_top',
+  'crash_group_breakdown', 'crash_group_users',
+  'funnels_breakdown', 'funnels_trends', 'funnels_user_progress',
+]);
+
+/**
+ * Whether a tool can run on a server with the given enabled plugins and API.
  * `plugins === null` means the plugin set is unknown: the tool stays visible.
  */
-export function isToolSupported(toolName: string, plugins: string[] | null): boolean {
+export function isToolSupported(toolName: string, plugins: string[] | null, v2 = false): boolean {
+  if (V2_ONLY_TOOLS.has(toolName) && !v2) {
+    return false;
+  }
   const required = getToolRequiredPlugin(toolName);
   return !required || !plugins || plugins.includes(required);
 }
@@ -609,12 +632,11 @@ export function isToolSupported(toolName: string, plugins: string[] | null): boo
 export function filterToolsByServer<T extends { name: string }>(
   tools: T[],
   config: ToolsConfig,
-  plugins: string[] | null,
-  member: MemberPermissions | null = null
+  server: { plugins: string[] | null; member?: MemberPermissions | null; v2?: boolean }
 ): T[] {
   return tools.filter(
     (tool) => isToolAllowed(tool.name, config)
-      && isToolSupported(tool.name, plugins)
-      && isToolPermitted(tool.name, member)
+      && isToolSupported(tool.name, server.plugins, server.v2 === true)
+      && isToolPermitted(tool.name, server.member ?? null)
   );
 }
