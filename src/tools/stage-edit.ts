@@ -144,6 +144,8 @@ function setLayer(scene: Record<string, any>, op: EditOp, pieces: Record<string,
   }
   if (op.steps !== undefined) {
     need(Array.isArray(op.steps), `set_layer ${id}: steps is a list of step ids`);
+    const playing = (scene.steps ?? []).filter((s: any) => s.play?.layer === id && !op.steps.includes(s.id)).map((s: any) => s.id);
+    need(playing.length === 0, `set_layer ${id}: steps leaves out ${playing.join(', ')}, which play${playing.length === 1 ? 's' : ''} a scenario on this layer; keep ${playing.length === 1 ? 'it' : 'them'}, or set_step play: null first`);
     for (const step of scene.steps ?? []) {
       const on = op.steps.includes(step.id);
       const has = step.layers.includes(id);

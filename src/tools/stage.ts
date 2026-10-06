@@ -787,7 +787,9 @@ export class StageTools {
 
   async stage_reference(_args: any): Promise<ToolResult> {
     return run('get the Stage reference', async () => {
-      const catalog = await this.pieceCatalog().catch(() => null);
+      // Only a server without the route falls back (pieceCatalog answers null);
+      // any other failure is the server's and is reported
+      const catalog = await this.pieceCatalog();
       const pieces = catalog
         ? catalog.pieces.map((p: any) => p.id)
         : STAGE_PIECE_IDS;

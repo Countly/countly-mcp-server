@@ -45,6 +45,13 @@ describe('stage scene edit operations', () => {
     expect(stopped.steps[0]).toEqual({ id: 's1', name: 'Intro', layers: ['title'], hold: 4000 });
   });
 
+  it('set_layer steps cannot take a layer off a step that plays it', () => {
+    const playing = applyEditOps(base(), [{ op: 'set_step', id: 's1', play: { layer: 'app', scenario: 'drill-query' } }]);
+    expect(() => applyEditOps(playing, [{ op: 'set_layer', id: 'app', steps: [] }])).toThrow(/leaves out s1, which plays a scenario on this layer/);
+    const moved = applyEditOps(playing, [{ op: 'set_step', id: 's1', play: null }, { op: 'set_layer', id: 'app', steps: [] }]);
+    expect(moved.steps[0].layers).toEqual(['title']);
+  });
+
   it('removing a layer clears it from steps, plays and breakpoints', () => {
     const scene = applyEditOps(base(), [
       { op: 'set_step', id: 's1', play: { layer: 'app', scenario: 'drill-query' } },

@@ -295,6 +295,10 @@ describe('piece tools', () => {
     const fallback = json(await new StageTools(old.context).stage_reference({}));
     expect(fallback.pieces.length).toBeGreaterThan(50);
     expect(fallback.piecesSource).toContain('built-in');
+    const broken = platformContext(() => ({ status: 500, data: { error: { code: 'INTERNAL_ERROR', message: 'boom' } } }));
+    const res: any = await new StageTools(broken.context).stage_reference({});
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('boom');
   });
 });
 
