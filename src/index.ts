@@ -244,30 +244,7 @@ class CountlyMCPServer {
       console.error(getConfigSummary(this.toolsConfig));
     }
     
-    this.server = new Server(
-      {
-        name: 'countly-mcp-server',
-        version: PACKAGE_VERSION,
-      },
-      {
-        capabilities: {
-          tools: {
-            listChanged: true,
-          },
-          resources: {
-            subscribe: false,
-            listChanged: false,
-          },
-          prompts: {
-            listChanged: false,
-          },
-        },
-      }
-    );
-
-    this.setupToolHandlers();
-    this.setupResourceHandlers();
-    this.setupPromptHandlers();
+    this.server = this.createServer();
     
     // Initialize config from environment variables using lib/config.ts
     // Auth token can be loaded from environment or overridden per-request from client metadata
@@ -315,15 +292,51 @@ class CountlyMCPServer {
     return { authToken };
   }
 
-  private setupToolHandlers() {
+  /**
+   * Build a fully configured MCP Server instance with all handlers registered.
+   * Stdio mode uses a single instance for the life of the process; HTTP mode
+   * (stateless) builds one per request, because the SDK refuses to reuse a
+   * stateless transport across requests and a Server can only be bound to
+   * one transport at a time.
+   */
+  private createServer(): Server {
+    const server = new Server(
+      {
+        name: 'countly-mcp-server',
+        version: PACKAGE_VERSION,
+      },
+      {
+        capabilities: {
+          tools: {
+            listChanged: true,
+          },
+          resources: {
+            subscribe: false,
+            listChanged: false,
+          },
+          prompts: {
+            listChanged: false,
+          },
+        },
+      }
+    );
+
+    this.setupToolHandlers(server);
+    this.setupResourceHandlers(server);
+    this.setupPromptHandlers(server);
+
+    return server;
+  }
+
+  private setupToolHandlers(server: Server) {
     // Use the modular tool definitions from tools/index.ts and filter by configuration
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
       const allTools = getAllToolDefinitions();
       const filteredTools = filterTools(allTools, this.toolsConfig);
       return { tools: filteredTools };
     });
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       const startTime = Date.now();
 
@@ -455,9 +468,9 @@ class CountlyMCPServer {
     });
   }
 
-  private setupResourceHandlers() {
+  private setupResourceHandlers(server: Server) {
     // Handle resources/list requests
-    this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+    server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -478,7 +491,7 @@ class CountlyMCPServer {
     });
 
     // Handle resources/read requests
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -506,9 +519,9 @@ class CountlyMCPServer {
     });
   }
 
-  private setupPromptHandlers() {
+  private setupPromptHandlers(server: Server) {
     // Handle prompts/list requests
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
       try {
         const prompts = listPrompts();
         
@@ -529,7 +542,7 @@ class CountlyMCPServer {
     });
 
     // Handle prompts/get requests
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       try {
         const { name, arguments: args } = request.params;
         
@@ -756,13 +769,12 @@ class CountlyMCPServer {
       console.error(`Health check available at: /health`);
       console.error(`All other endpoints are available for other applications on this server`);
       
-      // Create a single StreamableHTTPServerTransport instance in stateless mode
-      // Stateless mode (sessionIdGenerator: undefined) allows clients to manage their own sessions
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
-      
-      await this.server.connect(transport);
+      // Stateless mode (sessionIdGenerator: undefined): the SDK requires a
+      // fresh transport per request, and a Server can only be bound to one
+      // transport, so each /mcp request gets its own transport + Server pair
+      // (see the SDK's simpleStatelessStreamableHttp example). Handlers read
+      // per-request auth/server URL from AsyncLocalStorage, so nothing is
+      // lost by not sharing the Server instance.
       
       const httpServer = http.createServer((req, res) => {
         // Per-request wall-clock for the request log emitted at the bottom
@@ -1095,6 +1107,15 @@ class CountlyMCPServer {
               serverUrlFromCaller: !!serverUrl,
             },
             async () => {
+              const mcpServer = this.createServer();
+              const transport = new StreamableHTTPServerTransport({
+                sessionIdGenerator: undefined,
+              });
+              res.on('close', () => {
+                transport.close().catch(() => {});
+                mcpServer.close().catch(() => {});
+              });
+              await mcpServer.connect(transport);
               // Pass the body we already buffered so the SDK doesn't try to
               // re-read the (now consumed) request stream. undefined for
               // bodyless methods, matching the SDK's optional parsedBody arg.
