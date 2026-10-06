@@ -799,6 +799,21 @@ Some tools write depending on their arguments: `formulas_run` with a `mode` othe
 
 With an `apps` allow-list, every app id in a call's arguments is checked, at any depth and inside JSON-string arguments (`app_id`, `apps`, `selectedApps`, `widget.apps`, `<appId>***event` keys, ...), and an every-app wildcard (`"*"`, `"all"`) is refused. Tools that are not provably limited to the named app (`appScope: "unscoped"`, e.g. dashboards, which are not per app) are hidden while an allow-list is set.
 
+Usage analytics in library mode are driven by the host. Pass `analytics` to report tool usage to the MCP app on stats.count.ly, with the same events the standalone modes send (`server_started`, `transport_used`, `tool_executed`, `tool_execution_time`, `tool_category_used`, `error_occurred`):
+
+```ts
+createMcpHandler({
+  countlyUrl,
+  analytics: {
+    isEnabled: () => hostTrackingIsOn(),  // read before every event and every send
+    deviceId: () => hostDeviceId(),       // report under the host's own identity
+    host: 'countly',                      // optional label, sent as a segment
+  },
+});
+```
+
+The host decides when reporting is allowed and under which device id; nothing is sent without both. Library mode never initializes the global Countly SDK (a host may already use it for its own telemetry) and never loads the standalone modes' analytics module. No URLs, tokens, arguments or error messages are sent, only tool names, categories, outcomes and durations.
+
 ## Health Check
 
 The server includes a health check endpoint at `/health` (HTTP mode only):

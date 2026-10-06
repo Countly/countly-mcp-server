@@ -30,6 +30,7 @@
  * analytics or read process.env.
  */
 
+import { HostAnalytics, type HostAnalyticsOptions } from './lib/host-analytics.js';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { createRequire } from 'module';
 
@@ -61,6 +62,8 @@ import { getAllToolDefinitions, getAllToolMetadata } from './tools/index.js';
 import type { ToolContext } from './tools/types.js';
 
 export type { CrudOperation, ToolAppScope } from './lib/tools-config.js';
+export type { HostAnalyticsOptions } from './lib/host-analytics.js';
+export { DEFAULT_ANALYTICS_APP_KEY, DEFAULT_ANALYTICS_URL } from './lib/host-analytics.js';
 
 const require = createRequire(import.meta.url);
 const { version: PACKAGE_VERSION } = require('../package.json') as { version: string };
@@ -126,6 +129,13 @@ export interface CreateMcpHandlerOptions {
    * a tool whose plugin is missing fails when Countly rejects the call.
    */
   isPluginEnabled?: (plugin: string) => boolean;
+  /**
+   * Optional usage analytics to the MCP app on stats.count.ly, driven by the
+   * host (src/lib/host-analytics.ts): the host decides when reporting is
+   * allowed and which device id to report under. Without it, nothing is
+   * reported. The standalone modes' own analytics module is never loaded.
+   */
+  analytics?: HostAnalyticsOptions;
 }
 
 export interface McpHandler {
@@ -617,8 +627,10 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
   const serverVersion = options.serverVersion ?? PACKAGE_VERSION;
   const isPluginEnabled = options.isPluginEnabled;
   const appCaches = new GrantAppCaches();
+  const hostAnalytics = options.analytics ? new HostAnalytics(options.analytics) : null;
 
   const report = (entry: ToolCallReport): void => {
+    hostAnalytics?.toolCall(entry);
     if (!options.onToolCall) {
       return;
     }

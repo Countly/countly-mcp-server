@@ -1,8 +1,9 @@
 /**
- * Library mode must never load the package's own usage analytics
- * (src/lib/analytics.ts, which reports to stats.count.ly): a host such as
- * Countly embeds the tools and owns all reporting. This holds even with
- * ENABLE_ANALYTICS=true in the host's environment.
+ * Library mode must never load the standalone modes' analytics module
+ * (src/lib/analytics.ts), which initializes the global Countly SDK: a host
+ * such as Countly already uses that SDK for its own telemetry. Library-mode
+ * usage goes only through the host-driven `analytics` option
+ * (src/lib/host-analytics.ts). This holds even with ENABLE_ANALYTICS=true.
  */
 import { describe, expect, it, vi } from 'vitest';
 

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **`retention` saved a report when `save_report` was false** — the handler sent `save_report=0`, and Countly treats any non-empty value as "save", so asking not to save dispatched the calculation to the report manager anyway. It is now sent only when true.
 
+- **Host-driven usage analytics in library mode** — an optional `analytics: { isEnabled, deviceId, host? }` option reports tool usage to the MCP app on stats.count.ly with the standalone event names, under the host's device id and only while the host allows it. Library mode never initializes the global Countly SDK.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added
