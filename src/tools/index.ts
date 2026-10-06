@@ -318,6 +318,9 @@ import { journeysV2ToolDefinitions } from './v2/journeys.js';
 import { contentV2ToolDefinitions } from './v2/content.js';
 import { hooksV2ToolDefinitions } from './v2/hooks.js';
 import { emailReportsV2ToolDefinitions } from './v2/email-reports.js';
+import { liveV2ToolDefinitions } from './v2/live.js';
+import { drillQueriesV2ToolDefinitions } from './v2/drill-queries.js';
+import { queryDataV2ToolDefinitions } from './v2/query-data.js';
 
 /**
  * Tool definitions that replace the legacy ones when the connected server
@@ -337,5 +340,8 @@ export function getV2ToolDefinitionOverrides(): Record<string, any> {
     ...contentV2ToolDefinitions,
     ...hooksV2ToolDefinitions,
     ...emailReportsV2ToolDefinitions,
+    ...liveV2ToolDefinitions,
+    ...drillQueriesV2ToolDefinitions,
+    ...queryDataV2ToolDefinitions,
   };
 }

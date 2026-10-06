@@ -62,6 +62,8 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `tasks_list`, `task_result`: background tasks / long-running reports and their stored results
   - `notifications_list`: the connected user's dashboard notifications
   - `geo_locations_list` (`geo`), `revenue_iap_events` (`revenue`), `crash_jira_issues` (`crashes-jira`)
+  - `drill_saved_query_run` (requires the drill plugin): runs a saved drill query (from `drill_bookmarks_list`), optionally re-windowed, and returns results like `drill_query`
+  - `drill_property_values` (requires the drill plugin): distinct values of a user property, custom property, campaign property or event segment, for building exact filters
 - **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
   - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
   - `funnels_list`: paging with totals
@@ -80,6 +82,10 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `email_reports_list`: reports you own, receive or can see, optionally filtered by app and title, with a readable schedule
   - `email_reports_core_create`, `email_reports_dashboard_create`, `email_reports_update`, `email_reports_send`, `email_reports_delete`: same arguments, sent to `/v2/reports`. Reports created there are hidden from the legacy dashboard, and dashboard reports reference new-UI dashboards (the ids `dashboards_list` returns on Platform). `email_reports_update` keeps the stored schedule fields it is not asked to change
   - `email_reports_preview`: the rendered email reduced to readable text (one line per table row) instead of raw HTML
+  - `live_users`, `live_last_hour`, `live_last_day`, `live_last_30_days`: also return new-user counts, as compact series with ISO timestamps and the peak (they fall back to legacy when the user cannot read the v2 route). `live_overall` (v2 has no peak timestamp) and `live_metrics` (no v2 breakdown) stay legacy.
+  - `drill_bookmarks_list`, `drill_bookmarks_create`, `drill_bookmarks_delete`: work on Platform saved queries, which include bookmarks saved in the old drill UI. Listing covers all events of the app (or every app with `scope: "mine"`); creating accepts the same metrics, filter and breakdowns as `drill_query` (or `event_key` + `query_obj` + `by_val` for a count); deleting an old-UI bookmark goes through the legacy endpoint.
+  - `queriable_fields_list`, `metadata_get`: read drill metadata from `/v2/drill`; `metadata_get` lists every custom event with its segments in one batched call (both fall back to legacy for users without drill rights)
+  - `query_data`: unchanged behaviour (its `drill` mode keeps the classic segmentation response); on Platform its description points to `drill_query` for metrics, formulas and cohorts
 
   Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API. Also legacy: `crashes_stats_get` (no v2 stats endpoint), `apps_create` (`/v2/apps/create` skips the country/timezone/category validation and defaults), `apps_update`/`apps_delete`/`apps_reset`, `events_create`/`events_delete`, `user_profiles_get` and `app_users_*` (no v2 equivalent).
 - **Journeys** (`journeys_*`): all journey tools use `/v2/journey_engine`. This is required for writes: a journey written through `/v2` belongs to the new UI and the legacy write endpoints refuse it. The first `/v2` write on a journey created in the old dashboard moves it to the new UI for good. Block graphs keep the same JSON format. `journeys_list` gains status/search/sort/paging, `journeys_create`/`journeys_update` a description and conversion goal, `journeys_stats_uids` the `goal_converted` metric, and `journeys_stats_table` lists journey instances. `journeys_publish` cannot unpublish to draft on Platform (use `journeys_pause` or `journeys_complete`). Stats default to the last 30 days.

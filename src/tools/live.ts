@@ -1,5 +1,7 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import { handleLiveLast30DaysV2, handleLiveLastDayV2, handleLiveLastHourV2, handleLiveUsersV2 } from './v2/live.js';
 
 // ============================================================================
 // GET_LIVE_USERS TOOL
@@ -322,7 +324,8 @@ export class LiveTools {
   constructor(private context: ToolContext) {}
 
   async getLiveUsers(args: any): Promise<ToolResult> {
-    return handleGetLiveUsers(this.context, args);
+    const legacy = () => handleGetLiveUsers(this.context, args);
+    return (await usesV2(this.context)) ? handleLiveUsersV2(this.context, args, legacy) : legacy();
   }
 
   async getLiveMetrics(args: any): Promise<ToolResult> {
@@ -330,15 +333,18 @@ export class LiveTools {
   }
 
   async getLiveLastHour(args: any): Promise<ToolResult> {
-    return handleGetLiveLastHour(this.context, args);
+    const legacy = () => handleGetLiveLastHour(this.context, args);
+    return (await usesV2(this.context)) ? handleLiveLastHourV2(this.context, args, legacy) : legacy();
   }
 
   async getLiveLastDay(args: any): Promise<ToolResult> {
-    return handleGetLiveLastDay(this.context, args);
+    const legacy = () => handleGetLiveLastDay(this.context, args);
+    return (await usesV2(this.context)) ? handleLiveLastDayV2(this.context, args, legacy) : legacy();
   }
 
   async getLiveLast30Days(args: any): Promise<ToolResult> {
-    return handleGetLiveLast30Days(this.context, args);
+    const legacy = () => handleGetLiveLast30Days(this.context, args);
+    return (await usesV2(this.context)) ? handleLiveLast30DaysV2(this.context, args, legacy) : legacy();
   }
 
   async getLiveOverall(args: any): Promise<ToolResult> {

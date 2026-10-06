@@ -145,6 +145,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'drill_bookmarks_delete': 'D',
       'queriable_fields_list': 'R',
       'drill_query': 'R',  // Platform /v2 only
+      'drill_saved_query_run': 'R',  // Platform /v2 only
+      'drill_property_values': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'drill',
     availableByDefault: false,
@@ -703,6 +705,7 @@ export const V2_ONLY_TOOLS = new Set([
   'revenue_iap_events',
   'crash_jira_issues',
   'hooks_get',
+  'drill_saved_query_run', 'drill_property_values',
 ]);
 
 /**

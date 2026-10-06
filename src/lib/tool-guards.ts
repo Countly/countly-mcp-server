@@ -269,6 +269,8 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   geo_locations_list: f('geo', 'r'),
   revenue_iap_events: f('revenue', 'r'),
   crash_jira_issues: f('crashes', 'r'),
+  drill_saved_query_run: f('drill', 'r'),
+  drill_property_values: f('drill', 'r'),
 };
 
 /**
@@ -279,6 +281,8 @@ export const TOOL_GUARDS_V2: Record<string, ToolGuard> = {
   journeys_update: f('journey_engine', 'u'),
   journeys_delete: f('journey_engine', 'd'),
   hooks_update: f('hooks', 'u'),
+  drill_bookmarks_create: f('drill', 'c'),
+  drill_bookmarks_delete: f('drill', 'd'),
 };
 
 function guardFor(toolName: string, v2: boolean): ToolGuard | undefined {

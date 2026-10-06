@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **178 Tools** across 42 categories for comprehensive Countly operations
+- **187 Tools** across 42 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (178 available)
+### Tools (187 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -574,7 +574,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 178 tools across 42 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 187 tools across 42 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -590,7 +590,7 @@ The server provides 178 tools across 42 categories for comprehensive Countly int
 - **`apps_reset`** - Reset app data
 
 ### Analytics & Dashboards
-- **`get_analytics_data`** - Analytics data breakdown by predefined methods (locations, carriers, devices, etc.). For multi-segment breakdowns, use drill tools
+- **`query_data`** - Analytics data by predefined methods (locations, carriers, devices, etc.), event data, or drill segmentation. On Platform, use `drill_query` for metrics, formulas and cohorts
 - **`app_analytics_summary`** - General app summary and analytics overview
 - **`slipping_users`** - Identify inactive app users
 - **`session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
@@ -603,15 +603,15 @@ The server provides 178 tools across 42 categories for comprehensive Countly int
 - **`events_summary`** (Platform) - All custom events with count, sum, duration and per-occurrence averages for a period
 - **`events_top`** (Platform) - Events ranked by count, average sum and average duration
 - **`events_movers`** (Platform) - Fastest-growing and newly appearing events vs the previous period, with daily series
-- **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
+- **`events_delete`** - Delete events and their data
 
 ### Dashboard User Management
 - **`dashboard_users`** (v2 on Platform) - List all dashboard users (admin/management users who access the Countly dashboard); on Platform as compact rows with role and app access
 
 ### App User Management
-- **`apps_create_user`** - Create app user (end-user being tracked in your application)
-- **`apps_delete_user`** - Delete app user (end-user)
-- **`export_app_users`** - Export app user data (end-users)
+- **`app_users_create`** - Create app user (end-user being tracked in your application)
+- **`app_users_delete`** - Delete app users (end-users) matching a query
+- **`app_users_update`** - Update app user properties
 
 ### Alerts & Notifications
 - **`alerts_create`** - Create alert configuration
@@ -649,11 +649,13 @@ The server provides 178 tools across 42 categories for comprehensive Countly int
 
 ### Drill Segmentation (requires `drill` plugin)
 - **`drill_query`** (Platform) - Ad-hoc analytics over raw events: count, unique users, sum, average, percentiles, cohort and formula metrics, filters, breakdowns, time series and paging
-- **`queriable_fields_list`** - Get available properties for segmentation
-- **`run_query`** - Run drill query with filters and time buckets
-- **`drill_bookmarks_list`** - List saved segmentation queries
-- **`drill_bookmarks_create`** - Save a segmentation query
-- **`drill_bookmarks_delete`** - Delete a saved query
+- **`queriable_fields_list`** (v2 on Platform) - Get available properties for segmentation
+- **`metadata_get`** (v2 on Platform) - Event definitions, segments and system fields for building queries
+- **`drill_bookmarks_list`** (v2 on Platform) - List saved segmentation queries; on Platform all saved queries of an app (or all yours), including old-UI bookmarks
+- **`drill_bookmarks_create`** (v2 on Platform) - Save a segmentation query; on Platform also any `drill_query` metrics, filter and breakdowns
+- **`drill_bookmarks_delete`** (v2 on Platform) - Delete a saved query
+- **`drill_saved_query_run`** (Platform) - Run a saved drill query, optionally over another period
+- **`drill_property_values`** (Platform) - Distinct values of a user property, custom property or event segment, for building filters
 
 ### User Profiles (requires `users` plugin)
 - **`user_profiles_query`** (v2 on Platform) - Query users with MongoDB filters; on Platform also free-text search, sorting, paging and totals
@@ -682,14 +684,15 @@ The server provides 178 tools across 42 categories for comprehensive Countly int
 ### Formulas (requires `formulas` plugin)
 - **`formulas_run`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
 - **`formulas_list`** - List all saved formulas
+- **`formulas_save`** - Create or update a saved formula
 - **`formulas_delete`** - Delete a saved formula
 
 ### Live/Concurrent Users (requires `concurrent_users` plugin)
-- **`live_users`** - Get current online user count and new users at this moment
+- **`live_users`** (v2 on Platform) - Get current online user count and new users at this moment
 - **`live_metrics`** - Get breakdown by countries, devices and carriers for users currently online
-- **`live_last_hour`** - Get minute-by-minute data for the last hour (60 data points)
-- **`live_last_day`** - Get hour-by-hour data for the last day (24 data points)
-- **`live_last_30_days`** - Get daily data for the last 30 days (30 data points)
+- **`live_last_hour`** (v2 on Platform) - Get minute-by-minute data for the last hour (60 data points)
+- **`live_last_day`** (v2 on Platform) - Get hour-by-hour data for the last day (24 data points)
+- **`live_last_30_days`** (v2 on Platform) - Get daily data for the last 30 days (30 data points)
 - **`live_overall`** - Get maximum values for online users (peak concurrent usage records)
 
 ### Retention (requires `retention_segments` plugin)
@@ -728,6 +731,7 @@ The server provides 178 tools across 42 categories for comprehensive Countly int
 - **`filtering_rules_list`** - List all blocking rules that filter incoming requests
 - **`filtering_rules_create`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
 - **`filtering_rules_update`** - Update existing blocking rule configuration
+- **`filtering_rules_toggle_status`** - Enable or disable a blocking rule
 - **`filtering_rules_delete`** - Delete a blocking rule
 
 ### Datapoint (requires `server-stats` plugin)
@@ -763,7 +767,7 @@ On Countly Platform with the new UI, the dashboard tools work with the new-UI da
 - **`dashboards_update`** - Update dashboard configuration (name, sharing, refresh rate, theme)
 - **`dashboards_delete`** - Delete a dashboard by ID
 - **`dashboards_widget_add`** - Add a widget to a dashboard with full configuration (title, feature, widget type, apps, metrics, visualization)
-- **`dashboards_update_widget`** - Update widget position and size in the grid layout
+- **`dashboards_widget_update`** - Update a widget on a dashboard
 - **`dashboards_widget_remove`** - Remove a widget from a dashboard
 
 ### Times of Day (requires `times-of-day` plugin)

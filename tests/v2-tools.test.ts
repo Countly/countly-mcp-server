@@ -101,9 +101,9 @@ describe('drill_query', () => {
   it('maps custom events to [CLY]_custom + eventNames and keeps system events', async () => {
     const { toSlimMetrics } = await import('../src/tools/v2/drill.js');
     const [m] = toSlimMetrics([{ events: ['Purchase', '[CLY]_session'], aggregation: 'count' }], undefined);
-    expect(m).toMatchObject({ id: 'A', events: ['[CLY]_session', '[CLY]_custom'], eventNames: ['Purchase'] });
+    expect(m).toMatchObject({ id: 'A', events: ['[CLY]_session', '[CLY]_session_begin', '[CLY]_custom'], eventNames: ['Purchase'] });
     const [sys] = toSlimMetrics([{ events: ['[CLY]_view'] }], undefined);
-    expect(sys.events).toEqual(['[CLY]_view']);
+    expect(sys.events).toEqual(['[CLY]_view', '[CLY]_view_update']);
     expect(sys.eventNames).toBeUndefined();
   });
 

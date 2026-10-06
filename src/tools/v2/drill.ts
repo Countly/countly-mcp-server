@@ -15,6 +15,12 @@ import type { ToolContext, ToolResult } from '../types.js';
 
 const CUSTOM_EVENT = '[CLY]_custom';
 
+/** Native events stored under two keys, which the drill UI always queries together */
+export const NATIVE_VARIANTS: Record<string, string[]> = {
+  '[CLY]_session': ['[CLY]_session', '[CLY]_session_begin'],
+  '[CLY]_view': ['[CLY]_view', '[CLY]_view_update'],
+};
+
 const FIELD_HELP = 'Fields: "uid" (users), "c" (event count), "s" (event sum), "dur" (event duration), "sg.<segment>" (event segmentation), "up.<key>" (user property, e.g. "up.cc" country, "up.p" platform, "up.av" app version, "up.d" device), "custom.<key>" (custom user property).';
 
 export const drillQueryToolDefinition = {
@@ -131,8 +137,10 @@ export function toSlimMetrics(metrics: any[], globalFilter: unknown): any[] {
     if (events.length === 0) {
       throw new Error(`metric ${id}: give "events", "cohort_id" or "formula"`);
     }
-    // Custom events are stored as e='[CLY]_custom' with the real key in n
-    const system = events.filter((e) => e.startsWith('[CLY]_'));
+    // Custom events are stored as e='[CLY]_custom' with the real key in n.
+    // Sessions and views are stored under two keys each; the drill UI always
+    // sends both and the executor de-duplicates the pair, so do the same.
+    const system = [...new Set(events.filter((e) => e.startsWith('[CLY]_')).flatMap((e) => NATIVE_VARIANTS[e] ?? [e]))];
     const custom = events.filter((e) => !e.startsWith('[CLY]_'));
     const aggregation = m.aggregation || 'count';
     const field = m.field || (aggregation === 'unique' ? 'uid' : undefined);
@@ -159,6 +167,9 @@ export async function handleDrillQuery(context: ToolContext, args: any): Promise
       ? args.output
       : typeof args.output === 'string' ? [args.output] : ['total'];
     const sort = parseObject(args.sort, 'sort');
+    const breakdowns = Array.isArray(args.breakdowns) ? args.breakdowns : [];
+    // Paging and sorting apply to breakdown rows only; a scalar total rejects them
+    const paged = breakdowns.length > 0;
     const body = {
       scope: {
         appIds,
@@ -166,10 +177,10 @@ export async function handleDrillQuery(context: ToolContext, args: any): Promise
         ...(args.timezone ? { timezone: args.timezone } : {}),
       },
       metrics: toSlimMetrics(parseObject(args.metrics, 'metrics'), parseObject(args.filter, 'filter')),
-      breakdowns: Array.isArray(args.breakdowns) ? args.breakdowns : [],
+      breakdowns,
       outputs,
-      page: { limit: Math.max(1, Number(args.limit ?? 50)), ...(args.cursor ? { cursor: args.cursor } : {}) },
-      ...(sort?.by ? { sort: { by: sort.by, dir: sort.dir === 'asc' ? 'asc' : 'desc' } } : {}),
+      ...(paged ? { page: { limit: Math.max(1, Number(args.limit ?? 50)), ...(args.cursor ? { cursor: args.cursor } : {}) } } : {}),
+      ...(paged && sort?.by ? { sort: { by: sort.by, dir: sort.dir === 'asc' ? 'asc' : 'desc' } } : {}),
     };
     const data = await v2Request<any>(context, 'post', '/v2/drill/execute', { body });
     const meta = data.meta || {};

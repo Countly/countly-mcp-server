@@ -1,6 +1,20 @@
 import { ToolContext, ToolResult } from './types.js';
 import { withDefault } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  drillSavedQueryRunToolDefinition,
+  handleCreateSavedQueryV2,
+  handleDeleteSavedQueryV2,
+  handleListSavedQueriesV2,
+  handleRunSavedQuery,
+} from './v2/drill-queries.js';
+import {
+  drillPropertyValuesToolDefinition,
+  handleDrillPropertyValues,
+  handleGetAvailableFieldsV2,
+  handleGetMetadataV2,
+} from './v2/drill-meta.js';
 
 // ============================================================================
 // GET SEGMENTATION METADATA TOOL
@@ -659,6 +673,8 @@ export const drillToolDefinitions = [
   createDrillBookmarkToolDefinition,
   deleteDrillBookmarkToolDefinition,
   getMetadataToolDefinition,
+  drillSavedQueryRunToolDefinition, // Platform /v2 only
+  drillPropertyValuesToolDefinition, // Platform /v2 only
 ];
 
 export const drillToolHandlers = {
@@ -667,29 +683,44 @@ export const drillToolHandlers = {
   'drill_bookmarks_create': 'drill_bookmarks_create',
   'drill_bookmarks_delete': 'drill_bookmarks_delete',
   'metadata_get': 'metadata_get',
+  'drill_saved_query_run': 'drill_saved_query_run',
+  'drill_property_values': 'drill_property_values',
 } as const;
 
 export class DrillTools {
   constructor(private context: ToolContext) {}
 
   async queriable_fields_list(args: any): Promise<ToolResult> {
-    return handleGetAvailableFields(this.context, args);
+    const legacy = () => handleGetAvailableFields(this.context, args);
+    return (await usesV2(this.context)) ? handleGetAvailableFieldsV2(this.context, args, legacy) : legacy();
   }
 
   async drill_bookmarks_list(args: any): Promise<ToolResult> {
-    return handleListDrillBookmarks(this.context, args);
+    const legacy = () => handleListDrillBookmarks(this.context, args);
+    return (await usesV2(this.context)) ? handleListSavedQueriesV2(this.context, args, legacy) : legacy();
   }
 
   async drill_bookmarks_create(args: any): Promise<ToolResult> {
-    return handleCreateDrillBookmark(this.context, args);
+    const legacy = () => handleCreateDrillBookmark(this.context, args);
+    return (await usesV2(this.context)) ? handleCreateSavedQueryV2(this.context, args, legacy) : legacy();
   }
 
   async drill_bookmarks_delete(args: any): Promise<ToolResult> {
-    return handleDeleteDrillBookmark(this.context, args);
+    const legacy = () => handleDeleteDrillBookmark(this.context, args);
+    return (await usesV2(this.context)) ? handleDeleteSavedQueryV2(this.context, args, legacy) : legacy();
   }
 
   async metadata_get(args: any): Promise<ToolResult> {
-    return handleGetMetadata(this.context, args);
+    const legacy = () => handleGetMetadata(this.context, args);
+    return (await usesV2(this.context)) ? handleGetMetadataV2(this.context, args, legacy) : legacy();
+  }
+
+  async drill_saved_query_run(args: any): Promise<ToolResult> {
+    return handleRunSavedQuery(this.context, args);
+  }
+
+  async drill_property_values(args: any): Promise<ToolResult> {
+    return handleDrillPropertyValues(this.context, args);
   }
 }
 
