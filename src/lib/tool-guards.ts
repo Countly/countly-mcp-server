@@ -249,6 +249,25 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   journeys_stats_content: f('journey_engine', 'r'),
   journeys_stats_active_users: f('journey_engine', 'r'),
   journeys_templates: any,
+
+  // Platform /v2 extras
+  flows_list: f('flows', 'r'),
+  flows_get: f('flows', 'r'),
+  flows_data: f('flows', 'r'),
+  flows_dropoff: f('flows', 'r'),
+  ratings_widgets_list: f('star_rating', 'r'),
+  ratings_stats: f('star_rating', 'r'),
+  ratings_comments: f('star_rating', 'r'),
+  campaigns_list: f('campaigns', 'r'),
+  campaigns_get: f('campaigns', 'r'),
+  campaigns_results: f('campaigns', 'r'),
+  ai_assistants_analytics: any, // the route only runs validateUser
+  notifications_list: any, // the caller's own inbox
+  tasks_list: f('core', 'r'),
+  task_result: f('core', 'r'),
+  geo_locations_list: f('geo', 'r'),
+  revenue_iap_events: f('revenue', 'r'),
+  crash_jira_issues: f('crashes', 'r'),
 };
 
 /**

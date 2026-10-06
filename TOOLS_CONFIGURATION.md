@@ -53,6 +53,14 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `drill_query` (requires the drill plugin): ad-hoc metrics over raw events. Supports count, unique, sum, avg, min, max and percentile; cohort and formula metrics; filters, breakdowns, time series, sorting and cursor paging. Custom event keys are mapped to drill's storage format automatically.
   - `notes_update`: edit a graph note (owner or global admin). Editing a legacy note moves it to the new format, which the legacy dashboard no longer shows.
   - `journeys_complete`, `journeys_stats_blocks`, `journeys_stats_content`, `journeys_stats_active_users`, `journeys_templates` (require the journey_engine plugin): end a journey for good, per-block funnel, in-app content engagement, active users, and ready-made journey templates
+- **Platform-only tools for features without a legacy tool**, also listed only on `/v2` (and only when their plugin is enabled):
+  - `flows_list`, `flows_get`, `flows_data`, `flows_dropoff` (`flows`): saved user flows, their per-step results, and what users did instead of an expected step
+  - `ratings_widgets_list`, `ratings_stats`, `ratings_comments` (`star-rating`): rating widgets, their score distribution and individual responses
+  - `campaigns_list`, `campaigns_get`, `campaigns_results` (`campaigns`): push/in-app/survey/rating campaigns and their delivery funnel
+  - `ai_assistants_analytics` (`ai-assistants`): LLM assistant analytics, one view (tab) per call
+  - `tasks_list`, `task_result`: background tasks / long-running reports and their stored results
+  - `notifications_list`: the connected user's dashboard notifications
+  - `geo_locations_list` (`geo`), `revenue_iap_events` (`revenue`), `crash_jira_issues` (`crashes-jira`)
 - **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
   - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
   - `funnels_list`: paging with totals
@@ -94,6 +102,7 @@ The following categories are **only available if their corresponding plugin is e
 - **journeys** → `journey_engine` (Platform)
 - **content** → `content` (Platform)
 - **server_logs** → `errorlogs` (not available on Platform)
+- **flows** → `flows`, **ratings** → `star-rating`, **campaigns** → `campaigns`, **ai_assistants** → `ai-assistants`, **geo** → `geo`, **revenue** → `revenue`, **crashes_jira** → `crashes-jira` (Platform `/v2` only)
 - **remote_config** → `remote-config`, **logger** → `logger`, **sdks** → `sdk`, **compliance_hub** → `compliance-hub`, **datapoint** → `server-stats`, **email_reports** → `reports`, **dashboards** → `dashboards`, **times_of_day** → `times-of-day`, **hooks** → `hooks`
 
 ### Categories Available by Default
@@ -101,6 +110,7 @@ The following categories are **only available if their corresponding plugin is e
 These categories are always available without plugin checks:
 
 - **core**, **apps**, **analytics**, **notes**, **events**, **metadata**, **dashboard_users**, **app_users**
+- **tasks**, **notifications** (no plugin needed, but Platform `/v2` only)
 
 ## Tool Categories
 
@@ -721,3 +731,18 @@ Tools Configuration:
 ## Default Behavior
 
 If no configuration is provided, all tools and operations are enabled (equivalent to `COUNTLY_TOOLS_ALL=CRUD`).
+
+### Platform /v2 only categories
+All tools below are read-only (`R`) and listed only when the server serves the Platform `/v2` API.
+
+| Category | Tools | Requires plugin |
+|----------|-------|-----------------|
+| flows | `flows_list`, `flows_get`, `flows_data`, `flows_dropoff` | `flows` |
+| ratings | `ratings_widgets_list`, `ratings_stats`, `ratings_comments` | `star-rating` |
+| campaigns | `campaigns_list`, `campaigns_get`, `campaigns_results` | `campaigns` |
+| ai_assistants | `ai_assistants_analytics` | `ai-assistants` |
+| tasks | `tasks_list`, `task_result` | — |
+| notifications | `notifications_list` | — |
+| geo | `geo_locations_list` | `geo` |
+| revenue | `revenue_iap_events` | `revenue` |
+| crashes_jira | `crash_jira_issues` | `crashes-jira` |

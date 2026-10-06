@@ -168,6 +168,11 @@ import { platformInsightsToolDefinitions, platformInsightsToolHandlers, platform
 
 export { platformInsightsToolDefinitions, platformInsightsToolHandlers, platformInsightsToolMetadata, PlatformInsightsTools };
 
+// Platform extras: flows, ratings, campaigns, AI assistants, tasks, ... (Countly Platform /v2 only)
+import { platformExtrasToolDefinitions, platformExtrasToolHandlers, platformExtrasToolMetadata, PlatformExtrasTools } from './platform-extras.js';
+
+export { platformExtrasToolDefinitions, platformExtrasToolHandlers, platformExtrasToolMetadata, PlatformExtrasTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -210,6 +215,7 @@ export function getAllToolDefinitions() {
     ...journeysToolDefinitions,
     ...contentToolDefinitions,
     ...platformInsightsToolDefinitions,
+    ...platformExtrasToolDefinitions,
   ];
 }
 
@@ -252,6 +258,7 @@ export function getAllToolHandlers() {
     ...journeysToolHandlers,
     ...contentToolHandlers,
     ...platformInsightsToolHandlers,
+    ...platformExtrasToolHandlers,
   };
 }
 
@@ -294,6 +301,7 @@ export function getAllToolMetadata() {
     journeysToolMetadata,
     contentToolMetadata,
     platformInsightsToolMetadata,
+    platformExtrasToolMetadata,
   ];
 }
 
