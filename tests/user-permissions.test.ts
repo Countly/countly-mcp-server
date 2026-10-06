@@ -106,7 +106,7 @@ describe('tool guards', () => {
 
   it('hides write and admin tools from a read-only user', () => {
     const member = parseMember(readOnlyUser);
-    const names = filterToolsByServer(allTools, loadToolsConfig({}), null, member).map((t) => t.name);
+    const names = filterToolsByServer(allTools, loadToolsConfig({}), { plugins: null, member }).map((t) => t.name);
     expect(names).toContain('crash_groups_list');
     expect(names).toContain('dashboards_create'); // any user may create dashboards
     expect(names).not.toContain('notes_create');
@@ -116,12 +116,34 @@ describe('tool guards', () => {
   });
 
   it('keeps everything when the member is unknown', () => {
-    expect(filterToolsByServer(allTools, loadToolsConfig({}), null, null)).toHaveLength(allTools.length);
+    expect(filterToolsByServer(allTools, loadToolsConfig({}), { plugins: null, member: null, v2: true })).toHaveLength(allTools.length);
     expect(isToolPermitted('apps_delete', null)).toBe(true);
   });
 
   it('describes requirements', () => {
     expect(describeGuard('alerts_delete')).toBe('"update" permission for "alerts" on at least one app');
     expect(describeGuard('apps_delete')).toBe('global admin rights');
+  });
+});
+
+describe('edition-specific guards', () => {
+  const creator = parseMember({
+    global_admin: false,
+    permission: {
+      c: { a1: { all: false, allowed: { journey_engine: true } } },
+      r: { a1: { all: false, allowed: { journey_engine: true } } },
+      u: {}, d: {}, _: { u: [['a1']], a: [] },
+    },
+  });
+
+  it('uses the legacy guard on non-v2 servers', () => {
+    expect(isToolPermitted('journeys_update', creator)).toBe(true);
+    expect(isToolPermitted('journeys_delete', creator)).toBe(true);
+  });
+
+  it('uses the v2 route guard on Platform', () => {
+    expect(isToolPermitted('journeys_update', creator, true)).toBe(false);
+    expect(isToolPermitted('journeys_delete', creator, true)).toBe(false);
+    expect(describeGuard('journeys_delete', true)).toBe('"delete" permission for "journey_engine" on at least one app');
   });
 });

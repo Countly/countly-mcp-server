@@ -41,6 +41,64 @@ Detection also reads the connected user's permissions (`/o/users/me`) and hides 
 
 If `/o/users/me` cannot be read (e.g. tokens restricted to specific apps), no tools are hidden for permission reasons. Calling a hidden tool returns an error naming the missing permission.
 
+### Countly Platform /v2 API
+
+When the server serves the Platform `/v2` API (Platform with the new UI), some tools switch to it, keeping their names. Their definitions in `tools/list` change accordingly. The legacy `/o` and `/i` implementation stays for Lite, Enterprise and Platform builds without `/v2`.
+
+- **Platform-only insight tools**, listed only when the server serves `/v2`:
+  - `events_summary`, `events_top`, `events_movers`: event totals, rankings, and growers/newcomers vs. the previous period
+  - `views_top`: top views per metric
+  - `crash_group_breakdown`, `crash_group_users`: crash distribution over a field, and affected users
+  - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
+  - `hooks_get` (requires the hooks plugin): one hook with its configuration, run counters and the last failed runs with error messages
+  - `drill_query` (requires the drill plugin): ad-hoc metrics over raw events. Supports count, unique, sum, avg, min, max and percentile; cohort and formula metrics; filters, breakdowns, time series, sorting and cursor paging. Custom event keys are mapped to drill's storage format automatically.
+  - `notes_update`: edit a graph note (owner or global admin). Editing a legacy note moves it to the new format, which the legacy dashboard no longer shows.
+  - `journeys_complete`, `journeys_stats_blocks`, `journeys_stats_content`, `journeys_stats_active_users`, `journeys_templates` (require the journey_engine plugin): end a journey for good, per-block funnel, in-app content engagement, active users, and ready-made journey templates
+- **Platform-only tools for features without a legacy tool**, also listed only on `/v2` (and only when their plugin is enabled):
+  - `flows_list`, `flows_get`, `flows_data`, `flows_dropoff` (`flows`): saved user flows, their per-step results, and what users did instead of an expected step
+  - `ratings_widgets_list`, `ratings_stats`, `ratings_comments` (`star-rating`): rating widgets, their score distribution and individual responses
+  - `campaigns_list`, `campaigns_get`, `campaigns_results` (`campaigns`): push/in-app/survey/rating campaigns and their delivery funnel
+  - `ai_assistants_analytics` (`ai-assistants`): LLM assistant analytics, one view (tab) per call
+  - `tasks_list`, `task_result`: background tasks / long-running reports and their stored results
+  - `notifications_list`: the connected user's dashboard notifications
+  - `geo_locations_list` (`geo`), `revenue_iap_events` (`revenue`), `crash_jira_issues` (`crashes-jira`)
+  - `drill_saved_query_run` (requires the drill plugin): runs a saved drill query (from `drill_bookmarks_list`), optionally re-windowed, and returns results like `drill_query`
+  - `drill_property_values` (requires the drill plugin): distinct values of a user property, custom property, campaign property or event segment, for building exact filters
+- **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
+  - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
+  - `funnels_list`: paging with totals
+  - `funnels_data`: adds median and p95 time between steps; conversion percentages are computed by the tool
+  - `funnels_step_users`, `funnels_dropoff_users`: full user profiles, paginated (they fall back to legacy uids when drill profiles are unavailable or a filter is used)
+  - `sdk_logs_list`: paging, plus filters by request type, SDK, time range, text and problem requests
+  - `user_profiles_query`: free-text search, sorting, paging and total count (it falls back to legacy when drill profiles are unavailable)
+  - `user_profiles_breakdown`: top-N values of a profile property with each value's share (falls back to legacy when the users route is unavailable)
+  - `events_list`: search, paging, display names, metric labels and events only drill has seen; segments still come from the legacy events document (falls back to the legacy list when drill is unavailable)
+  - `notes_list`, `notes_create`, `notes_delete`: `/v2/notes`. Notes gain private/shared/global visibility and an optional event scope. Notes created on `/v2` are hidden from the legacy dashboard; only the owner or a global admin can delete them.
+  - `crashes_resolve`, `crashes_unresolve`, `crashes_hide`, `crashes_show`: `PUT /v2/crashes/crashgroups/:id`, returning the group's new state
+  - `apps_list`, `apps_get_by_name`: `/v2/apps`, with the caller's role per app. App name/id resolution for other tools still uses `/o/apps/mine`.
+  - `dashboard_users`: `/v2/members`, compacted to identity, role, app access and login times
+  - `hooks_list`: hooks of one app or all apps, filters by enabled state and text, paging with totals, lean rows
+  - `hooks_create`, `hooks_update`, `hooks_delete`, `hooks_test`: same arguments, sent to `/v2/hooks`. `hooks_update` changes only the supplied fields, and uses the status route when only `enabled` changes
+  - `email_reports_list`: reports you own, receive or can see, optionally filtered by app and title, with a readable schedule
+  - `email_reports_core_create`, `email_reports_dashboard_create`, `email_reports_update`, `email_reports_send`, `email_reports_delete`: same arguments, sent to `/v2/reports`. Reports created there are hidden from the legacy dashboard, and dashboard reports reference new-UI dashboards (the ids `dashboards_list` returns on Platform). `email_reports_update` keeps the stored schedule fields it is not asked to change
+  - `email_reports_preview`: the rendered email reduced to readable text (one line per table row) instead of raw HTML
+  - `live_users`, `live_last_hour`, `live_last_day`, `live_last_30_days`: also return new-user counts, as compact series with ISO timestamps and the peak (they fall back to legacy when the user cannot read the v2 route). `live_overall` (v2 has no peak timestamp) and `live_metrics` (no v2 breakdown) stay legacy.
+  - `drill_bookmarks_list`, `drill_bookmarks_create`, `drill_bookmarks_delete`: work on Platform saved queries, which include bookmarks saved in the old drill UI. Listing covers all events of the app (or every app with `scope: "mine"`); creating accepts the same metrics, filter and breakdowns as `drill_query` (or `event_key` + `query_obj` + `by_val` for a count); deleting an old-UI bookmark goes through the legacy endpoint.
+  - `queriable_fields_list`, `metadata_get`: read drill metadata from `/v2/drill`; `metadata_get` lists every custom event with its segments in one batched call (both fall back to legacy for users without drill rights)
+  - `query_data`: unchanged behaviour (its `drill` mode keeps the classic segmentation response); on Platform its description points to `drill_query` for metrics, formulas and cohorts
+
+  Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API. Also legacy: `crashes_stats_get` (no v2 stats endpoint), `apps_create` (`/v2/apps/create` skips the country/timezone/category validation and defaults), `apps_update`/`apps_delete`/`apps_reset`, `events_create`/`events_delete`, `user_profiles_get` and `app_users_*` (no v2 equivalent).
+- **Journeys** (`journeys_*`): all journey tools use `/v2/journey_engine`. This is required for writes: a journey written through `/v2` belongs to the new UI and the legacy write endpoints refuse it. The first `/v2` write on a journey created in the old dashboard moves it to the new UI for good. Block graphs keep the same JSON format. `journeys_list` gains status/search/sort/paging, `journeys_create`/`journeys_update` a description and conversion goal, `journeys_stats_uids` the `goal_converted` metric, and `journeys_stats_table` lists journey instances. `journeys_publish` cannot unpublish to draft on Platform (use `journeys_pause` or `journeys_complete`). Stats default to the last 30 days.
+- **Content** (`content_blocks_*`, `content_assets_*`): Platform replaces content blocks with content messages (popup, banner, carousel, survey, push; slides of typed blocks). `content_blocks_list` returns native messages and legacy blocks (flagged `legacy`); get, preview and delete accept both, falling back to the classic API for legacy ids. `content_blocks_create`/`content_blocks_update` take the message format (`message_format`, `platform`, `slides`, ...); legacy blocks are read-only. Assets use the shared `/v2` asset store (PNG/JPEG/GIF/WebP/SVG, max 10MB) that native messages reference. `content_langs_list` stays on the classic API.
+- **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).
+
+### ClickHouse on Countly Platform
+
+On Platform, raw events and user profiles are stored in ClickHouse. The database tools can read them through the dbviewer plugin:
+- `databases_list` shows the `clickhouse_countly_drill` database (`drill_events`, `app_users`, …).
+- `databases_query` and `databases_document` read ClickHouse tables with the same Mongo-style filter, projection, sort and paging; the server translates them to SQL. Always filter `drill_events` by `a` (app id).
+- `collections_aggregate` and `collections_indexes` apply to MongoDB only: ClickHouse has no aggregation pipelines or MongoDB-style indexes. The tools refuse ClickHouse databases up front. Use `drill_query` for counts, unique users, sums and breakdowns.
+
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.
 
 ### Categories Requiring Plugins
@@ -63,6 +121,7 @@ The following categories are **only available if their corresponding plugin is e
 - **journeys** → `journey_engine` (Platform)
 - **content** → `content` (Platform)
 - **server_logs** → `errorlogs` (not available on Platform)
+- **flows** → `flows`, **ratings** → `star-rating`, **campaigns** → `campaigns`, **ai_assistants** → `ai-assistants`, **geo** → `geo`, **revenue** → `revenue`, **crashes_jira** → `crashes-jira` (Platform `/v2` only)
 - **remote_config** → `remote-config`, **logger** → `logger`, **sdks** → `sdk`, **compliance_hub** → `compliance-hub`, **datapoint** → `server-stats`, **email_reports** → `reports`, **dashboards** → `dashboards`, **times_of_day** → `times-of-day`, **hooks** → `hooks`
 
 ### Categories Available by Default
@@ -70,6 +129,7 @@ The following categories are **only available if their corresponding plugin is e
 These categories are always available without plugin checks:
 
 - **core**, **apps**, **analytics**, **notes**, **events**, **metadata**, **dashboard_users**, **app_users**
+- **tasks**, **notifications** (no plugin needed, but Platform `/v2` only)
 
 ## Tool Categories
 
@@ -113,11 +173,12 @@ These categories are always available without plugin checks:
 **⚠️ Requires Plugin**: `crashes` plugin must be installed on Countly server
 
 ### notes
-**Tools**: `notes_list`, `notes_create`, `notes_delete`
+**Tools**: `notes_list`, `notes_create`, `notes_update` (Platform only), `notes_delete`
 
 **Operations**:
 - C: notes_create
 - R: notes_list
+- U: notes_update
 - D: notes_delete
 
 ### events
@@ -553,9 +614,9 @@ async function funnelExamples() {
 ```
 
 ### journeys
-**Tools**: `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`, `journeys_block_reference`, `journeys_stats_summary`, `journeys_stats_table`, `journeys_stats_performance`, `journeys_stats_uids`
+**Tools**: `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`, `journeys_block_reference`, `journeys_stats_summary`, `journeys_stats_table`, `journeys_stats_performance`, `journeys_stats_uids`, and on Countly Platform also `journeys_complete`, `journeys_stats_blocks`, `journeys_stats_content`, `journeys_stats_active_users`, `journeys_templates`
 
-**Requires plugin**: `journey_engine` (Countly Enterprise)
+**Requires plugin**: `journey_engine` (Countly Enterprise / Platform)
 
 Manage user journeys - automated multi-step engagement flows built from trigger, logical, engagement, and data-pipeline blocks. A journey consists of a definition and one or more versions; each version holds the block graph. New journeys start as drafts and must be published to run.
 
@@ -616,7 +677,9 @@ async function journeyExamples() {
 ### content
 **Tools**: `content_blocks_list`, `content_blocks_get`, `content_blocks_preview`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`, `content_assets_list`, `content_assets_upload`, `content_assets_update`, `content_assets_delete`, `content_langs_list`
 
-**Requires plugin**: `content` (Countly Enterprise)
+**Requires plugin**: `content` (Countly Enterprise / Platform)
+
+On Countly Platform these tools manage the new content messages; see [Countly Platform /v2 API](#countly-platform-v2-api).
 
 Manage content blocks - reusable in-app content (banners, modals, surveys) delivered to users, typically through journey "in-app-content" engagement blocks.
 
@@ -687,3 +750,18 @@ Tools Configuration:
 ## Default Behavior
 
 If no configuration is provided, all tools and operations are enabled (equivalent to `COUNTLY_TOOLS_ALL=CRUD`).
+
+### Platform /v2 only categories
+All tools below are read-only (`R`) and listed only when the server serves the Platform `/v2` API.
+
+| Category | Tools | Requires plugin |
+|----------|-------|-----------------|
+| flows | `flows_list`, `flows_get`, `flows_data`, `flows_dropoff` | `flows` |
+| ratings | `ratings_widgets_list`, `ratings_stats`, `ratings_comments` | `star-rating` |
+| campaigns | `campaigns_list`, `campaigns_get`, `campaigns_results` | `campaigns` |
+| ai_assistants | `ai_assistants_analytics` | `ai-assistants` |
+| tasks | `tasks_list`, `task_result` | — |
+| notifications | `notifications_list` | — |
+| geo | `geo_locations_list` | `geo` |
+| revenue | `revenue_iap_events` | `revenue` |
+| crashes_jira | `crash_jira_issues` | `crashes-jira` |

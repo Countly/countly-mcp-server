@@ -9,6 +9,16 @@
 import { safeApiCall } from '../lib/error-handler.js';
 import { withDefault } from '../lib/validation.js';
 import type { ToolContext, ToolResult } from './types.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleCreateCoreEmailReportV2,
+  handleCreateDashboardEmailReportV2,
+  handleDeleteEmailReportV2,
+  handleListEmailReportsV2,
+  handlePreviewEmailReportV2,
+  handleSendEmailReportV2,
+  handleUpdateEmailReportV2,
+} from './v2/email-reports.js';
 
 /**
  * Tool: email_reports_list
@@ -123,7 +133,7 @@ export const createCoreEmailReportTool = {
       },
       day: {
         type: 'number',
-        description: 'For "weekly": day of week 0-6 (Sun-Sat). For "monthly": day of month 1-31. Ignored for "daily".',
+        description: 'For "weekly": day of week 1-7 (1 = Monday, 7 = Sunday). For "monthly": day of month 1-31. Ignored for "daily".',
       },
       hour: {
         type: 'number',
@@ -227,7 +237,7 @@ export const createDashboardEmailReportTool = {
       },
       dashboards: {
         type: 'string',
-        description: 'Dashboard identifier to render. Obtain it from dashboards_list.',
+        description: 'Dashboard identifier to render. Obtain it from dashboards_list (on Countly Platform this is a new-UI dashboard id).',
       },
       date_range: {
         type: 'string',
@@ -244,7 +254,7 @@ export const createDashboardEmailReportTool = {
       },
       day: {
         type: 'number',
-        description: 'For "weekly": day of week 0-6 (Sun-Sat). For "monthly": day of month 1-31. Ignored for "daily".',
+        description: 'For "weekly": day of week 1-7 (1 = Monday, 7 = Sunday). For "monthly": day of month 1-31. Ignored for "daily".',
       },
       hour: {
         type: 'number',
@@ -355,7 +365,7 @@ export const updateEmailReportTool = {
       },
       day: {
         type: 'number',
-        description: 'New day-of-week (0-6) for weekly or day-of-month (1-31) for monthly.',
+        description: 'New day-of-week 1-7 (1 = Monday) for weekly or day-of-month (1-31) for monthly.',
       },
       hour: {
         type: 'number',
@@ -649,6 +659,9 @@ export class EmailReportsTools {
    * List all email reports
    */
   async listEmailReports(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListEmailReportsV2(this.context, args);
+    }
     return handleListEmailReports(this.context, args);
   }
 
@@ -656,6 +669,9 @@ export class EmailReportsTools {
    * Create a core email report
    */
   async createCoreEmailReport(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateCoreEmailReportV2(this.context, args);
+    }
     return handleCreateCoreEmailReport(this.context, args);
   }
 
@@ -663,6 +679,9 @@ export class EmailReportsTools {
    * Create a dashboard email report
    */
   async createDashboardEmailReport(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateDashboardEmailReportV2(this.context, args);
+    }
     return handleCreateDashboardEmailReport(this.context, args);
   }
 
@@ -670,6 +689,9 @@ export class EmailReportsTools {
    * Update an email report
    */
   async updateEmailReport(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateEmailReportV2(this.context, args);
+    }
     return handleUpdateEmailReport(this.context, args);
   }
 
@@ -677,6 +699,9 @@ export class EmailReportsTools {
    * Preview an email report
    */
   async previewEmailReport(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handlePreviewEmailReportV2(this.context, args);
+    }
     return handlePreviewEmailReport(this.context, args);
   }
 
@@ -684,6 +709,9 @@ export class EmailReportsTools {
    * Send an email report
    */
   async sendEmailReport(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleSendEmailReportV2(this.context, args);
+    }
     return handleSendEmailReport(this.context, args);
   }
 
@@ -691,6 +719,9 @@ export class EmailReportsTools {
    * Delete an email report
    */
   async deleteEmailReport(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteEmailReportV2(this.context, args);
+    }
     return handleDeleteEmailReport(this.context, args);
   }
 }

@@ -1,5 +1,13 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleCreateNoteV2,
+  handleDeleteNoteV2,
+  handleListNotesV2,
+  handleUpdateNoteV2,
+  updateNoteV2ToolDefinition,
+} from './v2/notes.js';
 
 // ============================================================================
 // CREATE_NOTE TOOL
@@ -142,8 +150,13 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
 
   );
   
-  const notes = response.data?.notes || response.data || [];
-  const noteCount = Array.isArray(notes) ? notes.length : Object.keys(notes).length;
+  // Countly answers a DataTables envelope ({aaData, iTotalRecords}); older
+  // servers return {notes: [...]} or a bare array
+  const data = response.data;
+  const notes = data?.aaData ?? data?.notes ?? data ?? [];
+  const noteCount = Array.isArray(notes)
+    ? notes.length
+    : typeof data?.iTotalRecords === 'number' ? data.iTotalRecords : Object.keys(notes).length;
   
   return {
     content: [
@@ -208,27 +221,49 @@ export const notesToolDefinitions = [
   createNoteToolDefinition,
   listNotesToolDefinition,
   deleteNoteToolDefinition,
+  // Countly Platform only (hidden elsewhere via V2_ONLY_TOOLS)
+  updateNoteV2ToolDefinition,
 ];
 
 export const notesToolHandlers = {
   'notes_create': 'createNote',
   'notes_list': 'listNotes',
   'notes_delete': 'deleteNote',
+  'notes_update': 'updateNote',
 } as const;
 
 export class NotesTools {
   constructor(private context: ToolContext) {}
 
   async createNote(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateNoteV2(this.context, args);
+    }
     return handleCreateNote(this.context, args);
   }
 
   async listNotes(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListNotesV2(this.context, args);
+    }
     return handleListNotes(this.context, args);
   }
 
   async deleteNote(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteNoteV2(this.context, args);
+    }
     return handleDeleteNote(this.context, args);
+  }
+
+  async updateNote(args: any): Promise<ToolResult> {
+    if (!(await usesV2(this.context))) {
+      return {
+        content: [{ type: 'text', text: 'notes_update needs Countly Platform (/v2 API). On this server delete the note and create a new one.' }],
+        isError: true,
+      } as ToolResult;
+    }
+    return handleUpdateNoteV2(this.context, args);
   }
 }
 

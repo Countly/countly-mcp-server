@@ -8,13 +8,33 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const listDatabasesToolDefinition = {
   name: 'databases_list',
-  description: 'List MongoDB databases and collections exposed by the Countly dbviewer (typically countly, countly_drill, countly_out, countly_fs) via /o/db. Requires the dbviewer plugin. Takes no arguments.',
+  description: 'List databases and collections exposed by the Countly dbviewer (typically countly, countly_drill, countly_out, countly_fs) via /o/db. On Countly Platform it also lists ClickHouse databases (prefixed "clickhouse_", e.g. clickhouse_countly_drill with drill_events and app_users), where raw events and user profiles live. Requires the dbviewer plugin. Takes no arguments.',
   inputSchema: {
     type: 'object',
     properties: {},
     required: [],
   },
 };
+
+const CLICKHOUSE_PREFIX = 'clickhouse_';
+
+/**
+ * ClickHouse databases (Countly Platform) have no aggregation pipelines or
+ * MongoDB-style indexes, so these tools only apply to MongoDB databases.
+ */
+function clickhouseUnsupported(database: unknown, toolName: string): ToolResult | null {
+  if (typeof database !== 'string' || !database.startsWith(CLICKHOUSE_PREFIX)) {
+    return null;
+  }
+  return {
+    content: [{
+      type: 'text',
+      text: `${toolName} does not support ClickHouse databases (${database}). Use databases_query for filtered reads, ` +
+        'or drill_query for counts, unique users, sums and breakdowns over drill_events.',
+    }],
+    isError: true,
+  } as ToolResult;
+}
 
 export async function handleListDatabases(context: ToolContext, _: any): Promise<ToolResult> {
   const params = {
@@ -48,7 +68,7 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
 
 export const queryDatabaseToolDefinition = {
   name: 'databases_query',
-  description: 'Run a raw MongoDB find() query on a Countly collection with filter, projection, sort, and pagination via /o/db. Requires the dbviewer plugin. For a single document by _id use databases_document; for aggregation pipelines use collections_aggregate.',
+  description: 'Run a raw find() query on a Countly collection with filter, projection, sort, and pagination via /o/db. Requires the dbviewer plugin. On Countly Platform, ClickHouse tables (database "clickhouse_countly_drill": drill_events, app_users) are queried the same way: the Mongo-style filter is translated to SQL. drill_events columns include a (app id), e (event key, custom events are "[CLY]_custom" with the name in n), n, uid, ts, c, s, dur, sg.<segment>, up.<user property>; always filter by a. For a single document by _id use databases_document; for aggregation pipelines use collections_aggregate (MongoDB only; on ClickHouse use drill_query).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -197,7 +217,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 
 export const aggregateCollectionToolDefinition = {
   name: 'collections_aggregate',
-  description: 'Run a read-only MongoDB aggregation pipeline on a collection via /o/db; write and introspection stages such as $out, $merge and $currentOp are rejected. Requires the dbviewer plugin. For simple find queries use databases_query.',
+  description: 'Run a read-only MongoDB aggregation pipeline on a collection via /o/db; write and introspection stages such as $out, $merge and $currentOp are rejected. Requires the dbviewer plugin. MongoDB databases only: for ClickHouse databases on Countly Platform use databases_query or drill_query. For simple find queries use databases_query.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -273,6 +293,10 @@ export function findDisallowedStage(aggregation: unknown): string | undefined {
 
 export async function handleAggregateCollection(context: ToolContext, args: any): Promise<ToolResult> {
   const { database = 'countly', collection, aggregation } = args;
+  const unsupported = clickhouseUnsupported(database, 'collections_aggregate');
+  if (unsupported) {
+    return unsupported;
+  }
 
   const disallowedStage = findDisallowedStage(aggregation);
   if (disallowedStage) {
@@ -343,6 +367,10 @@ export const getCollectionIndexesToolDefinition = {
 
 export async function handleGetCollectionIndexes(context: ToolContext, args: any): Promise<ToolResult> {
   const { database = 'countly', collection } = args;
+  const unsupportedIndexes = clickhouseUnsupported(database, 'collections_indexes');
+  if (unsupportedIndexes) {
+    return unsupportedIndexes;
+  }
   
   const params = {
     ...context.getAuthParams(),

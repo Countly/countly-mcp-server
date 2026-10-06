@@ -68,6 +68,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'crashes_unresolve': 'U',
       'crashes_hide': 'U',
       'crashes_show': 'U',
+      'crash_group_breakdown': 'R',  // Platform /v2 only
+      'crash_group_users': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'crashes',
     availableByDefault: false,
@@ -77,6 +79,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'notes_list': 'R',
       'notes_create': 'C',
       'notes_delete': 'D',
+      'notes_update': 'U',
     },
     availableByDefault: true,
   },
@@ -85,6 +88,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'events_create': 'C',
       'events_list': 'R',
       'events_delete': 'D',
+      'events_summary': 'R',  // Platform /v2 only
+      'events_top': 'R',  // Platform /v2 only
+      'events_movers': 'R',  // Platform /v2 only
     },
     availableByDefault: true,
   },
@@ -101,6 +107,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     operations: {
       'views_table': 'R',
       'views_data': 'R',
+      'views_top': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'views',
     availableByDefault: false,
@@ -137,6 +144,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'drill_bookmarks_create': 'C',
       'drill_bookmarks_delete': 'D',
       'queriable_fields_list': 'R',
+      'drill_query': 'R',  // Platform /v2 only
+      'drill_saved_query_run': 'R',  // Platform /v2 only
+      'drill_property_values': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'drill',
     availableByDefault: false,
@@ -181,6 +191,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'funnels_create': 'C',
       'funnels_update': 'U',
       'funnels_delete': 'D',
+      'funnels_breakdown': 'R',  // Platform /v2 only
+      'funnels_trends': 'R',  // Platform /v2 only
+      'funnels_user_progress': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'funnels',
     availableByDefault: false,
@@ -338,6 +351,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'hooks_create': 'C',
       'hooks_update': 'U',
       'hooks_delete': 'D',
+      'hooks_get': 'R',
     },
     requiresPlugin: 'hooks',
     availableByDefault: false,
@@ -357,6 +371,11 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'journeys_stats_performance': 'R',
       'journeys_stats_uids': 'R',
       'journeys_block_reference': 'R',
+      'journeys_complete': 'U',
+      'journeys_stats_blocks': 'R',
+      'journeys_stats_content': 'R',
+      'journeys_stats_active_users': 'R',
+      'journeys_templates': 'R',
     },
     requiresPlugin: 'journey_engine',
     availableByDefault: false,
@@ -376,6 +395,76 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'content_langs_list': 'R',
     },
     requiresPlugin: 'content',
+    availableByDefault: false,
+  },
+  // Platform /v2 only categories
+  flows: {
+    operations: {
+      'flows_list': 'R',
+      'flows_get': 'R',
+      'flows_data': 'R',
+      'flows_dropoff': 'R',
+    },
+    requiresPlugin: 'flows',
+    availableByDefault: false,
+  },
+  ratings: {
+    operations: {
+      'ratings_widgets_list': 'R',
+      'ratings_stats': 'R',
+      'ratings_comments': 'R',
+    },
+    requiresPlugin: 'star-rating',
+    availableByDefault: false,
+  },
+  campaigns: {
+    operations: {
+      'campaigns_list': 'R',
+      'campaigns_get': 'R',
+      'campaigns_results': 'R',
+    },
+    requiresPlugin: 'campaigns',
+    availableByDefault: false,
+  },
+  ai_assistants: {
+    operations: {
+      'ai_assistants_analytics': 'R',
+    },
+    requiresPlugin: 'ai-assistants',
+    availableByDefault: false,
+  },
+  notifications: {
+    operations: {
+      'notifications_list': 'R',
+    },
+    availableByDefault: true,
+  },
+  tasks: {
+    operations: {
+      'tasks_list': 'R',
+      'task_result': 'R',
+    },
+    availableByDefault: true,
+  },
+  geo: {
+    operations: {
+      'geo_locations_list': 'R',
+    },
+    requiresPlugin: 'geo',
+    availableByDefault: false,
+  },
+  revenue: {
+    operations: {
+      'revenue_iap_events': 'R',
+    },
+    requiresPlugin: 'revenue',
+    availableByDefault: false,
+  },
+  crashes_jira: {
+    operations: {
+      'crash_jira_issues': 'R',
+    },
+    requiresPlugin: 'crashes-jira',
     availableByDefault: false,
   },
 };
@@ -606,10 +695,53 @@ export function getToolRequiredPlugin(toolName: string): string | undefined {
 }
 
 /**
- * Whether a tool can run on a server with the given enabled plugins.
+ * Tools backed only by Countly Platform's /v2 API. Hidden unless the server
+ * is known to serve /v2.
+ */
+export const V2_ONLY_TOOLS = new Set([
+  'events_summary', 'events_top', 'events_movers',
+  'views_top',
+  'crash_group_breakdown', 'crash_group_users',
+  'funnels_breakdown', 'funnels_trends', 'funnels_user_progress',
+  'drill_query',
+  'notes_update',
+  'journeys_complete', 'journeys_stats_blocks', 'journeys_stats_content', 'journeys_stats_active_users', 'journeys_templates',
+  'flows_list', 'flows_get', 'flows_data', 'flows_dropoff',
+  'ratings_widgets_list', 'ratings_stats', 'ratings_comments',
+  'campaigns_list', 'campaigns_get', 'campaigns_results',
+  'ai_assistants_analytics',
+  'notifications_list',
+  'tasks_list', 'task_result',
+  'geo_locations_list',
+  'revenue_iap_events',
+  'crash_jira_issues',
+  'hooks_get',
+  'drill_saved_query_run', 'drill_property_values',
+]);
+
+/**
+ * Whether a tool can run on a server with the given enabled plugins and API.
  * `plugins === null` means the plugin set is unknown: the tool stays visible.
  */
-export function isToolSupported(toolName: string, plugins: string[] | null): boolean {
+/**
+ * Tools that must not run against Countly Platform (with or without /v2).
+ * databases_stats calls mongotop/mongostat, which Platform images do not
+ * ship; the failed spawn is an uncaught exception that restarts the API.
+ */
+export const NOT_ON_PLATFORM_TOOLS = new Set(['databases_stats']);
+
+export function isToolSupported(
+  toolName: string,
+  plugins: string[] | null,
+  v2 = false,
+  architecture?: string
+): boolean {
+  if (V2_ONLY_TOOLS.has(toolName) && !v2) {
+    return false;
+  }
+  if (architecture === 'platform' && NOT_ON_PLATFORM_TOOLS.has(toolName)) {
+    return false;
+  }
   const required = getToolRequiredPlugin(toolName);
   return !required || !plugins || plugins.includes(required);
 }
@@ -620,12 +752,11 @@ export function isToolSupported(toolName: string, plugins: string[] | null): boo
 export function filterToolsByServer<T extends { name: string }>(
   tools: T[],
   config: ToolsConfig,
-  plugins: string[] | null,
-  member: MemberPermissions | null = null
+  server: { plugins: string[] | null; member?: MemberPermissions | null; v2?: boolean; architecture?: string }
 ): T[] {
   return tools.filter(
     (tool) => isToolAllowed(tool.name, config)
-      && isToolSupported(tool.name, plugins)
-      && isToolPermitted(tool.name, member)
+      && isToolSupported(tool.name, server.plugins, server.v2 === true, server.architecture)
+      && isToolPermitted(tool.name, server.member ?? null, server.v2 === true)
   );
 }

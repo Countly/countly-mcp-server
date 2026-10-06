@@ -68,13 +68,16 @@ import {
   getConfigSummary,
   getToolRequiredPlugin,
   isToolSupported,
+  V2_ONLY_TOOLS,
+  NOT_ON_PLATFORM_TOOLS,
   TOOL_CATEGORIES,
   type ToolsConfig,
 } from './lib/tools-config.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
-  getAllToolDefinitions, 
+  getAllToolDefinitions,
+  getV2ToolDefinitionOverrides, 
   getAllToolMetadata,
 } from './tools/index.js';
 import { ToolContext } from './tools/types.js';
@@ -362,10 +365,19 @@ class CountlyMCPServer {
       const serverUrl = this.requestContext.getStore()?.serverUrl || this.config.serverUrl;
       const caps = await this.getServerCapabilities(client, serverUrl, authToken);
       if (!caps) {
-        return { tools: filteredTools };
+        // Detection disabled: expose every configured tool, as documented.
+        // Detection on but inconclusive: hide only tools that certainly need
+        // the Platform /v2 API.
+        return {
+          tools: this.autoDetect
+            ? filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null })
+            : filteredTools,
+        };
       }
+      const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
       return {
-        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins, caps.member),
+        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps)
+          .map((tool) => overrides[tool.name] ?? tool),
       };
     });
 
@@ -427,18 +439,37 @@ class CountlyMCPServer {
         // explanation the model can act on (instead of a raw 400/401 later).
         const requiredPlugin = getToolRequiredPlugin(name);
         const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
-        if (caps && !isToolPermitted(name, caps.member)) {
+        if (caps && !isToolPermitted(name, caps.member, caps.v2)) {
           return {
             content: [{
               type: 'text',
-              text: `Tool "${name}" is not available: it requires ${describeGuard(name)}, ` +
+              text: `Tool "${name}" is not available: it requires ${describeGuard(name, caps.v2)}, ` +
                 'which the connected Countly user does not have.',
             }],
             isError: true,
           };
         }
+        if (caps?.architecture === 'platform' && NOT_ON_PLATFORM_TOOLS.has(name)) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Tool "${name}" is not available on Countly Platform (${describeCapabilities(caps)}).`,
+            }],
+            isError: true,
+          };
+        }
+        if (this.autoDetect && V2_ONLY_TOOLS.has(name) && !caps?.v2) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Tool "${name}" is not available: it needs the Countly Platform /v2 API, ` +
+                `which this server does not serve${caps ? ` (${describeCapabilities(caps)})` : ''}.`,
+            }],
+            isError: true,
+          };
+        }
         if (requiredPlugin) {
-          if (caps && !isToolSupported(name, caps.plugins)) {
+          if (caps && !isToolSupported(name, caps.plugins, caps.v2)) {
             return {
               content: [{
                 type: 'text',

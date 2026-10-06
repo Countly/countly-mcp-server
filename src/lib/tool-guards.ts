@@ -46,6 +46,7 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   notes_list: f('core', 'r'),
   notes_create: f('core', 'c'),
   notes_delete: f('core', 'd'),
+  notes_update: f('core', 'c'), // PUT /v2/notes/:id checks the create right
 
   // events
   events_list: f('core', 'r'),
@@ -203,6 +204,7 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   hooks_update: f('hooks', 'c'),
   hooks_delete: f('hooks', 'd'),
   hooks_test: f('hooks', 'c'),
+  hooks_get: f('hooks', 'r'),
 
   // journeys
   journeys_list: f('journey_engine', 'r'),
@@ -231,20 +233,74 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   content_assets_update: f('content', 'u'),
   content_assets_delete: f('content', 'd'),
   content_langs_list: f('content', 'r'),
+
+  // Platform /v2 insights
+  events_summary: f('core', 'r'),
+  events_top: f('core', 'r'),
+  events_movers: f('core', 'r'),
+  views_top: f('views', 'r'),
+  crash_group_breakdown: f('crashes', 'r'),
+  crash_group_users: f('crashes', 'r'),
+  funnels_breakdown: f('funnels', 'r'),
+  funnels_trends: f('funnels', 'r'),
+  funnels_user_progress: f('funnels', 'r'),
+  drill_query: f('drill', 'r'),
+  journeys_complete: f('journey_engine', 'u'),
+  journeys_stats_blocks: f('journey_engine', 'r'),
+  journeys_stats_content: f('journey_engine', 'r'),
+  journeys_stats_active_users: f('journey_engine', 'r'),
+  journeys_templates: any,
+
+  // Platform /v2 extras
+  flows_list: f('flows', 'r'),
+  flows_get: f('flows', 'r'),
+  flows_data: f('flows', 'r'),
+  flows_dropoff: f('flows', 'r'),
+  ratings_widgets_list: f('star_rating', 'r'),
+  ratings_stats: f('star_rating', 'r'),
+  ratings_comments: f('star_rating', 'r'),
+  campaigns_list: f('campaigns', 'r'),
+  campaigns_get: f('campaigns', 'r'),
+  campaigns_results: f('campaigns', 'r'),
+  ai_assistants_analytics: any, // the route only runs validateUser
+  notifications_list: any, // the caller's own inbox
+  tasks_list: f('core', 'r'),
+  task_result: f('core', 'r'),
+  geo_locations_list: f('geo', 'r'),
+  revenue_iap_events: f('revenue', 'r'),
+  crash_jira_issues: f('crashes', 'r'),
+  drill_saved_query_run: f('drill', 'r'),
+  drill_property_values: f('drill', 'r'),
 };
+
+/**
+ * Guards that differ when the tool runs against the Platform /v2 API,
+ * because the v2 route checks another right than the legacy endpoint.
+ */
+export const TOOL_GUARDS_V2: Record<string, ToolGuard> = {
+  journeys_update: f('journey_engine', 'u'),
+  journeys_delete: f('journey_engine', 'd'),
+  hooks_update: f('hooks', 'u'),
+  drill_bookmarks_create: f('drill', 'c'),
+  drill_bookmarks_delete: f('drill', 'd'),
+};
+
+function guardFor(toolName: string, v2: boolean): ToolGuard | undefined {
+  return (v2 ? TOOL_GUARDS_V2[toolName] : undefined) ?? TOOL_GUARDS[toolName];
+}
 
 /**
  * Whether the connected user may use a tool. Unknown member or unmapped
  * tool means "allowed": the server stays the authority.
  */
-export function isToolPermitted(toolName: string, member: MemberPermissions | null): boolean {
-  const guard = TOOL_GUARDS[toolName];
+export function isToolPermitted(toolName: string, member: MemberPermissions | null, v2 = false): boolean {
+  const guard = guardFor(toolName, v2);
   return !member || !guard || canUseGuard(member, guard);
 }
 
 /** Human-readable requirement, for error messages */
-export function describeGuard(toolName: string): string {
-  const guard = TOOL_GUARDS[toolName];
+export function describeGuard(toolName: string, v2 = false): string {
+  const guard = guardFor(toolName, v2);
   const verbs: Record<AccessType, string> = { c: 'create', r: 'read', u: 'update', d: 'delete' };
   switch (guard?.kind) {
   case 'feature':

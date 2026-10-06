@@ -1,5 +1,7 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import { handleGetAppByNameV2, handleListAppsV2 } from './v2/apps.js';
 
 import { ToolContext, ToolResult } from './types.js';
 
@@ -313,10 +315,16 @@ export class AppManagementTools {
   constructor(private context: ToolContext) {}
 
   async apps_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListAppsV2(this.context, args);
+    }
     return handleListApps(this.context, args);
   }
 
   async apps_get_by_name(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleGetAppByNameV2(this.context, args);
+    }
     return handleGetAppByName(this.context, args);
   }
 

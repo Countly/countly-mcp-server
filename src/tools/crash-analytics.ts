@@ -1,5 +1,7 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import { handleCrashGroupActionV2, handleListCrashGroupsV2 } from './v2/crashes.js';
 
 // ============================================================================
 // RESOLVE_CRASH TOOL
@@ -564,10 +566,16 @@ export class CrashAnalyticsTools {
   constructor(private context: ToolContext) {}
 
   async resolveCrash(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCrashGroupActionV2(this.context, args, 'resolve');
+    }
     return handleResolveCrash(this.context, args);
   }
 
   async unresolveCrash(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCrashGroupActionV2(this.context, args, 'unresolve');
+    }
     return handleUnresolveCrash(this.context, args);
   }
 
@@ -576,10 +584,16 @@ export class CrashAnalyticsTools {
   }
 
   async hideCrash(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCrashGroupActionV2(this.context, args, 'hide');
+    }
     return handleHideCrash(this.context, args);
   }
 
   async showCrash(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCrashGroupActionV2(this.context, args, 'show');
+    }
     return handleShowCrash(this.context, args);
   }
 
@@ -596,6 +610,9 @@ export class CrashAnalyticsTools {
   }
 
   async listCrashGroups(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListCrashGroupsV2(this.context, args);
+    }
     return handleListCrashGroups(this.context, args);
   }
 

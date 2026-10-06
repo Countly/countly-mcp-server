@@ -27,6 +27,8 @@ export type ServerFlavor = 'lite' | 'enterprise' | 'platform' | 'unknown';
 export interface ServerCapabilities {
   architecture: ServerArchitecture;
   flavor: ServerFlavor;
+  /** Server answers the Platform /v2 REST API (Platform with the new UI) */
+  v2: boolean;
   /** Version string from /o/system/version, when readable */
   version?: string;
   /** Enabled plugin codes; null only when the flavor itself is unknown */
@@ -71,6 +73,7 @@ function resolvePlugins(flavor: ServerFlavor, plugins: string[] | null): Pick<Se
 const UNKNOWN: Omit<ServerCapabilities, 'detectedAt'> = {
   architecture: 'unknown',
   flavor: 'unknown',
+  v2: false,
   plugins: null,
   pluginsAssumed: false,
   member: null,
@@ -127,10 +130,12 @@ export function classifyFlavor(
  */
 export async function detectServerCapabilities(
   client: AxiosInstance,
-  authToken: string | undefined,
+  _authToken: string | undefined,
   timeoutMs = 5000
 ): Promise<ServerCapabilities> {
-  const params: Record<string, string> = authToken ? { auth_token: authToken } : {};
+  // The client carries the token in its countly-token header; keep it out of
+  // query strings, which end up in access logs.
+  const params: Record<string, string> = {};
   const get = (url: string, extra: Record<string, string> = {}) =>
     client
       .get(url, { params: { ...params, ...extra }, timeout: timeoutMs, validateStatus: () => true })
@@ -152,6 +157,7 @@ export async function detectServerCapabilities(
     return {
       architecture: 'platform',
       flavor: 'platform',
+      v2: true,
       version,
       ...resolvePlugins('platform', plugins),
       member,
@@ -181,6 +187,7 @@ export async function detectServerCapabilities(
     return {
       architecture: 'platform',
       flavor: 'platform',
+      v2: false,
       version,
       ...resolvePlugins('platform', plugins),
       member,
@@ -200,6 +207,7 @@ export async function detectServerCapabilities(
   return {
     architecture: 'legacy',
     flavor,
+    v2: false,
     version,
     ...resolvePlugins(flavor, plugins),
     member,

@@ -163,6 +163,16 @@ import { contentToolDefinitions, contentToolHandlers, contentToolMetadata, Conte
 
 export { contentToolDefinitions, contentToolHandlers, contentToolMetadata, ContentTools };
 
+// Platform insights (Countly Platform /v2 only)
+import { platformInsightsToolDefinitions, platformInsightsToolHandlers, platformInsightsToolMetadata, PlatformInsightsTools } from './platform-insights.js';
+
+export { platformInsightsToolDefinitions, platformInsightsToolHandlers, platformInsightsToolMetadata, PlatformInsightsTools };
+
+// Platform extras: flows, ratings, campaigns, AI assistants, tasks, ... (Countly Platform /v2 only)
+import { platformExtrasToolDefinitions, platformExtrasToolHandlers, platformExtrasToolMetadata, PlatformExtrasTools } from './platform-extras.js';
+
+export { platformExtrasToolDefinitions, platformExtrasToolHandlers, platformExtrasToolMetadata, PlatformExtrasTools };
+
 // Type definitions
 export type { ToolContext, ToolResult } from './types.js';
 
@@ -204,6 +214,8 @@ export function getAllToolDefinitions() {
     ...hooksToolDefinitions,
     ...journeysToolDefinitions,
     ...contentToolDefinitions,
+    ...platformInsightsToolDefinitions,
+    ...platformExtrasToolDefinitions,
   ];
 }
 
@@ -245,6 +257,8 @@ export function getAllToolHandlers() {
     ...hooksToolHandlers,
     ...journeysToolHandlers,
     ...contentToolHandlers,
+    ...platformInsightsToolHandlers,
+    ...platformExtrasToolHandlers,
   };
 }
 
@@ -286,5 +300,48 @@ export function getAllToolMetadata() {
     hooksToolMetadata,
     journeysToolMetadata,
     contentToolMetadata,
+    platformInsightsToolMetadata,
+    platformExtrasToolMetadata,
   ];
+}
+
+// Countly Platform /v2 tool variants
+import { dashboardsV2ToolDefinitions } from './dashboards-v2.js';
+import { crashesV2ToolDefinitions } from './v2/crashes.js';
+import { funnelsV2ToolDefinitions } from './v2/funnels.js';
+import { loggerV2ToolDefinitions } from './v2/logger.js';
+import { drillV2ToolDefinitions } from './v2/drill.js';
+import { notesV2ToolDefinitions } from './v2/notes.js';
+import { eventsV2ToolDefinitions } from './v2/events.js';
+import { usersV2ToolDefinitions } from './v2/users.js';
+import { journeysV2ToolDefinitions } from './v2/journeys.js';
+import { contentV2ToolDefinitions } from './v2/content.js';
+import { hooksV2ToolDefinitions } from './v2/hooks.js';
+import { emailReportsV2ToolDefinitions } from './v2/email-reports.js';
+import { liveV2ToolDefinitions } from './v2/live.js';
+import { drillQueriesV2ToolDefinitions } from './v2/drill-queries.js';
+import { queryDataV2ToolDefinitions } from './v2/query-data.js';
+
+/**
+ * Tool definitions that replace the legacy ones when the connected server
+ * serves the Platform /v2 API. Same tool names, different schema/semantics.
+ */
+export function getV2ToolDefinitionOverrides(): Record<string, any> {
+  return {
+    ...dashboardsV2ToolDefinitions,
+    ...crashesV2ToolDefinitions,
+    ...funnelsV2ToolDefinitions,
+    ...loggerV2ToolDefinitions,
+    ...drillV2ToolDefinitions,
+    ...notesV2ToolDefinitions,
+    ...eventsV2ToolDefinitions,
+    ...usersV2ToolDefinitions,
+    ...journeysV2ToolDefinitions,
+    ...contentV2ToolDefinitions,
+    ...hooksV2ToolDefinitions,
+    ...emailReportsV2ToolDefinitions,
+    ...liveV2ToolDefinitions,
+    ...drillQueriesV2ToolDefinitions,
+    ...queryDataV2ToolDefinitions,
+  };
 }
