@@ -157,7 +157,7 @@ describe('tool filtering by server', () => {
   const tools = ['ping', 'apps_list', 'cohorts_list', 'journeys_list', 'server_logs_files_list', 'sdk_stats_get', 'filtering_rules_list']
     .map((name) => ({ name }));
   const config = loadToolsConfig({});
-  const names = (plugins: string[] | null) => filterToolsByServer(tools, config, plugins).map((t) => t.name);
+  const names = (plugins: string[] | null) => filterToolsByServer(tools, config, { plugins }).map((t) => t.name);
 
   it('hides enterprise tools on Lite', () => {
     expect(names(LITE_PLUGINS)).toEqual(['ping', 'apps_list', 'server_logs_files_list', 'sdk_stats_get']);
@@ -222,6 +222,33 @@ describe('ServerCapabilitiesCache', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('Platform /v2-only tools', () => {
+  const config = loadToolsConfig({});
+  const tools = [{ name: 'events_summary' }, { name: 'events_list' }, { name: 'funnels_trends' }];
+
+  it('are hidden unless the server serves /v2', () => {
+    expect(filterToolsByServer(tools, config, { plugins: null }).map((t) => t.name)).toEqual(['events_list']);
+    expect(filterToolsByServer(tools, config, { plugins: null, v2: true }).map((t) => t.name))
+      .toEqual(['events_summary', 'events_list', 'funnels_trends']);
+  });
+
+  it('still respect plugins on /v2 servers', () => {
+    expect(isToolSupported('funnels_trends', ['mobile'], true)).toBe(false);
+    expect(isToolSupported('funnels_trends', ['funnels'], true)).toBe(true);
+  });
+});
+
+describe('tools unsafe on Platform', () => {
+  it('hides databases_stats on Platform with or without /v2', () => {
+    const config = loadToolsConfig({});
+    const tools = [{ name: 'databases_stats' }, { name: 'databases_list' }];
+    const names = (server: any) => filterToolsByServer(tools, config, server).map((t) => t.name);
+    expect(names({ plugins: null, architecture: 'platform', v2: true })).toEqual(['databases_list']);
+    expect(names({ plugins: null, architecture: 'platform', v2: false })).toEqual(['databases_list']);
+    expect(names({ plugins: null, architecture: 'legacy' })).toEqual(['databases_stats', 'databases_list']);
   });
 });
 

@@ -1,6 +1,13 @@
 import { ToolContext, ToolResult } from './types.js';
 import { withDefault } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleFunnelDropoffUsersV2,
+  handleFunnelStepUsersV2,
+  handleGetFunnelDataV2,
+  handleListFunnelsV2,
+} from './v2/funnels.js';
 
 /**
  * Funnels Module
@@ -653,18 +660,30 @@ export class FunnelsTools {
   constructor(private context: ToolContext) {}
 
   async funnels_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListFunnelsV2(this.context, args);
+    }
     return handleListFunnels(this.context, args);
   }
 
   async funnels_data(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleGetFunnelDataV2(this.context, args);
+    }
     return handleGetFunnelData(this.context, args);
   }
 
   async funnels_step_users(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleFunnelStepUsersV2(this.context, args, () => handleGetFunnelStepUsers(this.context, args));
+    }
     return handleGetFunnelStepUsers(this.context, args);
   }
 
   async funnels_dropoff_users(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleFunnelDropoffUsersV2(this.context, args, () => handleGetFunnelDropoffUsers(this.context, args));
+    }
     return handleGetFunnelDropoffUsers(this.context, args);
   }
 

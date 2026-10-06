@@ -51,6 +51,15 @@ describe('Tools Configuration', () => {
       'journeys',
       'content',
       'metadata',
+      'flows',
+      'ratings',
+      'campaigns',
+      'ai_assistants',
+      'notifications',
+      'tasks',
+      'geo',
+      'revenue',
+      'crashes_jira',
     ];
     const actualCategories = Object.keys(TOOL_CATEGORIES);
     expect(actualCategories.sort()).toEqual(expectedCategories.sort());
@@ -61,18 +70,18 @@ describe('Tools Configuration', () => {
       core: 3,
       apps: 6,
       analytics: 6,
-      crashes: 10,
-      notes: 3,
-      events: 3,
+      crashes: 12,
+      notes: 4,
+      events: 6,
       alerts: 3,
-      views: 2,
+      views: 3,
       database: 6,
       dashboard_users: 1,
       app_users: 3,
-      drill: 4,
+      drill: 7,
       user_profiles: 3,
       cohorts: 5,
-      funnels: 7,
+      funnels: 10,
       formulas: 4,
       live: 6,
       retention: 1,
@@ -87,10 +96,19 @@ describe('Tools Configuration', () => {
       email_reports: 7,
       dashboards: 8,
       times_of_day: 1,
-      hooks: 5,
-      journeys: 13,
+      hooks: 6,
+      journeys: 18,
       content: 11,
       metadata: 1,
+      flows: 4,
+      ratings: 3,
+      campaigns: 3,
+      ai_assistants: 1,
+      notifications: 1,
+      tasks: 2,
+      geo: 1,
+      revenue: 1,
+      crashes_jira: 1,
     };
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
@@ -108,12 +126,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 151 tools', () => {
+    it('should have total of 187 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(151);
+      expect(totalTools).toBe(187);
     });
   });
 

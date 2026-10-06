@@ -1,5 +1,7 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import { handleListSdkLogsV2 } from './v2/logger.js';
 
 // ============================================================================
 // LIST_SDK_LOGS TOOL
@@ -70,6 +72,9 @@ export class LoggerTools {
   constructor(private context: ToolContext) {}
 
   async sdk_logs_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListSdkLogsV2(this.context, args);
+    }
     return handleListSDKLogs(this.context, args);
   }
 }

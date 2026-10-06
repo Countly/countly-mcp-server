@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   getAllToolDefinitions,
+  getV2ToolDefinitionOverrides,
   getAllToolMetadata,
   getAllToolHandlers,
 } from '../src/tools/index.js';
@@ -90,9 +91,11 @@ describe('every tool definition ships a JSON Schema, not a zod schema', () => {
   // must stay empty; do NOT add new entries.
   const KNOWN_ZOD_SCHEMA_MODULES = new Set<string>([]);
 
-  const definitionsToCheck = getAllToolDefinitions().filter(
-    (d) => !KNOWN_ZOD_SCHEMA_MODULES.has(d.name)
-  );
+  const definitionsToCheck = [
+    ...getAllToolDefinitions(),
+    // Platform /v2 variants replace legacy definitions in tools/list
+    ...Object.values(getV2ToolDefinitionOverrides()).map((d: any) => ({ ...d, name: `${d.name} (v2)` })),
+  ].filter((d) => !KNOWN_ZOD_SCHEMA_MODULES.has(d.name));
 
   it.each(definitionsToCheck.map((d) => [d.name, d]))(
     '%s inputSchema is a plain JSON Schema object',

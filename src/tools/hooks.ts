@@ -2,6 +2,16 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
 import { parseJsonParam, withDefault } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleCreateHookV2,
+  handleDeleteHookV2,
+  handleGetHookV2,
+  handleListHooksV2,
+  handleTestHookV2,
+  handleUpdateHookV2,
+  hooksGetToolDefinition,
+} from './v2/hooks.js';
 
 /**
  * Hooks Module
@@ -325,7 +335,9 @@ export async function handleUpdateHook(
     'Failed to get existing hook'
   );
 
-  const existingHook = listResponse.data.find((h: any) => h._id === hook_id);
+  // /o/hook/list answers {hooksList: [...]}; older servers answered a bare array
+  const hooks: any[] = Array.isArray(listResponse.data) ? listResponse.data : listResponse.data?.hooksList || [];
+  const existingHook = hooks.find((h: any) => h._id === hook_id);
   if (!existingHook) {
     return {
       content: [
@@ -461,6 +473,8 @@ export const hooksToolDefinitions = [
   createHookToolDefinition,
   updateHookToolDefinition,
   deleteHookToolDefinition,
+  // Countly Platform only (listed when the server serves /v2)
+  hooksGetToolDefinition,
 ];
 
 export const hooksToolHandlers = {
@@ -469,29 +483,49 @@ export const hooksToolHandlers = {
   'hooks_create': 'hooks_create',
   'hooks_update': 'hooks_update',
   'hooks_delete': 'hooks_delete',
+  'hooks_get': 'hooks_get',
 } as const;
 
 export class HooksTools {
   constructor(private context: ToolContext) {}
 
   async hooks_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListHooksV2(this.context, args);
+    }
     return handleListHooks(this.context, args);
   }
 
   async hooks_test(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleTestHookV2(this.context, args);
+    }
     return handleTestHook(this.context, args);
   }
 
   async hooks_create(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateHookV2(this.context, args);
+    }
     return handleCreateHook(this.context, args);
   }
 
   async hooks_update(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateHookV2(this.context, args);
+    }
     return handleUpdateHook(this.context, args);
   }
 
   async hooks_delete(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteHookV2(this.context, args);
+    }
     return handleDeleteHook(this.context, args);
+  }
+
+  async hooks_get(args: any): Promise<ToolResult> {
+    return handleGetHookV2(this.context, args);
   }
 }
 

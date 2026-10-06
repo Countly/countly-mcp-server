@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **151 Tools** across 33 categories for comprehensive Countly operations
+- **187 Tools** across 42 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (151 available)
+### Tools (187 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -305,7 +305,7 @@ COUNTLY_TOOLS_ALERTS=NONE      # Alerts: Completely disabled
 COUNTLY_TOOLS_ALL=R            # Read-only mode for all tools
 ```
 
-**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 33):
+**Available Categories** (subset — see TOOLS_CONFIGURATION.md for all 42):
 - `CORE` - Core tools (ping, get_version, get_plugins) (3 tools)
 - `APPS` - Application management (6 tools)
 - `ANALYTICS` - Analytics data retrieval (7 tools)
@@ -604,7 +604,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 151 tools across 33 categories for comprehensive Countly integration:
+The server provides 187 tools across 42 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -612,15 +612,15 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`get_plugins`** - Get list of installed plugins on the server
 
 ### App Management
-- **`apps_list`** - List all applications
-- **`apps_get_by_name`** - Get app details by name
+- **`apps_list`** (v2 on Platform) - List all applications; on Platform with your role (admin/user) per app
+- **`apps_get_by_name`** (v2 on Platform) - Get app details by name
 - **`apps_create`** - Create new application
 - **`apps_update`** - Update app settings
 - **`apps_delete`** - Delete application
 - **`apps_reset`** - Reset app data
 
 ### Analytics & Dashboards
-- **`get_analytics_data`** - Analytics data breakdown by predefined methods (locations, carriers, devices, etc.). For multi-segment breakdowns, use drill tools
+- **`query_data`** - Analytics data by predefined methods (locations, carriers, devices, etc.), event data, or drill segmentation. On Platform, use `drill_query` for metrics, formulas and cohorts
 - **`app_analytics_summary`** - General app summary and analytics overview
 - **`slipping_users`** - Identify inactive app users
 - **`session_frequency`** - Session frequency distribution across time buckets (f=0: first session, f=1: 1-24h, f=2: 1 day, through f=11: 30+ days)
@@ -629,16 +629,19 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 
 ### Events
 - **`events_create`** - Define event with metadata and configuration
-- **`events_list`** - List all events and their segments, including internal Countly events with exact database structure
-- **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
+- **`events_list`** (v2 on Platform) - List all events and their segments, including internal Countly events with exact database structure; on Platform with search, paging, display names and drill-only events
+- **`events_summary`** (Platform) - All custom events with count, sum, duration and per-occurrence averages for a period
+- **`events_top`** (Platform) - Events ranked by count, average sum and average duration
+- **`events_movers`** (Platform) - Fastest-growing and newly appearing events vs the previous period, with daily series
+- **`events_delete`** - Delete events and their data
 
 ### Dashboard User Management
-- **`dashboard_users`** - List all dashboard users (admin/management users who access the Countly dashboard)
+- **`dashboard_users`** (v2 on Platform) - List all dashboard users (admin/management users who access the Countly dashboard); on Platform as compact rows with role and app access
 
 ### App User Management
-- **`apps_create_user`** - Create app user (end-user being tracked in your application)
-- **`apps_delete_user`** - Delete app user (end-user)
-- **`export_app_users`** - Export app user data (end-users)
+- **`app_users_create`** - Create app user (end-user being tracked in your application)
+- **`app_users_delete`** - Delete app users (end-users) matching a query
+- **`app_users_update`** - Update app user properties
 
 ### Alerts & Notifications
 - **`alerts_create`** - Create alert configuration
@@ -646,9 +649,10 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`alerts_list`** - List all alerts
 
 ### Notes
-- **`notes_list`** - List all dashboard notes
-- **`notes_create`** - Create note
-- **`notes_delete`** - Delete note
+- **`notes_list`** (v2 on Platform) - List all dashboard notes
+- **`notes_create`** (v2 on Platform) - Create note; on Platform with private/shared/global visibility and optional event scope (hidden from the legacy dashboard)
+- **`notes_update`** (Platform) - Edit a note's text, time, color, visibility or event scope
+- **`notes_delete`** (v2 on Platform) - Delete note
 
 ### Database Operations
 - **`databases_list`** - List available databases
@@ -659,27 +663,33 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`databases_stats`** - Database statistics
 
 ### Crash Analytics
-- **`crash_groups_list`** - List crash groups for an app
+- **`crash_groups_list`** (v2 on Platform) - List crash groups for an app; on Platform with server-side search and sorting
 - **`crashes_stats_get`** - Get crash statistics and graphs
 - **`crashes_get`** - View crash details
-- **`crashes_resolve`** - Mark crash as resolved
-- **`uncrashes_resolve`** - Mark crash as unresolved
-- **`crashes_hide`** - Hide crash from view
-- **`crashes_show`** - Show hidden crash
+- **`crash_group_breakdown`** (Platform) - Distribution of a crash group over a field (OS version, device, app version, …)
+- **`crash_group_users`** (Platform) - Users affected by a crash group
+- **`crash_jira_issues`** (Platform, requires `crashes-jira` plugin) - Jira issues linked to crash groups
+- **`crashes_resolve`** (v2 on Platform) - Mark crash as resolved
+- **`crashes_unresolve`** (v2 on Platform) - Mark crash as unresolved
+- **`crashes_hide`** (v2 on Platform) - Hide crash from view
+- **`crashes_show`** (v2 on Platform) - Show hidden crash
 - **`crashes_comment_add`** - Add comment to crash
 - **`crashes_comment_update`** - Edit crash comment
 - **`crashes_comment_delete`** - Delete crash comment
 
 ### Drill Segmentation (requires `drill` plugin)
-- **`queriable_fields_list`** - Get available properties for segmentation
-- **`run_query`** - Run drill query with filters and time buckets
-- **`drill_bookmarks_list`** - List saved segmentation queries
-- **`drill_bookmarks_create`** - Save a segmentation query
-- **`drill_bookmarks_delete`** - Delete a saved query
+- **`drill_query`** (Platform) - Ad-hoc analytics over raw events: count, unique users, sum, average, percentiles, cohort and formula metrics, filters, breakdowns, time series and paging
+- **`queriable_fields_list`** (v2 on Platform) - Get available properties for segmentation
+- **`metadata_get`** (v2 on Platform) - Event definitions, segments and system fields for building queries
+- **`drill_bookmarks_list`** (v2 on Platform) - List saved segmentation queries; on Platform all saved queries of an app (or all yours), including old-UI bookmarks
+- **`drill_bookmarks_create`** (v2 on Platform) - Save a segmentation query; on Platform also any `drill_query` metrics, filter and breakdowns
+- **`drill_bookmarks_delete`** (v2 on Platform) - Delete a saved query
+- **`drill_saved_query_run`** (Platform) - Run a saved drill query, optionally over another period
+- **`drill_property_values`** (Platform) - Distinct values of a user property, custom property or event segment, for building filters
 
 ### User Profiles (requires `users` plugin)
-- **`user_profiles_query`** - Query users with MongoDB filters
-- **`user_profiles_breakdown`** - Break down user counts by properties
+- **`user_profiles_query`** (v2 on Platform) - Query users with MongoDB filters; on Platform also free-text search, sorting, paging and totals
+- **`user_profiles_breakdown`** (v2 on Platform) - Break down user counts by a property; on Platform with a top-N limit and each value's share
 - **`user_profiles_get`** - Get specific user details by UID
 
 ### Cohorts (requires `cohorts` plugin)
@@ -690,25 +700,29 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`cohorts_delete`** - Delete a cohort
 
 ### Funnels (requires `funnels` plugin)
-- **`funnels_list`** - List all conversion funnels
-- **`funnels_data`** - Get funnel analytics data with filtering
-- **`funnels_step_users`** - Get users who reached a specific step
-- **`funnels_dropoff_users`** - Get users who dropped off between steps
+- **`funnels_list`** (v2 on Platform) - List all conversion funnels
+- **`funnels_data`** (v2 on Platform) - Get funnel analytics data with filtering; on Platform adds median and p95 time between steps
+- **`funnels_step_users`** (v2 on Platform) - Get users who reached a specific step; on Platform with full profiles
+- **`funnels_dropoff_users`** (v2 on Platform) - Get users who dropped off between steps; on Platform with full profiles
 - **`funnels_create`** - Create conversion funnel with event sequence
 - **`funnels_update`** - Update funnel configuration
 - **`funnels_delete`** - Delete a funnel
+- **`funnels_breakdown`** (Platform) - Users who reached a step, split by a property
+- **`funnels_trends`** (Platform) - Daily entered, completed and conversion rate
+- **`funnels_user_progress`** (Platform) - How far one user got in every funnel
 
 ### Formulas (requires `formulas` plugin)
 - **`formulas_run`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
 - **`formulas_list`** - List all saved formulas
+- **`formulas_save`** - Create or update a saved formula
 - **`formulas_delete`** - Delete a saved formula
 
 ### Live/Concurrent Users (requires `concurrent_users` plugin)
-- **`live_users`** - Get current online user count and new users at this moment
+- **`live_users`** (v2 on Platform) - Get current online user count and new users at this moment
 - **`live_metrics`** - Get breakdown by countries, devices and carriers for users currently online
-- **`live_last_hour`** - Get minute-by-minute data for the last hour (60 data points)
-- **`live_last_day`** - Get hour-by-hour data for the last day (24 data points)
-- **`live_last_30_days`** - Get daily data for the last 30 days (30 data points)
+- **`live_last_hour`** (v2 on Platform) - Get minute-by-minute data for the last hour (60 data points)
+- **`live_last_day`** (v2 on Platform) - Get hour-by-hour data for the last day (24 data points)
+- **`live_last_30_days`** (v2 on Platform) - Get daily data for the last 30 days (30 data points)
 - **`live_overall`** - Get maximum values for online users (peak concurrent usage records)
 
 ### Retention (requires `retention_segments` plugin)
@@ -732,7 +746,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`ab_experiments_delete`** - Delete experiment and all its data
 
 ### Logger (requires `logger` plugin)
-- **`sdk_logs_list`** - List incoming data logs sent by SDK to the server for debugging and monitoring
+- **`sdk_logs_list`** (v2 on Platform) - List incoming data logs sent by SDK to the server for debugging and monitoring; on Platform with paging and filters by request type, SDK, time range and problem requests
 
 ### SDKs (requires `sdk` plugin)
 - **`sdk_stats_get`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
@@ -747,6 +761,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`filtering_rules_list`** - List all blocking rules that filter incoming requests
 - **`filtering_rules_create`** - Create rule to block requests based on MongoDB conditions (IP, version, device properties)
 - **`filtering_rules_update`** - Update existing blocking rule configuration
+- **`filtering_rules_toggle_status`** - Enable or disable a blocking rule
 - **`filtering_rules_delete`** - Delete a blocking rule
 
 ### Datapoint (requires `server-stats` plugin)
@@ -759,62 +774,105 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`server_logs_contents`** - Get contents of a specific server log file for debugging and monitoring (only available in non-Docker deployments)
 
 ### Email Reports (requires `reports` plugin)
-- **`email_reports_list`** - List all email reports configured for an app
-- **`email_reports_core_create`** - Create a core email report with metrics like analytics, events, crashes, and star-rating
-- **`email_reports_dashboard_create`** - Create a dashboard email report for specific dashboards
-- **`email_reports_update`** - Update an existing email report configuration
-- **`email_reports_preview`** - Preview an email report to see what it will look like before sending
-- **`email_reports_send`** - Manually trigger sending an email report immediately
-- **`email_reports_delete`** - Delete an email report configuration
+- **`email_reports_list`** (v2 on Platform) - List all email reports configured for an app; on Platform across apps with an optional app and title filter
+- **`email_reports_core_create`** (v2 on Platform) - Create a core email report with metrics like analytics, events, crashes, and star-rating
+- **`email_reports_dashboard_create`** (v2 on Platform) - Create a dashboard email report for specific dashboards; on Platform for new-UI dashboards
+- **`email_reports_update`** (v2 on Platform) - Update an existing email report configuration
+- **`email_reports_preview`** (v2 on Platform) - Preview an email report to see what it will look like before sending; on Platform as readable text
+- **`email_reports_send`** (v2 on Platform) - Manually trigger sending an email report immediately
+- **`email_reports_delete`** (v2 on Platform) - Delete an email report configuration
+
+### Views (requires `views` plugin)
+- **`views_table`** - Per-view metrics table (views, users, duration, bounces, exits)
+- **`views_data`** - View metrics over time
+- **`views_top`** (Platform) - Top views per metric (count, duration, bounce rate, landings, exits, scroll depth)
 
 ### Dashboards (requires `dashboards` plugin)
+
+On Countly Platform with the new UI, the dashboard tools work with the new-UI dashboards (v2). Their widgets use the Platform widget format (drill, funnel, retention, profiles, active and online users), and `dashboards_data` returns each widget's results.
+
 - **`dashboards_list`** - List all available dashboards (with optional schema-only parameter)
 - **`dashboards_data`** - Get widgets and data for a specific dashboard with time period filtering
 - **`dashboards_create`** - Create a new dashboard with sharing settings, auto-refresh configuration, and theme
 - **`dashboards_update`** - Update dashboard configuration (name, sharing, refresh rate, theme)
 - **`dashboards_delete`** - Delete a dashboard by ID
 - **`dashboards_widget_add`** - Add a widget to a dashboard with full configuration (title, feature, widget type, apps, metrics, visualization)
-- **`dashboards_update_widget`** - Update widget position and size in the grid layout
+- **`dashboards_widget_update`** - Update a widget on a dashboard
 - **`dashboards_widget_remove`** - Remove a widget from a dashboard
 
 ### Times of Day (requires `times-of-day` plugin)
 - **`times_of_day`** - Get user behavior patterns in their local time for a specific event. Shows when users are most active throughout the day (by hour) and week (by day). Useful for understanding optimal engagement times and scheduling.
 
 ### Hooks (requires `hooks` plugin)
-- **`hooks_list`** - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details.
-- **`hooks_test`** - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
-- **`hooks_create`** - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
-- **`hooks_update`** - Update an existing webhook/hook configuration.
-- **`hooks_delete`** - Delete a webhook/hook by its ID.
-- **`hooks_internal_triggers_get`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
+- **`hooks_list`** (v2 on Platform) - List all webhooks/hooks configured for an app. Shows triggers, effects, and configuration details. On Platform also across apps, with enabled/text filters, paging and run counters.
+- **`hooks_get`** (Platform) - Get one hook with its configuration, run counters and its last failed runs with error messages.
+- **`hooks_test`** (v2 on Platform) - Test a hook configuration with mock data before creating it. Useful for validating trigger conditions and effect actions.
+- **`hooks_create`** (v2 on Platform) - Create a new webhook/hook with various trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect).
+- **`hooks_update`** (v2 on Platform) - Update an existing webhook/hook configuration.
+- **`hooks_delete`** (v2 on Platform) - Delete a webhook/hook by its ID.
 
-### Journeys (requires `journey_engine` plugin, Countly Enterprise)
-- **`journeys_list`** - List journey definitions for an app, including version summaries, status, and usage counters.
-- **`journeys_get`** - Get one journey definition by ID with all versions and their block graphs.
-- **`journeys_create`** - Create a new journey (definition plus first draft version) from a block graph.
-- **`journeys_update`** - Update a journey's name and/or the blocks of one of its versions.
-- **`journeys_delete`** - Soft-delete a journey definition and all its versions.
-- **`journeys_publish`** - Publish (activate) or unpublish (set back to draft) a journey version.
-- **`journeys_pause`** - Pause an active journey version and its running instances.
-- **`journeys_resume`** - Resume a paused journey version.
-- **`journeys_block_reference`** - Get the journey block JSON schema reference (block types, per-subtype fields, validation rules, sample graphs) for authoring blocks.
-- **`journeys_stats_summary`** - Get summary KPIs for a journey (users entered/engaged/completed/dropped off, content viewed/interacted) with period-over-period change.
-- **`journeys_stats_table`** - Get the per-block journey statistics table with pagination (long queries return a task id to poll).
-- **`journeys_stats_performance`** - Get time-series journey performance data for trend charts.
-- **`journeys_stats_uids`** - List user UIDs in a journey stat bucket (entered, completed, dropped off, etc.).
+### Journeys (requires `journey_engine` plugin)
+On Countly Platform all journey tools use the `/v2` API. Its first write on a journey created in the old dashboard moves that journey to the new UI.
+- **`journeys_list`** (v2 on Platform) - List journeys with status, versions and usage counters; on Platform with status/search filters, paging and counts per status
+- **`journeys_get`** (v2 on Platform) - Get one journey with its versions and block graph
+- **`journeys_create`** (v2 on Platform) - Create a new journey (definition plus first draft version) from a block graph; on Platform also with a description and conversion goal
+- **`journeys_update`** (v2 on Platform) - Update a journey's name, per-user limit and/or the blocks of one of its versions; on Platform also description and goal
+- **`journeys_delete`** (v2 on Platform) - Soft-delete a journey and all its versions
+- **`journeys_publish`** (v2 on Platform) - Publish (activate) a journey version; on Lite/Enterprise it can also unpublish to draft
+- **`journeys_pause`** (v2 on Platform) - Pause an active journey version and its running instances
+- **`journeys_resume`** (v2 on Platform) - Resume a paused journey version
+- **`journeys_complete`** (Platform) - End an active or paused journey for good
+- **`journeys_block_reference`** - Get the journey block JSON schema reference (block types, per-subtype fields, validation rules, sample graphs) for authoring blocks
+- **`journeys_templates`** (Platform) - Ready-made journey templates with their block graphs
+- **`journeys_stats_summary`** (v2 on Platform) - Summary KPIs for a journey (users entered/engaged/completed/dropped off) with period-over-period change; on Platform also goal conversion
+- **`journeys_stats_table`** (v2 on Platform) - Journey instances (one row per user run) with pagination
+- **`journeys_stats_performance`** (v2 on Platform) - Time-series journey performance data for trend charts
+- **`journeys_stats_uids`** (v2 on Platform) - List user UIDs behind a journey metric (entered, completed, dropped off, goal converted, ...)
+- **`journeys_stats_blocks`** (Platform) - Per-block funnel: users who entered and completed each block
+- **`journeys_stats_content`** (Platform) - In-app content engagement per message: shown, interacted, button clicks
+- **`journeys_stats_active_users`** (Platform) - Users active in a journey, with a daily/weekly/monthly breakdown
 
-### Content Blocks (requires `content` plugin, Countly Enterprise)
-- **`content_blocks_list`** - List all content blocks (in-app content such as banners, modals, surveys) for an app.
-- **`content_blocks_get`** - Get one content block by ID with its full definitions and metadata.
-- **`content_blocks_preview`** - Get a browser preview URL showing the content block rendered exactly as end users see it.
-- **`content_blocks_create`** - Create a content block that can be delivered through journeys.
-- **`content_blocks_update`** - Update an existing content block (title, type, blocks, favorite).
-- **`content_blocks_delete`** - Delete a content block (fails if the block is still used in a journey).
-- **`content_assets_list`** - List uploaded content assets (images/videos) with metadata.
-- **`content_assets_upload`** - Upload an image asset (base64, max 5MB) for use in content blocks.
-- **`content_assets_update`** - Update an asset's name and/or tags.
-- **`content_assets_delete`** - Delete an uploaded content asset.
-- **`content_langs_list`** - List languages eligible for content translations.
+### Content (requires `content` plugin)
+On Countly Platform these tools manage the new content messages (popup, banner, carousel, survey, push). Legacy content blocks are listed too, and can be read, previewed and deleted, but not edited.
+- **`content_blocks_list`** (v2 on Platform) - List content for an app; on Platform with search, status and format filters and paging
+- **`content_blocks_get`** (v2 on Platform) - Get one content block / message with its full definition
+- **`content_blocks_preview`** (v2 on Platform) - Get a browser preview URL showing the content rendered exactly as end users see it
+- **`content_blocks_create`** (v2 on Platform) - Create content that can be delivered through journeys; on Platform a content message built from slides
+- **`content_blocks_update`** (v2 on Platform) - Update existing content (on Lite/Enterprise: title, type, blocks, favorite; on Platform: name, status, slides, styling, placement, translations)
+- **`content_blocks_delete`** (v2 on Platform) - Delete content (fails while it is still used in a journey or campaign)
+- **`content_assets_list`** (v2 on Platform) - List uploaded content images with metadata; on Platform with search, tags and paging
+- **`content_assets_upload`** (v2 on Platform) - Upload an image asset (base64; max 5MB, or 10MB on Platform)
+- **`content_assets_update`** (v2 on Platform) - Update an asset's name and/or tags
+- **`content_assets_delete`** (v2 on Platform) - Delete an uploaded content asset
+- **`content_langs_list`** - List languages eligible for content translations
+
+### Flows (requires `flows` plugin)
+- **`flows_list`** (Platform) - List saved user flows with anchor, direction, period and status
+- **`flows_get`** (Platform) - Definition of one saved flow
+- **`flows_data`** (Platform) - Top events per step from the anchor event, with the strongest transitions
+- **`flows_dropoff`** (Platform) - What users did instead of an expected next step
+
+### Ratings (requires `star-rating` plugin)
+- **`ratings_widgets_list`** (Platform) - Rating widgets with status, times shown, responses and average rating
+- **`ratings_stats`** (Platform) - Responses, average and 1-5 distribution of one widget for a period
+- **`ratings_comments`** (Platform) - Individual responses (rating, comment, email, user) of one widget
+
+### Campaigns (requires `campaigns` plugin)
+- **`campaigns_list`** (Platform) - Push, in-app, survey and rating campaigns with status and delivery counters
+- **`campaigns_get`** (Platform) - Full definition of one campaign
+- **`campaigns_results`** (Platform) - Delivery funnel of one campaign (events and users per stage)
+
+### AI Assistants (requires `ai-assistants` plugin)
+- **`ai_assistants_analytics`** (Platform) - LLM assistant analytics: overview, conversations, tools, models, quality, cost, performance, adoption
+
+### Tasks & Notifications
+- **`tasks_list`** (Platform) - Background tasks and long-running reports with status and timing
+- **`task_result`** (Platform) - Stored result of a finished background task
+- **`notifications_list`** (Platform) - The connected user's dashboard notifications and unread count
+
+### Geo, Revenue
+- **`geo_locations_list`** (Platform, requires `geo` plugin) - Saved geo locations (geofences)
+- **`revenue_iap_events`** (Platform, requires `revenue` plugin) - Events configured as in-app purchases
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 
