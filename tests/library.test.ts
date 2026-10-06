@@ -43,6 +43,11 @@ const APPS_BY_TOKEN: Record<string, Array<{ _id: string; name: string }>> = {
 };
 
 let countlyRequests: RecordedRequest[] = [];
+/** Server capability detection (see server-capabilities.ts), kept apart from the tools' own requests. */
+let detectionRequests: RecordedRequest[] = [];
+const DETECTION_PATHS = new Set(['/v2/countly_version', '/o/system/version', '/o/users/me', '/v2/plugins/enabled', '/o/system/plugins', '/o/system/observability']);
+/** Whether the fake answers like Countly Platform with the /v2 API. */
+let platformV2 = false;
 let pingStatus = 200;
 let countlyServer: http.Server;
 let countlyUrl: string;
@@ -78,10 +83,26 @@ function listen(server: http.Server): Promise<string> {
 
 beforeAll(async () => {
   countlyServer = http.createServer((req, res) => {
-    countlyRequests.push({ method: req.method || '', url: req.url || '', headers: req.headers });
     const path = new URL(req.url || '/', 'http://x').pathname;
+    const recorded = { method: req.method || '', url: req.url || '', headers: req.headers };
     const token = req.headers['countly-token'] as string;
     res.setHeader('Content-Type', 'application/json');
+    if (DETECTION_PATHS.has(path)) {
+      detectionRequests.push(recorded);
+      if (platformV2 && path === '/v2/countly_version') {
+        res.end(JSON.stringify({ data: { version: '26.01' } }));
+        return;
+      }
+      if (platformV2 && path === '/v2/plugins/enabled') {
+        res.end(JSON.stringify({ data: ['notes', 'journey_engine', 'drill', 'alerts', 'formulas', 'retention_segments', 'funnels'] }));
+        return;
+      }
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'text/html');
+      res.end('Not found');
+      return;
+    }
+    countlyRequests.push(recorded);
     if (path === '/o/apps/mine') {
       // Countly's real shape: administered apps under admin_of, used ones under
       // user_of (an app can be in both). Alpha is administered, the rest only used.
@@ -128,6 +149,8 @@ const savedEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   countlyRequests = [];
+  detectionRequests = [];
+  platformV2 = false;
   reports = [];
   pingStatus = 200;
   throwingCallback = false;
@@ -505,6 +528,33 @@ describe('tool filtering', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Server capabilities
+// ---------------------------------------------------------------------------
+
+describe('server capabilities', () => {
+  it('offers and routes Platform /v2 tools on a /v2 server, detecting once per grant', async () => {
+    platformV2 = true;
+    currentContext = context({ grantId: 'grant-v2-' + Date.now() });
+    const names = await listToolNames();
+    expect(names).toContain('notes_update');
+    expect(names).toContain('journeys_templates');
+
+    await callTool('notes_update', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', note_id: 'n1', note: 'x' });
+    expect(countlyRequests.some((r) => r.url.startsWith('/v2/notes')), JSON.stringify(countlyRequests.map((r) => r.url))).toBe(true);
+    expect(detectionRequests.filter((r) => r.url.startsWith('/v2/countly_version'))).toHaveLength(1);
+  });
+
+  it('hides /v2-only tools on a server without the /v2 API', async () => {
+    currentContext = context({ grantId: 'grant-legacy-' + Date.now() });
+    const names = await listToolNames();
+    expect(names).not.toContain('notes_update');
+    expect(names).toContain('notes_list');
+    const res = await callTool('notes_update', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', note_id: 'n1', note: 'x' });
+    expect(res.error?.message).toContain('Unknown tool');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Apps
 // ---------------------------------------------------------------------------
 
@@ -514,6 +564,13 @@ describe('apps', () => {
     expect(res.result.content[0].text).toContain('Beta');
     await callTool('events_list', { app_name: 'Beta' });
     expect(reports.at(-1)).toMatchObject({ tool: 'events_list', appId: 'aaaaaaaaaaaaaaaaaaaaaaa2', outcome: 'success' });
+  });
+
+  it('reads the app list again after an app is created, renamed or deleted', async () => {
+    await callTool('apps_list');
+    await callTool('apps_create', { name: 'New', timezone: 'UTC', country: 'US', category: '1' });
+    await callTool('apps_list');
+    expect(countlyRequests.filter((r) => r.url.startsWith('/o/apps/mine')).length, JSON.stringify(reports)).toBe(2);
   });
 
   it('reports an unknown app name as a failure', async () => {

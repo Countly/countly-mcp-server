@@ -88,10 +88,27 @@ export function normalizeServerUrlForHash(url: string): string {
   }
 }
 
-/** Loopback hosts: a server only reachable on this machine has no domain. */
+/**
+ * Loopback hosts: a server only reachable on this machine has no domain. The
+ * host is first normalised the way a browser does (WHATWG URL), so every
+ * spelling counts: `[0:0:0:0:0:0:0:1]` is `[::1]`, `127.1` and `0x7f.1` are
+ * `127.0.0.1`, and IPv4-mapped `[::ffff:127.0.0.1]` is `[::ffff:7f00:1]`.
+ */
 function isLoopbackHost(host: string): boolean {
-  const h = host.toLowerCase();
-  return h === 'localhost' || h.endsWith('.localhost') || h === '[::1]' || h === '0.0.0.0' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
+  let h: string;
+  try {
+    h = new URL(`http://${host}`).hostname.toLowerCase();
+  } catch {
+    h = host.toLowerCase();
+  }
+  if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' || h === '[::1]' || h === '[::]') {
+    return true;
+  }
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) {
+    return true;
+  }
+  // IPv4-mapped 127.0.0.0/8: ::ffff:7f00:0 to ::ffff:7fff:ffff
+  return /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(h);
 }
 
 /**

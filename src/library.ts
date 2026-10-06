@@ -46,11 +46,14 @@ import axios, { AxiosInstance } from 'axios';
 
 import { AppCache, parseAppsMineResponse, type CountlyApp } from './lib/app-cache.js';
 import { getPrompt, listPrompts } from './lib/prompts.js';
+import { detectServerCapabilities, ServerCapabilitiesCache, type ServerCapabilities } from './lib/server-capabilities.js';
+import { isToolPermitted } from './lib/tool-guards.js';
 import {
   ADMIN_ONLY_TOOLS,
   getCallShapes,
   getEffectiveOperations,
   getPossibleOperations,
+  isToolSupported,
   TOOL_AREAS,
   TOOL_CATEGORIES,
   type CrudOperation,
@@ -382,6 +385,9 @@ function sanitizeArgs(args: unknown): Record<string, unknown> {
 // APP CACHE (keyed by grant id)
 // ============================================================================
 
+/** Tools that change the app list a grant's cache holds. */
+const APP_MUTATIONS: ReadonlySet<string> = new Set(['apps_create', 'apps_update', 'apps_delete']);
+
 const MAX_CACHED_GRANTS = 1000;
 
 class GrantAppCaches {
@@ -451,6 +457,10 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
   const serverVersion = options.serverVersion ?? PACKAGE_VERSION;
   const isPluginEnabled = options.isPluginEnabled;
   const appCaches = new GrantAppCaches();
+  // What the server is (Platform /v2 or not), its enabled plugins and the
+  // member's permissions, detected once per grant as the standalone modes do,
+  // so tools take their /v2 paths on Platform and unsupported ones are hidden.
+  const capabilitiesCache = new ServerCapabilitiesCache();
   const hostAnalytics = options.analytics ? new HostAnalytics(options.analytics) : null;
 
   const report = (entry: ToolCallReport): void => {
@@ -496,9 +506,25 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
 
   const buildServer = (context: McpRequestContext): Server => {
     const state = getCatalogState();
-    const allowed = (name: string): ToolInfo | undefined => {
+    let capabilities: Promise<ServerCapabilities | null> | undefined;
+    const getCapabilities = (): Promise<ServerCapabilities | null> => {
+      capabilities ??= capabilitiesCache
+        .get(countlyUrl, context.grantId, () => detectServerCapabilities(createClient(context.upstreamToken, () => {}), undefined))
+        .catch(() => null);
+      return capabilities;
+    };
+    const allowed = async (name: string): Promise<ToolInfo | undefined> => {
       const info = state.byName.get(name);
-      return info && isToolAllowedFor(info, context, isPluginEnabled) ? info : undefined;
+      if (!info || !isToolAllowedFor(info, context, isPluginEnabled)) {
+        return undefined;
+      }
+      // Undetected (null): v2-only tools stay hidden, the rest are offered.
+      const caps = await getCapabilities();
+      const v2 = caps?.v2 === true;
+      if (!isToolSupported(name, caps?.plugins ?? null, v2) || !isToolPermitted(name, caps?.member ?? null, v2)) {
+        return undefined;
+      }
+      return info;
     };
 
     const server = new Server(
@@ -511,16 +537,19 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
       }
     );
 
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: state.infos
-        .filter((info) => allowed(info.name))
-        .map((info) => state.definitions.get(info.name)) as any[],
-    }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+      const listed = await Promise.all(state.infos.map((info) => allowed(info.name)));
+      return {
+        tools: listed
+          .filter((info): info is ToolInfo => !!info)
+          .map((info) => state.definitions.get(info.name)) as any[],
+      };
+    });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const name = request.params.name;
       const known = state.byName.get(name);
-      const info = allowed(name);
+      const info = await allowed(name);
       const started = performance.now();
       const args = sanitizeArgs(request.params.arguments);
       const callOperations = known ? operationsForCall(known, args) : [];
@@ -572,6 +601,7 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
         httpClient: client,
         appCache: cache,
         getAuthParams: () => ({}),
+        getServerCapabilities: getCapabilities,
         getApps,
         resolveAppId: async (a: any) => {
           const requestedId = a?.app_id;
@@ -600,6 +630,10 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
         const instance = new route.toolClass(toolContext);
         const result = await instance[route.methodName](args);
         const failedResult = !!(result && typeof result === 'object' && (result as any).isError === true);
+        if (!failedResult && APP_MUTATIONS.has(name)) {
+          // The grant's app list changed: the next lookup reads it again.
+          cache.clear();
+        }
         finish(failedResult ? (noAccess ? 'no_access' : 'failed') : 'success', appId);
         return result;
       } catch (error) {
