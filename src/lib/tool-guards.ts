@@ -271,17 +271,30 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
 };
 
 /**
+ * Guards that differ when the tool runs against the Platform /v2 API,
+ * because the v2 route checks another right than the legacy endpoint.
+ */
+export const TOOL_GUARDS_V2: Record<string, ToolGuard> = {
+  journeys_update: f('journey_engine', 'u'),
+  journeys_delete: f('journey_engine', 'd'),
+};
+
+function guardFor(toolName: string, v2: boolean): ToolGuard | undefined {
+  return (v2 ? TOOL_GUARDS_V2[toolName] : undefined) ?? TOOL_GUARDS[toolName];
+}
+
+/**
  * Whether the connected user may use a tool. Unknown member or unmapped
  * tool means "allowed": the server stays the authority.
  */
-export function isToolPermitted(toolName: string, member: MemberPermissions | null): boolean {
-  const guard = TOOL_GUARDS[toolName];
+export function isToolPermitted(toolName: string, member: MemberPermissions | null, v2 = false): boolean {
+  const guard = guardFor(toolName, v2);
   return !member || !guard || canUseGuard(member, guard);
 }
 
 /** Human-readable requirement, for error messages */
-export function describeGuard(toolName: string): string {
-  const guard = TOOL_GUARDS[toolName];
+export function describeGuard(toolName: string, v2 = false): string {
+  const guard = guardFor(toolName, v2);
   const verbs: Record<AccessType, string> = { c: 'create', r: 'read', u: 'update', d: 'delete' };
   switch (guard?.kind) {
   case 'feature':

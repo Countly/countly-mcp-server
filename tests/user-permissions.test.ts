@@ -125,3 +125,25 @@ describe('tool guards', () => {
     expect(describeGuard('apps_delete')).toBe('global admin rights');
   });
 });
+
+describe('edition-specific guards', () => {
+  const creator = parseMember({
+    global_admin: false,
+    permission: {
+      c: { a1: { all: false, allowed: { journey_engine: true } } },
+      r: { a1: { all: false, allowed: { journey_engine: true } } },
+      u: {}, d: {}, _: { u: [['a1']], a: [] },
+    },
+  });
+
+  it('uses the legacy guard on non-v2 servers', () => {
+    expect(isToolPermitted('journeys_update', creator)).toBe(true);
+    expect(isToolPermitted('journeys_delete', creator)).toBe(true);
+  });
+
+  it('uses the v2 route guard on Platform', () => {
+    expect(isToolPermitted('journeys_update', creator, true)).toBe(false);
+    expect(isToolPermitted('journeys_delete', creator, true)).toBe(false);
+    expect(describeGuard('journeys_delete', true)).toBe('"delete" permission for "journey_engine" on at least one app');
+  });
+});

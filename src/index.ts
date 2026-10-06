@@ -417,11 +417,11 @@ class CountlyMCPServer {
         // explanation the model can act on (instead of a raw 400/401 later).
         const requiredPlugin = getToolRequiredPlugin(name);
         const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
-        if (caps && !isToolPermitted(name, caps.member)) {
+        if (caps && !isToolPermitted(name, caps.member, caps.v2)) {
           return {
             content: [{
               type: 'text',
-              text: `Tool "${name}" is not available: it requires ${describeGuard(name)}, ` +
+              text: `Tool "${name}" is not available: it requires ${describeGuard(name, caps.v2)}, ` +
                 'which the connected Countly user does not have.',
             }],
             isError: true,

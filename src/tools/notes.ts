@@ -150,8 +150,13 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
 
   );
   
-  const notes = response.data?.notes || response.data || [];
-  const noteCount = Array.isArray(notes) ? notes.length : Object.keys(notes).length;
+  // Countly answers a DataTables envelope ({aaData, iTotalRecords}); older
+  // servers return {notes: [...]} or a bare array
+  const data = response.data;
+  const notes = data?.aaData ?? data?.notes ?? data ?? [];
+  const noteCount = Array.isArray(notes)
+    ? notes.length
+    : typeof data?.iTotalRecords === 'number' ? data.iTotalRecords : Object.keys(notes).length;
   
   return {
     content: [

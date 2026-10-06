@@ -726,6 +726,6 @@ export function filterToolsByServer<T extends { name: string }>(
   return tools.filter(
     (tool) => isToolAllowed(tool.name, config)
       && isToolSupported(tool.name, server.plugins, server.v2 === true)
-      && isToolPermitted(tool.name, server.member ?? null)
+      && isToolPermitted(tool.name, server.member ?? null, server.v2 === true)
   );
 }

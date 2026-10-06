@@ -246,3 +246,16 @@ describe('user_profiles_breakdown on Platform', () => {
     expect(get.mock.calls[0][1].params).toMatchObject({ method: 'user_details', projectionKey: '["cc"]' });
   });
 });
+
+describe('legacy notes_list count', () => {
+  it('counts DataTables rows instead of envelope keys', async () => {
+    const { handleListNotes } = await import('../src/tools/notes.js');
+    const context: any = {
+      httpClient: { get: async () => ({ data: { aaData: [], iTotalDisplayRecords: 0, iTotalRecords: 0, sEcho: 1 } }) },
+      getAuthParams: () => ({}),
+      resolveAppId: async () => 'app',
+    };
+    const res = await handleListNotes(context, { app_id: 'app', period: '30days' });
+    expect(res.content[0].text).toContain('Found 0 note(s)');
+  });
+});
