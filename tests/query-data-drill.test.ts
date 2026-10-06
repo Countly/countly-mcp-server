@@ -63,6 +63,13 @@ describe('handleQueryData drill', () => {
     context = makeContext();
   });
 
+  it('flags a drill query on a server without drill as an error', async () => {
+    (context.httpClient.get as any).mockRejectedValueOnce(new Error('404'));
+    const result = await handleQueryData(context, { query_type: 'drill', event: 'Purchase' });
+    expect(result.content[0].text).toContain('Drill plugin not available');
+    expect(result.isError).toBe(true);
+  });
+
   it('sends projectionKey as a JSON-encoded string, not an array', async () => {
     await handleQueryData(context, { query_type: 'drill', event: 'Purchase', projection_key: ['did'] });
     expect(queryParams(context).projectionKey).toBe('["did"]');

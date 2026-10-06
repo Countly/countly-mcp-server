@@ -74,6 +74,7 @@ import {
   TOOL_CATEGORIES,
   type ToolsConfig,
 } from './lib/tools-config.js';
+import { withAnnotations } from './lib/tool-annotations.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
@@ -371,15 +372,18 @@ class CountlyMCPServer {
         // Detection on but inconclusive: hide only tools that certainly need
         // the Platform /v2 API.
         return {
-          tools: this.autoDetect
+          tools: (this.autoDetect
             ? filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null })
-            : filteredTools,
+            : filteredTools
+          ).map(withAnnotations),
         };
       }
       const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
       return {
         tools: filterToolsByServer(filteredTools, this.toolsConfig, caps)
-          .map((tool) => overrides[tool.name] ? restrictToolArguments(overrides[tool.name], this.toolsConfig) : tool),
+          .map((tool) => withAnnotations(
+            overrides[tool.name] ? restrictToolArguments(overrides[tool.name], this.toolsConfig) : tool
+          )),
       };
     });
 
@@ -555,13 +559,19 @@ class CountlyMCPServer {
           name
         );
         
-        if (error instanceof McpError) {
+        // An unknown tool is a protocol error. Anything that failed while
+        // running the tool goes back as an isError result, as the MCP spec
+        // asks, so the model sees the message and can correct its call.
+        if (error instanceof McpError && error.code === ErrorCode.MethodNotFound) {
           throw error;
         }
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Error executing tool ${name}: ${error instanceof Error ? error.message : String(error)}`
-        );
+        return {
+          content: [{
+            type: 'text',
+            text: `Error executing tool ${name}: ${error instanceof Error ? error.message : String(error)}`,
+          }],
+          isError: true,
+        };
       }
       // No finally {} needed — per-request httpClient and cache are local to
       // this handler. Nothing shared was mutated.

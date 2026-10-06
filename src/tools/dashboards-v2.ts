@@ -117,7 +117,7 @@ export const dashboardsV2ToolDefinitions: Record<string, any> = {
   },
   dashboards_widget_remove: {
     name: 'dashboards_widget_remove',
-    description: 'Remove a widget from a dashboard (Countly Platform). Rows left empty are removed too.',
+    description: 'Remove a widget from a dashboard (Countly Platform). Rows left empty are removed too. WARNING: irreversible.',
     inputSchema: {
       type: 'object',
       properties: {

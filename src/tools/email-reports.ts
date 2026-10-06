@@ -518,7 +518,7 @@ export async function handlePreviewEmailReport(
  */
 export const sendEmailReportTool = {
   name: 'email_reports_send',
-  description: 'Send an email report to its configured recipients immediately (outside its normal schedule) via /i/reports/send. Requires the reports plugin. To see it without sending use email_reports_preview.',
+  description: 'Send an email report to its configured recipients immediately (outside its normal schedule) via /i/reports/send. WARNING: real emails are delivered and cannot be recalled. Requires the reports plugin. To see it without sending use email_reports_preview.',
   inputSchema: {
     type: 'object',
     properties: {

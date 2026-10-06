@@ -18,4 +18,6 @@ export interface ToolResult {
     type: string;
     text: string;
   }>;
+  /** Set when the call failed, so the model sees the text as an error */
+  isError?: boolean;
 }

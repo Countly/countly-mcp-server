@@ -106,7 +106,7 @@ export const journeysV2ToolDefinitions: Record<string, any> = {
   },
   journeys_delete: {
     name: 'journeys_delete',
-    description: 'Delete a journey and all its versions (soft delete; it disappears from lists and stats). Requires the journey_engine plugin. To find journey IDs use journeys_list.',
+    description: 'Delete a journey and all its versions (soft delete; it disappears from lists and stats). Requires the journey_engine plugin. WARNING: no tool can restore a deleted journey. To find journey IDs use journeys_list.',
     inputSchema: { type: 'object', properties: { ...appProps, ...journeyIdProp }, required: ['journey_id'] },
   },
   journeys_publish: {
