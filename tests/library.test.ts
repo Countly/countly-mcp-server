@@ -48,6 +48,8 @@ let detectionRequests: RecordedRequest[] = [];
 const DETECTION_PATHS = new Set(['/v2/countly_version', '/o/system/version', '/o/users/me', '/v2/plugins/enabled', '/o/system/plugins', '/o/system/observability']);
 /** Whether the fake answers like Countly Platform with the /v2 API. */
 let platformV2 = false;
+/** Delay before the fake answers a detection request, in ms. */
+let detectionDelay = 0;
 let pingStatus = 200;
 let countlyServer: http.Server;
 let countlyUrl: string;
@@ -89,6 +91,14 @@ beforeAll(async () => {
     res.setHeader('Content-Type', 'application/json');
     if (DETECTION_PATHS.has(path)) {
       detectionRequests.push(recorded);
+      if (detectionDelay) {
+        setTimeout(() => respondDetection(), detectionDelay);
+        return;
+      }
+      respondDetection();
+      return;
+    }
+    function respondDetection() {
       if (platformV2 && path === '/v2/countly_version') {
         res.end(JSON.stringify({ data: { version: '26.01' } }));
         return;
@@ -100,7 +110,6 @@ beforeAll(async () => {
       res.statusCode = 404;
       res.setHeader('Content-Type', 'text/html');
       res.end('Not found');
-      return;
     }
     countlyRequests.push(recorded);
     if (path === '/o/apps/mine') {
@@ -151,6 +160,7 @@ beforeEach(() => {
   countlyRequests = [];
   detectionRequests = [];
   platformV2 = false;
+  detectionDelay = 0;
   reports = [];
   pingStatus = 200;
   throwingCallback = false;
@@ -433,8 +443,8 @@ describe('tool filtering', () => {
   it('refuses formulas_run in saved mode for a read-only context, with no Countly request', async () => {
     currentContext = context({ operations: ['R'] });
     const res = await callTool('formulas_run', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', formula: '[]', mode: 'saved', formulaMeta: '{}' });
-    expect(res.error).toBeDefined();
-    expect(res.error.message).toMatch(/insufficient_scope/);
+    expect(res.result?.isError, JSON.stringify(res)).toBe(true);
+    expect(res.result.content[0].text).toMatch(/persists the formula/);
     expect(countlyRequests).toHaveLength(0);
     expect(reports[0]).toMatchObject({ tool: 'formulas_run', operation: 'R', operations: ['C', 'R'], outcome: 'no_access' });
 
@@ -446,7 +456,7 @@ describe('tool filtering', () => {
   it('refuses retention with save_report for a read-only context, with no Countly request', async () => {
     currentContext = context({ operations: ['R'] });
     const res = await callTool('retention', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', save_report: true });
-    expect(res.error).toBeDefined();
+    expect(res.result?.isError, JSON.stringify(res)).toBe(true);
     expect(countlyRequests).toHaveLength(0);
 
     const ok = await callTool('retention', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', save_report: false });
@@ -461,7 +471,7 @@ describe('tool filtering', () => {
     for (const alert_config of [{ _id: 'alert1', alertName: 'x' }, JSON.stringify({ _id: 'alert1' })]) {
       reports = [];
       const res = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config });
-      expect(res.error).toBeDefined();
+      expect(res.result?.isError, JSON.stringify(res)).toBe(true);
       expect(reports[0]).toMatchObject({ operations: ['U'], outcome: 'no_access' });
     }
     expect(countlyRequests).toHaveLength(0);
@@ -483,7 +493,7 @@ describe('tool filtering', () => {
 
     reports = [];
     const create = await callTool('alerts_create', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', alert_config: { alertName: 'x' } });
-    expect(create.error).toBeDefined();
+    expect(create.result?.isError, JSON.stringify(create)).toBe(true);
     expect(reports[0]).toMatchObject({ operations: ['C'], outcome: 'no_access' });
     expect(countlyRequests).toHaveLength(1);
   });
@@ -544,13 +554,28 @@ describe('server capabilities', () => {
     expect(detectionRequests.filter((r) => r.url.startsWith('/v2/countly_version'))).toHaveLength(1);
   });
 
+  it('lists tools with their annotations, as the standalone modes do', async () => {
+    currentContext = context({ grantId: 'grant-annotations-' + Date.now() });
+    const res = await rpc('tools/list');
+    const appsList = res.result.tools.find((t: { name: string }) => t.name === 'apps_list');
+    expect(appsList.annotations).toMatchObject({ readOnlyHint: true });
+  });
+
+  it('counts first-call server detection in the reported duration', async () => {
+    detectionDelay = 120;
+    currentContext = context({ grantId: 'grant-timing-' + Date.now() });
+    await callTool('ping');
+    expect(reports[0].durationMs).toBeGreaterThanOrEqual(100);
+  });
+
   it('hides /v2-only tools on a server without the /v2 API', async () => {
     currentContext = context({ grantId: 'grant-legacy-' + Date.now() });
     const names = await listToolNames();
     expect(names).not.toContain('notes_update');
     expect(names).toContain('notes_list');
     const res = await callTool('notes_update', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', note_id: 'n1', note: 'x' });
-    expect(res.error?.message).toContain('Unknown tool');
+    expect(res.result?.isError).toBe(true);
+    expect(res.result?.content[0].text).toContain('needs the Countly Platform /v2 API');
   });
 });
 
@@ -575,7 +600,7 @@ describe('apps', () => {
 
   it('reports an unknown app name as a failure', async () => {
     const res = await callTool('events_list', { app_name: 'Nope' });
-    expect(res.error).toBeDefined();
+    expect(res.result?.isError, JSON.stringify(res)).toBe(true);
     expect(reports[0]).toMatchObject({ outcome: 'failed' });
   });
 });
@@ -604,7 +629,7 @@ describe('onToolCall', () => {
       reports = [];
       pingStatus = status;
       const res = await callTool('ping');
-      expect(res.error).toBeDefined();
+      expect(res.result?.isError, JSON.stringify(res)).toBe(true);
       expect(reports[0].outcome).toBe('no_access');
     }
   });
@@ -612,7 +637,7 @@ describe('onToolCall', () => {
   it('reports failed for other errors', async () => {
     pingStatus = 500;
     const res = await callTool('ping');
-    expect(res.error).toBeDefined();
+    expect(res.result?.isError, JSON.stringify(res)).toBe(true);
     expect(reports[0].outcome).toBe('failed');
   });
 

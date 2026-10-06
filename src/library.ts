@@ -14,10 +14,15 @@
  *   argument is stripped before a tool runs.
  * - The token is sent only as the `countly-token` header, never as a query
  *   parameter, so it does not end up in access logs.
- * - Tools are filtered per request by CRUD operation, admin rights and
- *   (optionally) enabled plugins, and an unclassified tool is never exposed.
- *   Each call is checked against the operations its arguments need
- *   (TOOL_OPERATION_RULES), not only the tool's static operation.
+ * - Listing and calling tools go through the same pipeline as the standalone
+ *   modes (lib/tool-pipeline.ts): the grant's operations become a tools
+ *   configuration, the server's capabilities are detected once per grant (so
+ *   tools take their Platform /v2 paths), and each call is checked against
+ *   the operations its arguments need (TOOL_OPERATION_RULES). Library mode
+ *   adds admin-only tools, the host's plugin check, and never exposes an
+ *   unclassified tool. A refusal or failure is an isError result.
+ * - Every per-grant cache is bounded, so a long-running host holds a fixed
+ *   number of entries however many grants it has seen.
  * - Apps are not limited here: the upstream token carries the caller's own
  *   rights, and Countly enforces them on every request.
  * - Stateless: every request gets its own MCP server and transport, and the
@@ -44,16 +49,15 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, parseAppsMineResponse, type CountlyApp } from './lib/app-cache.js';
+import { AppCache } from './lib/app-cache.js';
+import { BoundedCache } from './lib/bounded-cache.js';
+import { callTool, configForOperations, listTools, toolContext, type ToolRequest } from './lib/tool-pipeline.js';
 import { getPrompt, listPrompts } from './lib/prompts.js';
 import { detectServerCapabilities, ServerCapabilitiesCache, type ServerCapabilities } from './lib/server-capabilities.js';
-import { isToolPermitted } from './lib/tool-guards.js';
 import {
   ADMIN_ONLY_TOOLS,
-  getCallShapes,
   getEffectiveOperations,
   getPossibleOperations,
-  isToolSupported,
   TOOL_AREAS,
   TOOL_CATEGORIES,
   type CrudOperation,
@@ -342,13 +346,8 @@ function isToolAllowedFor(
   context: McpRequestContext,
   isPluginEnabled: ((plugin: string) => boolean) | undefined
 ): boolean {
-  // Listed when at least one kind of call is allowed (an update-only grant
-  // still sees alerts_create, for updating an existing alert); each call is
-  // then checked against what its own arguments need.
-  const shapes = getCallShapes(info.name) ?? [info.possibleOperations];
-  if (!shapes.some((shape) => shape.every((op) => context.operations.includes(op)))) {
-    return false;
-  }
+  // Operations are checked by the shared pipeline (configForOperations);
+  // these are library mode's own filters.
   if (info.adminOnly && context.admin !== true) {
     return false;
   }
@@ -390,36 +389,6 @@ const APP_MUTATIONS: ReadonlySet<string> = new Set(['apps_create', 'apps_update'
 
 const MAX_CACHED_GRANTS = 1000;
 
-class GrantAppCaches {
-  private readonly caches = new Map<string, AppCache>();
-
-  for(grantId: string): AppCache {
-    let cache = this.caches.get(grantId);
-    if (cache) {
-      // Refresh recency so the least recently used grant is evicted first.
-      this.caches.delete(grantId);
-    } else {
-      cache = new AppCache();
-    }
-    this.caches.set(grantId, cache);
-    while (this.caches.size > MAX_CACHED_GRANTS) {
-      const oldest = this.caches.keys().next().value as string;
-      this.caches.delete(oldest);
-    }
-    return cache;
-  }
-}
-
-async function fetchApps(client: AxiosInstance, cache: AppCache): Promise<CountlyApp[]> {
-  if (!cache.isExpired()) {
-    return cache.getAll();
-  }
-  const response = await client.get('/o/apps/mine');
-  const apps: CountlyApp[] = parseAppsMineResponse(response.data);
-  cache.update(apps);
-  return apps;
-}
-
 // ============================================================================
 // HANDLER
 // ============================================================================
@@ -456,11 +425,12 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
   const serverName = options.serverName ?? 'countly-mcp-server';
   const serverVersion = options.serverVersion ?? PACKAGE_VERSION;
   const isPluginEnabled = options.isPluginEnabled;
-  const appCaches = new GrantAppCaches();
+  // Per grant, bounded: a long-running host keeps at most MAX_CACHED_GRANTS.
+  const appCaches = new BoundedCache<string, AppCache>(MAX_CACHED_GRANTS);
   // What the server is (Platform /v2 or not), its enabled plugins and the
   // member's permissions, detected once per grant as the standalone modes do,
   // so tools take their /v2 paths on Platform and unsupported ones are hidden.
-  const capabilitiesCache = new ServerCapabilitiesCache();
+  const capabilitiesCache = new ServerCapabilitiesCache(undefined, MAX_CACHED_GRANTS);
   const hostAnalytics = options.analytics ? new HostAnalytics(options.analytics) : null;
 
   const report = (entry: ToolCallReport): void => {
@@ -506,26 +476,37 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
 
   const buildServer = (context: McpRequestContext): Server => {
     const state = getCatalogState();
+    const grant = context.grantId;
+    const appCache = (() => {
+      let cache = appCaches.get(grant);
+      if (!cache) {
+        cache = new AppCache();
+        appCaches.set(grant, cache);
+      }
+      return cache;
+    })();
     let capabilities: Promise<ServerCapabilities | null> | undefined;
     const getCapabilities = (): Promise<ServerCapabilities | null> => {
       capabilities ??= capabilitiesCache
-        .get(countlyUrl, context.grantId, () => detectServerCapabilities(createClient(context.upstreamToken, () => {}), undefined))
+        .get(countlyUrl, grant, () => detectServerCapabilities(createClient(context.upstreamToken, () => {}), undefined))
         .catch(() => null);
       return capabilities;
     };
-    const allowed = async (name: string): Promise<ToolInfo | undefined> => {
+    // Library mode's additions to the shared pipeline: only classified tools,
+    // admin-only tools for admin grants, and the host's plugin check.
+    const hidden = (name: string): boolean => {
       const info = state.byName.get(name);
-      if (!info || !isToolAllowedFor(info, context, isPluginEnabled)) {
-        return undefined;
-      }
-      // Undetected (null): v2-only tools stay hidden, the rest are offered.
-      const caps = await getCapabilities();
-      const v2 = caps?.v2 === true;
-      if (!isToolSupported(name, caps?.plugins ?? null, v2) || !isToolPermitted(name, caps?.member ?? null, v2)) {
-        return undefined;
-      }
-      return info;
+      return !info || !isToolAllowedFor(info, context, isPluginEnabled);
     };
+    const request = (client: AxiosInstance): ToolRequest => ({
+      client,
+      appCache,
+      authParams: () => ({}),
+      capabilities: getCapabilities,
+      autoDetect: true,
+      config: configForOperations(context.operations),
+      hidden,
+    });
 
     const server = new Server(
       { name: serverName, version: serverVersion },
@@ -537,23 +518,18 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
       }
     );
 
-    server.setRequestHandler(ListToolsRequestSchema, async () => {
-      const listed = await Promise.all(state.infos.map((info) => allowed(info.name)));
-      return {
-        tools: listed
-          .filter((info): info is ToolInfo => !!info)
-          .map((info) => state.definitions.get(info.name)) as any[],
-      };
-    });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: await listTools(request(createClient(context.upstreamToken, () => {}))),
+    }));
 
-    server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const name = request.params.name;
-      const known = state.byName.get(name);
-      const info = await allowed(name);
+    server.setRequestHandler(CallToolRequestSchema, async (request_) => {
+      // Timed from the start, so detection and checks count toward the call.
       const started = performance.now();
-      const args = sanitizeArgs(request.params.arguments);
-      const callOperations = known ? operationsForCall(known, args) : [];
-      const finish = (outcome: ToolCallReport['outcome'], appId?: string) => {
+      const name = request_.params.name;
+      const known = state.byName.get(name);
+      const args = sanitizeArgs(request_.params.arguments);
+      let appId = typeof args.app_id === 'string' && args.app_id !== '' ? args.app_id : undefined;
+      const finish = (outcome: ToolCallReport['outcome']) => {
         if (!known) {
           return;
         }
@@ -561,11 +537,11 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
           tool: known.name,
           category: known.category,
           operation: known.operation,
-          operations: [...callOperations],
+          operations: [...operationsForCall(known, args)],
           area: known.area,
           outcome,
           durationMs: Math.max(0, performance.now() - started),
-          grantId: context.grantId,
+          grantId: grant,
         };
         if (appId) {
           entry.appId = appId;
@@ -573,79 +549,27 @@ export function createMcpHandler(options: CreateMcpHandlerOptions): McpHandler {
         report(entry);
       };
 
-      if (!info) {
-        finish('no_access');
-        // Same answer for an unknown tool and a filtered one, so the error
-        // does not reveal which tools exist beyond the caller's grant.
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-      }
-
-      let appId = typeof args.app_id === 'string' && args.app_id !== '' ? args.app_id : undefined;
-
-      const missing = callOperations.filter((op) => !context.operations.includes(op));
-      if (missing.length > 0) {
-        finish('no_access', appId);
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `insufficient_scope: this call of ${name} needs operation ${missing.join(', ')}, which this connection does not allow`
-        );
-      }
-
       let noAccess = false;
-      const client = createClient(context.upstreamToken, () => {
+      const toolRequest = request(createClient(context.upstreamToken, () => {
         noAccess = true;
-      });
-      const cache = appCaches.for(context.grantId);
-      const getApps = (): Promise<CountlyApp[]> => fetchApps(client, cache);
-      const toolContext: ToolContext = {
-        httpClient: client,
-        appCache: cache,
-        getAuthParams: () => ({}),
-        getServerCapabilities: getCapabilities,
-        getApps,
-        resolveAppId: async (a: any) => {
-          const requestedId = a?.app_id;
-          if (requestedId) {
-            appId = String(requestedId);
-            return appId;
-          }
-          if (a?.app_name) {
-            const app = (await getApps()).find((x) => x.name === a.app_name);
-            if (!app) {
-              throw new McpError(ErrorCode.InvalidParams, `App not found: ${a.app_name}`);
-            }
-            appId = String(app._id);
-            return appId;
-          }
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            'Either app_id or app_name must be provided.\n' +
-            'Example: { app_id: "abc123" } or { app_name: "MyApp" }'
-          );
-        },
-      };
-
-      const route = state.routes.get(name) as ToolRoute;
+      }));
+      let call;
       try {
-        const instance = new route.toolClass(toolContext);
-        const result = await instance[route.methodName](args);
-        const failedResult = !!(result && typeof result === 'object' && (result as any).isError === true);
-        if (!failedResult && APP_MUTATIONS.has(name)) {
-          // The grant's app list changed: the next lookup reads it again.
-          cache.clear();
-        }
-        finish(failedResult ? (noAccess ? 'no_access' : 'failed') : 'success', appId);
-        return result;
+        call = await callTool(toolRequest, name, args, toolContext(toolRequest, (id) => {
+          appId = id;
+        }));
       } catch (error) {
-        finish(noAccess ? 'no_access' : 'failed', appId);
-        if (error instanceof McpError) {
-          throw error;
-        }
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Error executing tool ${name}: ${error instanceof Error ? error.message : String(error)}`
-        );
+        // Unknown or hidden tool: same answer either way, so the error does
+        // not reveal which tools exist beyond the caller's grant.
+        finish('no_access');
+        throw error;
       }
+      if (call.outcome === 'success' && APP_MUTATIONS.has(name)) {
+        // The grant's app list changed: the next lookup reads it again.
+        appCache.clear();
+      }
+      finish(call.outcome === 'success' ? 'success' : call.outcome === 'refused' || noAccess ? 'no_access' : 'failed');
+      return call.result as any;
     });
 
     server.setRequestHandler(ListPromptsRequestSchema, async () => ({ prompts: listPrompts() }));

@@ -4,6 +4,7 @@
  */
 
 import { createHash } from 'crypto';
+import { BoundedCache } from './bounded-cache.js';
 
 export interface CountlyApp {
   _id: string;
@@ -113,11 +114,14 @@ export class AppCache {
  * it cannot collide with authenticated callers.
  */
 export class AppCacheRegistry {
-  private readonly caches = new Map<string, AppCache>();
+  // Bounded: a multi-tenant HTTP server that sees many tokens keeps the most
+  // recently used ones only; a dropped tenant just reads its apps again.
+  private readonly caches: BoundedCache<string, AppCache>;
   private readonly cacheDurationMs: number;
 
-  constructor(cacheDurationMs = 300000) {
+  constructor(cacheDurationMs = 300000, maxTenants = 1000) {
     this.cacheDurationMs = cacheDurationMs;
+    this.caches = new BoundedCache(maxTenants);
   }
 
   /**

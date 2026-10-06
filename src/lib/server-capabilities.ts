@@ -18,6 +18,7 @@ import { createHash } from 'crypto';
 import { AxiosInstance, AxiosResponse } from 'axios';
 
 import { parseAppsMineResponse } from './app-cache.js';
+import { BoundedCache } from './bounded-cache.js';
 import { fetchMemberPermissions, type MemberPermissions } from './user-permissions.js';
 import { ENTERPRISE_DEFAULT_PLUGINS, LITE_DEFAULT_PLUGINS, PLATFORM_DEFAULT_PLUGINS } from './default-plugins.js';
 
@@ -245,12 +246,16 @@ async function probeDrill(
 
 /**
  * Per server + token cache with in-flight de-duplication, so a burst of
- * tools/list and tools/call requests triggers a single detection.
+ * tools/list and tools/call requests triggers a single detection. Bounded:
+ * a long-running server that sees many tokens (or, in library mode, grants)
+ * keeps at most `maxEntries` detections.
  */
 export class ServerCapabilitiesCache {
-  private entries = new Map<string, { promise: Promise<ServerCapabilities>; expiresAt: number }>();
+  private readonly entries: BoundedCache<string, Promise<ServerCapabilities>>;
 
-  constructor(private readonly ttlMs = 10 * 60 * 1000) {}
+  constructor(private readonly ttlMs = 10 * 60 * 1000, maxEntries = 1000) {
+    this.entries = new BoundedCache(maxEntries, ttlMs);
+  }
 
   private key(serverUrl: string, authToken: string | undefined): string {
     const token = authToken ? createHash('sha256').update(authToken).digest('hex') : '__anonymous__';
@@ -263,23 +268,34 @@ export class ServerCapabilitiesCache {
     detect: () => Promise<ServerCapabilities>
   ): Promise<ServerCapabilities> {
     const key = this.key(serverUrl, authToken);
-    const now = Date.now();
     const cached = this.entries.get(key);
-    if (cached && cached.expiresAt > now) {
-      return cached.promise;
+    if (cached) {
+      return cached;
     }
-    const promise = detect().then((caps) => {
-      // Don't keep inconclusive results for the full TTL; retry soon.
-      if (caps.architecture === 'unknown' || caps.flavor === 'unknown' || caps.plugins === null) {
-        const entry = this.entries.get(key);
-        if (entry) {
-          entry.expiresAt = Math.min(entry.expiresAt, Date.now() + 30_000);
+    const promise = detect().then(
+      (caps) => {
+        // Don't keep inconclusive results for the full TTL; retry soon.
+        if (caps.architecture === 'unknown' || caps.flavor === 'unknown' || caps.plugins === null) {
+          if (this.entries.get(key) === promise) {
+            this.entries.set(key, promise, 30_000);
+          }
         }
+        return caps;
+      },
+      (error) => {
+        // A failed detection is not kept: the next call tries again.
+        if (this.entries.get(key) === promise) {
+          this.entries.delete(key);
+        }
+        throw error;
       }
-      return caps;
-    });
-    this.entries.set(key, { promise, expiresAt: now + this.ttlMs });
+    );
+    this.entries.set(key, promise);
     return promise;
+  }
+
+  get size(): number {
+    return this.entries.size;
   }
 
   clear(): void {

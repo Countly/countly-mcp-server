@@ -89,59 +89,33 @@ export function normalizeServerUrlForHash(url: string): string {
 }
 
 /**
- * Loopback hosts: a server only reachable on this machine has no domain. The
- * host is first normalised the way a browser does (WHATWG URL), so every
- * spelling counts: `[0:0:0:0:0:0:0:1]` is `[::1]`, `127.1` and `0x7f.1` are
- * `127.0.0.1`, and IPv4-mapped `[::ffff:127.0.0.1]` is `[::ffff:7f00:1]`.
- */
-function isLoopbackHost(host: string): boolean {
-  let h: string;
-  try {
-    h = new URL(`http://${host}`).hostname.toLowerCase();
-  } catch {
-    h = host.toLowerCase();
-  }
-  if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' || h === '[::1]' || h === '[::]') {
-    return true;
-  }
-  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) {
-    return true;
-  }
-  // IPv4-mapped 127.0.0.0/8: ::ffff:7f00:0 to ::ffff:7fff:ffff
-  return /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(h);
-}
-
-/**
  * The device id a Countly server reports telemetry under: its domain with the
- * scheme and trailing slashes stripped, as the Countly platform's tracker
- * derives it from `api.domain` (api/parts/mgmt/tracker.js), so the same
- * server gets the same device id from both. Credentials in the URL
- * (`user:pass@`), the query and the fragment are dropped and never leave the process. A loopback host
- * (localhost with any port or path, 127.x, [::1]) is no domain.
+ * scheme and trailing slashes stripped, exactly as the Countly platform's
+ * tracker derives it from `api.domain` (api/parts/mgmt/tracker.js), so the
+ * same server gets the same device id from both. Nothing is sent when it is
+ * empty or exactly "localhost", the platform's own check. Anything else is
+ * reported as is, local addresses included: it only has to tell servers
+ * apart. Credentials (`user:pass@`), a query and a fragment are dropped so a
+ * secret written into the server URL never leaves the process.
  * @param url - the Countly server URL
- * @returns the device id, or undefined when there is no usable domain
+ * @returns the device id, or undefined when there is none
  */
 export function deviceIdFromServerUrl(url: string | undefined | null): string | undefined {
   if (typeof url !== 'string') {
     return undefined;
   }
-  let id = stripTrailingSlashes(url.trim().split('://').pop() ?? '');
-  const authorityEnd = id.search(/[/?#]/);
-  let authority = authorityEnd < 0 ? id : id.slice(0, authorityEnd);
-  // The path only: a query or fragment can carry a credential
-  // (?auth_token=...) and never leaves the process.
-  let rest = authorityEnd < 0 ? '' : id.slice(authorityEnd);
-  const queryStart = rest.search(/[?#]/);
-  if (queryStart >= 0) {
-    rest = stripTrailingSlashes(rest.slice(0, queryStart));
+  let id = url.trim().split('://').pop() ?? '';
+  const cut = id.search(/[?#]/);
+  if (cut >= 0) {
+    id = id.slice(0, cut);
   }
-  const at = authority.lastIndexOf('@');
+  const slash = id.indexOf('/');
+  const at = id.lastIndexOf('@', slash < 0 ? id.length : slash);
   if (at >= 0) {
-    authority = authority.slice(at + 1);
+    id = id.slice(at + 1);
   }
-  id = authority + rest;
-  const host = authority.startsWith('[') ? authority.slice(0, authority.indexOf(']') + 1) : authority.split(':')[0];
-  if (!host || isLoopbackHost(host)) {
+  id = stripTrailingSlashes(id);
+  if (!id || id === 'localhost') {
     return undefined;
   }
   return id;

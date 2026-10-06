@@ -36,7 +36,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, AppCacheRegistry, parseAppsMineResponse, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, AppCacheRegistry } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
@@ -60,30 +60,17 @@ import {
   ServerCapabilitiesCache,
   type ServerCapabilities,
 } from './lib/server-capabilities.js';
-import { describeGuard, isToolPermitted } from './lib/tool-guards.js';
 import {
   loadToolsConfig,
   filterTools,
-  filterToolsByServer,
-  getArgumentRefusal,
-  restrictToolArguments,
   getConfigSummary,
-  getToolRequiredPlugin,
-  isToolCallAllowed,
-  isToolSupported,
-  V2_ONLY_TOOLS,
   TOOL_CATEGORIES,
   type ToolsConfig,
 } from './lib/tools-config.js';
-import { withAnnotations } from './lib/tool-annotations.js';
+import { callTool, listTools, toolContext, type ToolRequest } from './lib/tool-pipeline.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
-import { 
-  getAllToolDefinitions,
-  getV2ToolDefinitionOverrides, 
-  getAllToolMetadata,
-} from './tools/index.js';
-import { ToolContext } from './tools/types.js';
+import { getAllToolDefinitions } from './tools/index.js';
 
 interface CountlyConfig {
   serverUrl: string;
@@ -359,34 +346,12 @@ class CountlyMCPServer {
   }
 
   private setupToolHandlers(server: Server) {
-    // Use the modular tool definitions from tools/index.ts, filter by
-    // configuration, then by what the connected Countly server supports
+    // Listing and calling go through the shared pipeline (lib/tool-pipeline.ts),
+    // which library mode uses too; this mode adds its credentials, analytics
+    // and loop detection.
     server.setRequestHandler(ListToolsRequestSchema, async (request) => {
-      const allTools = getAllToolDefinitions();
-      const filteredTools = filterTools(allTools, this.toolsConfig)
-        .map((tool) => restrictToolArguments(tool, this.toolsConfig));
-      const { client, authToken } = this.buildPerRequestClient(request);
-      const serverUrl = this.requestContext.getStore()?.serverUrl || this.config.serverUrl;
-      const caps = await this.getServerCapabilities(client, serverUrl, authToken);
-      if (!caps) {
-        // Detection disabled: expose every configured tool, as documented.
-        // Detection on but inconclusive: hide only tools that certainly need
-        // the Platform /v2 API.
-        return {
-          tools: (this.autoDetect
-            ? filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null })
-            : filteredTools
-          ).map((tool) => withAnnotations(tool, this.toolsConfig)),
-        };
-      }
-      const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
-      return {
-        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps)
-          .map((tool) => withAnnotations(
-            overrides[tool.name] ? restrictToolArguments(overrides[tool.name], this.toolsConfig) : tool,
-            this.toolsConfig
-          )),
-      };
+      const { client, cache, authToken } = this.buildPerRequestClient(request);
+      return { tools: await listTools(this.toolRequest(client, cache, authToken)) };
     });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -416,148 +381,34 @@ class CountlyMCPServer {
         const authToken = credentials.authToken;
 
         // Build a fresh axios client for this request so concurrent tenants
-        // cannot share headers / baseURL on the same object. The shared
-        // `this.httpClient` is intentionally untouched. Caller-supplied server
-        // URLs additionally get connect-time DNS validation + no-redirects.
+        // cannot share headers / baseURL on the same object. Caller-supplied
+        // server URLs additionally get connect-time DNS validation + no-redirects.
         const perReqHttpClient = this.createRequestHttpClient(
           authToken,
           serverUrl,
           reqState?.serverUrlFromCaller === true
         );
-
-        // Per-tenant app cache. Keyed by SHA-256(authToken) inside the
-        // registry so one tenant's apps cannot leak into another's
-        // resolveAppId lookup.
+        // Per-tenant app cache, keyed by SHA-256(authToken) inside the
+        // registry so one tenant's apps cannot leak into another's lookups.
         const perTenantAppCache = this.appCacheRegistry.for(authToken);
+        const toolRequest = this.toolRequest(perReqHttpClient, perTenantAppCache, authToken, serverUrl);
 
-        // Create tool context
-        const context: ToolContext = {
-          resolveAppId: async (a: any) =>
-            await this.resolveAppIdentifierWithContext(a, perReqHttpClient, perTenantAppCache, authToken),
-          getAuthParams: () => (authToken ? { auth_token: authToken } : {}),
-          httpClient: perReqHttpClient,
-          appCache: perTenantAppCache,
-          getApps: async () =>
-            await this.getAppsWithContext(perReqHttpClient, perTenantAppCache, authToken),
-          getServerCapabilities: async () =>
-            await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken),
-        };
-
-        // Refuse tools the connected server or user can't use, with an
-        // explanation the model can act on (instead of a raw 400/401 later).
-        const requiredPlugin = getToolRequiredPlugin(name);
-        const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
-        if (caps && !isToolPermitted(name, caps.member, caps.v2)) {
-          return {
-            content: [{
-              type: 'text',
-              text: `Tool "${name}" is not available: it requires ${describeGuard(name, caps.v2)}, ` +
-                'which the connected Countly user does not have.',
-            }],
-            isError: true,
-          };
-        }
-        if (this.autoDetect && V2_ONLY_TOOLS.has(name) && !caps?.v2) {
-          return {
-            content: [{
-              type: 'text',
-              text: `Tool "${name}" is not available: it needs the Countly Platform /v2 API, ` +
-                `which this server does not serve${caps ? ` (${describeCapabilities(caps)})` : ''}.`,
-            }],
-            isError: true,
-          };
-        }
-        if (requiredPlugin) {
-          if (caps && !isToolSupported(name, caps.plugins, caps.v2)) {
-            return {
-              content: [{
-                type: 'text',
-                text: `Tool "${name}" is not available: it requires the "${requiredPlugin}" plugin, ` +
-                  (caps.pluginsAssumed
-                    ? `which is not in the default plugin set of ${describeCapabilities(caps)} ` +
-                      '(this token cannot list the server\'s plugins).'
-                    : `which is not enabled on this server (${describeCapabilities(caps)}).`),
-              }],
-              isError: true,
-            };
-          }
-        }
-
-        // Get all tool metadata and filter based on tools configuration
-        const toolMetadataList = getAllToolMetadata();
-        const allowedToolNames = new Set(
-          filterTools(getAllToolDefinitions(), this.toolsConfig).map(t => t.name)
-        );
-        
-        const toolInstances: Record<string, any> = {};
-        const toolHandlers: Record<string, string> = {};
-        const instanceMap: Record<string, string> = {};
-        
-        // Loop through metadata to build routing information
-        for (const metadata of toolMetadataList) {
-          // Instantiate the tool class if not already done
-          if (!toolInstances[metadata.instanceKey]) {
-            toolInstances[metadata.instanceKey] = new metadata.toolClass(context);
-          }
-          
-          // Add handler mappings only for allowed tools
-          for (const [toolName, methodName] of Object.entries(metadata.handlers)) {
-            if (allowedToolNames.has(toolName)) {
-              toolHandlers[toolName] = methodName;
-              instanceMap[toolName] = metadata.instanceKey;
-            }
-          }
-        }
-        
-        // Look up the handler method and instance
-        const methodName = toolHandlers[name];
-        const instanceKey = instanceMap[name];
-        
-        if (!methodName || !instanceKey) {
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Unknown tool: ${name}`
-          );
-        }
-        
-        // Some arguments change what an allowed tool does (formulas_run with
-        // mode "saved" persists the formula), so check them against the
-        // tools configuration too.
-        const argumentRefusal = getArgumentRefusal(name, args, this.toolsConfig);
-        if (argumentRefusal) {
-          return {
-            content: [{ type: 'text', text: argumentRefusal }],
-            isError: true,
-          };
-        }
-        // The tool is enabled, but some tools write depending on their
-        // arguments (see TOOL_OPERATION_RULES): check what this call needs.
-        if (!isToolCallAllowed(name, args, this.toolsConfig)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Tool ${name} with these arguments needs an operation that is disabled by the tools configuration`
-          );
-        }
-
-        const instance = toolInstances[instanceKey];
-        
         // Check for potential infinite loops before executing the tool
         const loopCheck = this.loopDetector.addCall(name, args);
         if (loopCheck.isLoop) {
           console.warn(loopCheck.warning);
           // Still allow the call but log the warning
         }
-        
-        const result = await instance[methodName](args);
-        
-        // Track successful tool execution
+
+        const { result, outcome } = await callTool(toolRequest, name, (args ?? {}) as Record<string, unknown>, toolContext(toolRequest));
         const duration = Date.now() - startTime;
-        analytics.trackToolExecution(name, true, duration);
-        
-        // Track tool category based on prefix (e.g., "get_", "create_", "list_")
-        const category = name.split('_')[0] || 'unknown';
-        analytics.trackToolCategory(category);
-        
+        analytics.trackToolExecution(name, outcome === 'success', duration);
+        if (outcome === 'success') {
+          // Track tool category based on prefix (e.g., "get_", "create_", "list_")
+          analytics.trackToolCategory(name.split('_')[0] || 'unknown');
+        } else {
+          analytics.trackError(outcome === 'refused' ? 'refused' : 'tool_error', name);
+        }
         return result as any;
       } catch (error) {
         // Track failed tool execution
@@ -567,10 +418,9 @@ class CountlyMCPServer {
           error instanceof McpError ? error.code.toString() : 'unknown',
           name
         );
-        
-        // An unknown tool is a protocol error. Anything that failed while
-        // running the tool goes back as an isError result, as the MCP spec
-        // asks, so the model sees the message and can correct its call.
+
+        // An unknown tool is a protocol error. Anything else goes back as an
+        // isError result, as the MCP spec asks, so the model can correct its call.
         if (error instanceof McpError && error.code === ErrorCode.MethodNotFound) {
           throw error;
         }
@@ -582,9 +432,22 @@ class CountlyMCPServer {
           isError: true,
         };
       }
-      // No finally {} needed — per-request httpClient and cache are local to
-      // this handler. Nothing shared was mutated.
     });
+  }
+
+  /**
+   * This mode's view of one request, for the shared pipeline.
+   */
+  private toolRequest(client: AxiosInstance, cache: AppCache, authToken: string | undefined, serverUrl?: string): ToolRequest {
+    const url = serverUrl ?? (this.requestContext.getStore()?.serverUrl || this.config.serverUrl);
+    return {
+      client,
+      appCache: cache,
+      authParams: (): Record<string, string> => (authToken ? { auth_token: authToken } : {}),
+      capabilities: () => this.getServerCapabilities(client, url, authToken),
+      autoDetect: this.autoDetect,
+      config: this.toolsConfig,
+    };
   }
 
   private setupResourceHandlers(server: Server) {
@@ -790,32 +653,9 @@ class CountlyMCPServer {
     return { client, cache, authToken };
   }
 
-  private async getAppsWithContext(
-    client: AxiosInstance,
-    cache: AppCache,
-    authToken: string | undefined
-  ): Promise<CountlyApp[]> {
-    if (!cache.isExpired()) {
-      return cache.getAll();
-    }
-    const params = authToken ? { auth_token: authToken } : {};
-    const response = await client.get('/o/apps/mine', { params });
 
-    const apps = parseAppsMineResponse(response.data);
 
-    cache.update(apps);
-    return apps;
-  }
 
-  private async resolveAppIdentifierWithContext(
-    args: any,
-    client: AxiosInstance,
-    cache: AppCache,
-    authToken: string | undefined
-  ): Promise<string> {
-    const apps = await this.getAppsWithContext(client, cache, authToken);
-    return resolveAppIdentifier(args, apps);
-  }
 
   /**
    * Detect (or return cached) flavor + plugins of the Countly server behind

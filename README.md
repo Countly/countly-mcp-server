@@ -900,7 +900,7 @@ app.post('/v2/mcp', async (req, res) => {
 });
 ```
 
-`getToolCatalog()` returns each tool's category, CRUD operation, `possibleOperations`, area, and `adminOnly` flag. Tools outside the grant are not listed, and calling one returns a JSON-RPC error without contacting Countly.
+`getToolCatalog()` returns each tool's category, CRUD operation, `possibleOperations`, area, and `adminOnly` flag. Library mode lists and calls tools through the same pipeline as the standalone modes: the server is detected once per grant, so on Countly Platform tools use the `/v2` API and tools the server cannot serve are hidden. Tools outside the grant are not listed; calling one is an unknown-tool error, and a call the grant does not allow comes back as an `isError` result the assistant can read, without contacting Countly. Per-grant caches are bounded, so a long-running host keeps a fixed amount of memory.
 
 Some tools write depending on their arguments: `formulas_run` with a `mode` other than `"unsaved"` and `retention` with `save_report` also need `C`, `alerts_create` with an `alert_config._id` is an update (`U`), and `events_create` can overwrite an existing event so it needs `C` and `U`. Each call is checked against the operations its own arguments need. `requiredOperations(body)` returns them for every `tools/call` in a JSON-RPC body (`{ tool, operation, adminOnly }[]`), so the host can answer `403 insufficient_scope` before handing the request over; `toolsCalledIn(body)` still returns just the tool names.
 

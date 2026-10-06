@@ -24,6 +24,7 @@
 
 import { createRequire } from 'module';
 
+import { BoundedCache } from './bounded-cache.js';
 import { stripTrailingSlashes } from './url.js';
 
 const require = createRequire(import.meta.url);
@@ -80,7 +81,8 @@ export class HostAnalytics {
   private readonly fetchImpl: Fetch;
   private queue: QueuedEvent[] = [];
   private timer: NodeJS.Timeout | null = null;
-  private started = new Set<string>();
+  // Device ids that already sent server_started; bounded for hosts with many tenants.
+  private started = new BoundedCache<string, true>(1000);
 
   constructor(options: HostAnalyticsOptions, fetchImpl?: Fetch) {
     this.options = options;
@@ -121,10 +123,10 @@ export class HostAnalytics {
 
   /** server_started and transport_used, once per device id, on its first event. */
   private ensureStarted(deviceId: string): void {
-    if (this.started.has(deviceId)) {
+    if (this.started.get(deviceId)) {
       return;
     }
-    this.started.add(deviceId);
+    this.started.set(deviceId, true);
     const host = this.options.host ?? 'embedded';
     this.push(deviceId, 'server_started', {
       platform: process.platform,
