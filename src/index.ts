@@ -45,6 +45,7 @@ import {
   ConcurrencyLimiter,
   escapeHtml,
   extractClientIp,
+  isPlainHostHeader,
   formatRequestLog,
   parseCorsAllowed,
   RateLimiter,
@@ -1134,14 +1135,16 @@ class CountlyMCPServer {
           // fine in a request line but not as an argument to `claude mcp add`.
           // Scheme: honour X-Forwarded-Proto only behind a trusted proxy,
           // otherwise assume TLS for anything that isn't a local address.
-          const pageHost = (req.headers.host || `${hostname}:${port}`).trim();
+          // The Host header is caller-controlled and ends up in a shell
+          // command readers copy, so only a plain host[:port] is used.
+          const requestHost = (req.headers.host || '').trim();
+          const pageHost = isPlainHostHeader(requestHost) ? requestHost : `${hostname}:${port}`;
           const forwardedProto = trustProxy
             ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim().toLowerCase()
             : undefined;
           const pageProto = (forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : undefined)
             || (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(pageHost) ? 'http' : 'https');
-          // Host and X-Forwarded-Proto are caller-controlled; escape before
-          // the URL goes into the markup below.
+          // Escape as well, so the markup never depends on the check above.
           const pageEndpointUrl = escapeHtml(`${pageProto}://${pageHost}${mcpEndpoint}`);
 
           const pageTools = filterTools(getAllToolDefinitions(), this.toolsConfig);

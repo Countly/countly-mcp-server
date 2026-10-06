@@ -341,6 +341,21 @@ export function readLimitedBody(
 }
 
 /**
+ * True when `host` is a plain `Host` header value: a DNS name or IPv4
+ * address, or a bracketed IPv6 address, with an optional port.
+ *
+ * The welcome page prints a shell command (`claude mcp add ... <url>`) built
+ * from the request's Host header. HTML escaping protects the markup, but text
+ * copied from the page is decoded before the shell sees it, so a forged Host
+ * such as `a.test$(cmd)` would run on the reader's machine. Only values that
+ * cannot carry shell syntax are accepted; anything else is replaced by the
+ * server's own address.
+ */
+export function isPlainHostHeader(host: string): boolean {
+  return /^(?:\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?)(?::\d{1,5})?$/.test(host);
+}
+
+/**
  * Escape a string for interpolation into HTML text or a quoted attribute.
  *
  * The welcome page builds its copy-pasteable endpoint URL from the request's

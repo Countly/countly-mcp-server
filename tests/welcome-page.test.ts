@@ -36,6 +36,11 @@ const welcomePage = (() => {
 
 describe('welcome page', () => {
   describe('caller-controlled values', () => {
+    it('only uses a plain host[:port] from the Host header, since it ends up in a shell command', () => {
+      // HTML escaping does not stop `$(...)` in a copied `claude mcp add` line.
+      expect(indexSource).toMatch(/isPlainHostHeader\(requestHost\) \? requestHost :/);
+    });
+
     it('HTML-escapes the endpoint URL built from the Host header', () => {
       // pageEndpointUrl is derived from req.headers.host (and X-Forwarded-Proto
       // behind a trusted proxy). Unescaped, a forged Host reflected markup

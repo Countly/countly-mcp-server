@@ -8,6 +8,7 @@ import {
   escapeHtml,
   extractClientIp,
   formatRequestLog,
+  isPlainHostHeader,
   parseContentLength,
   parseCorsAllowed,
   RateLimiter,
@@ -435,6 +436,25 @@ describe('resolveCorsOrigin', () => {
   it('returns null when allowlist is specific and no Origin header is sent', () => {
     expect(resolveCorsOrigin(['https://a.com'], undefined)).toBeNull();
   });
+});
+
+describe('isPlainHostHeader', () => {
+  it.each(['localhost', 'localhost:3101', 'mcp.count.ly', 'mcp.count.ly:443', '127.0.0.1:3000', '[::1]:3101', '[2001:db8::1]'])(
+    'accepts %s',
+    (h) => expect(isPlainHostHeader(h)).toBe(true)
+  );
+  it.each([
+    'good.test$(touch${IFS}/tmp/pwn)',
+    'a.test`id`',
+    'a.test;id',
+    'a.test|id',
+    "a.test'",
+    'a b',
+    'test.com</pre><script>alert(1)</script>',
+    'a.test:99999x',
+    '',
+    '-a.test',
+  ])('rejects %s', (h) => expect(isPlainHostHeader(h)).toBe(false));
 });
 
 describe('escapeHtml', () => {
