@@ -65,6 +65,8 @@ import {
   loadToolsConfig,
   filterTools,
   filterToolsByServer,
+  getArgumentRefusal,
+  restrictToolArguments,
   getConfigSummary,
   getToolRequiredPlugin,
   isToolSupported,
@@ -359,7 +361,8 @@ class CountlyMCPServer {
     // configuration, then by what the connected Countly server supports
     server.setRequestHandler(ListToolsRequestSchema, async (request) => {
       const allTools = getAllToolDefinitions();
-      const filteredTools = filterTools(allTools, this.toolsConfig);
+      const filteredTools = filterTools(allTools, this.toolsConfig)
+        .map((tool) => restrictToolArguments(tool, this.toolsConfig));
       const { client, authToken } = this.buildPerRequestClient(request);
       const serverUrl = this.requestContext.getStore()?.serverUrl || this.config.serverUrl;
       const caps = await this.getServerCapabilities(client, serverUrl, authToken);
@@ -376,7 +379,7 @@ class CountlyMCPServer {
       const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
       return {
         tools: filterToolsByServer(filteredTools, this.toolsConfig, caps)
-          .map((tool) => overrides[tool.name] ?? tool),
+          .map((tool) => overrides[tool.name] ? restrictToolArguments(overrides[tool.name], this.toolsConfig) : tool),
       };
     });
 
@@ -511,6 +514,17 @@ class CountlyMCPServer {
           );
         }
         
+        // Some arguments change what an allowed tool does (formulas_run with
+        // mode "saved" persists the formula), so check them against the
+        // tools configuration too.
+        const argumentRefusal = getArgumentRefusal(name, args, this.toolsConfig);
+        if (argumentRefusal) {
+          return {
+            content: [{ type: 'text', text: argumentRefusal }],
+            isError: true,
+          };
+        }
+
         const instance = toolInstances[instanceKey];
         
         // Check for potential infinite loops before executing the tool
