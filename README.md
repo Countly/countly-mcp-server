@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **151 Tools** across 33 categories for comprehensive Countly operations
+- **161 Tools** across 33 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (151 available)
+### Tools (161 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -574,7 +574,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 151 tools across 33 categories for comprehensive Countly integration:
+The server provides 161 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -600,6 +600,9 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 ### Events
 - **`events_create`** - Define event with metadata and configuration
 - **`events_list`** - List all events and their segments, including internal Countly events with exact database structure
+- **`events_summary`** (Platform) - All custom events with count, sum, duration and per-occurrence averages for a period
+- **`events_top`** (Platform) - Events ranked by count, average sum and average duration
+- **`events_movers`** (Platform) - Fastest-growing and newly appearing events vs the previous period, with daily series
 - **`get_events_data`** - Basic events data tool. If event is provided, shows breakdown of that event per time bucket. If event is not provided, shows all events total data for the period. For segmenting events by segments, you will need to use the drill tool.
 
 ### Dashboard User Management
@@ -629,9 +632,11 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`databases_stats`** - Database statistics
 
 ### Crash Analytics
-- **`crash_groups_list`** - List crash groups for an app
+- **`crash_groups_list`** (v2 on Platform) - List crash groups for an app; on Platform with server-side search and sorting
 - **`crashes_stats_get`** - Get crash statistics and graphs
 - **`crashes_get`** - View crash details
+- **`crash_group_breakdown`** (Platform) - Distribution of a crash group over a field (OS version, device, app version, …)
+- **`crash_group_users`** (Platform) - Users affected by a crash group
 - **`crashes_resolve`** - Mark crash as resolved
 - **`uncrashes_resolve`** - Mark crash as unresolved
 - **`crashes_hide`** - Hide crash from view
@@ -641,6 +646,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`crashes_comment_delete`** - Delete crash comment
 
 ### Drill Segmentation (requires `drill` plugin)
+- **`drill_query`** (Platform) - Ad-hoc analytics over raw events: count, unique users, sum, average, percentiles, cohort and formula metrics, filters, breakdowns, time series and paging
 - **`queriable_fields_list`** - Get available properties for segmentation
 - **`run_query`** - Run drill query with filters and time buckets
 - **`drill_bookmarks_list`** - List saved segmentation queries
@@ -648,7 +654,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`drill_bookmarks_delete`** - Delete a saved query
 
 ### User Profiles (requires `users` plugin)
-- **`user_profiles_query`** - Query users with MongoDB filters
+- **`user_profiles_query`** (v2 on Platform) - Query users with MongoDB filters; on Platform also free-text search, sorting, paging and totals
 - **`user_profiles_breakdown`** - Break down user counts by properties
 - **`user_profiles_get`** - Get specific user details by UID
 
@@ -660,13 +666,16 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`cohorts_delete`** - Delete a cohort
 
 ### Funnels (requires `funnels` plugin)
-- **`funnels_list`** - List all conversion funnels
-- **`funnels_data`** - Get funnel analytics data with filtering
-- **`funnels_step_users`** - Get users who reached a specific step
-- **`funnels_dropoff_users`** - Get users who dropped off between steps
+- **`funnels_list`** (v2 on Platform) - List all conversion funnels
+- **`funnels_data`** (v2 on Platform) - Get funnel analytics data with filtering; on Platform adds median and p95 time between steps
+- **`funnels_step_users`** (v2 on Platform) - Get users who reached a specific step; on Platform with full profiles
+- **`funnels_dropoff_users`** (v2 on Platform) - Get users who dropped off between steps; on Platform with full profiles
 - **`funnels_create`** - Create conversion funnel with event sequence
 - **`funnels_update`** - Update funnel configuration
 - **`funnels_delete`** - Delete a funnel
+- **`funnels_breakdown`** (Platform) - Users who reached a step, split by a property
+- **`funnels_trends`** (Platform) - Daily entered, completed and conversion rate
+- **`funnels_user_progress`** (Platform) - How far one user got in every funnel
 
 ### Formulas (requires `formulas` plugin)
 - **`formulas_run`** - Run mathematical formulas on metrics (sessions, events, users) with filters and segments
@@ -702,7 +711,7 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`ab_experiments_delete`** - Delete experiment and all its data
 
 ### Logger (requires `logger` plugin)
-- **`sdk_logs_list`** - List incoming data logs sent by SDK to the server for debugging and monitoring
+- **`sdk_logs_list`** (v2 on Platform) - List incoming data logs sent by SDK to the server for debugging and monitoring; on Platform with paging and filters by request type, SDK, time range and problem requests
 
 ### SDKs (requires `sdk` plugin)
 - **`sdk_stats_get`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
@@ -737,7 +746,15 @@ The server provides 151 tools across 33 categories for comprehensive Countly int
 - **`email_reports_send`** - Manually trigger sending an email report immediately
 - **`email_reports_delete`** - Delete an email report configuration
 
+### Views (requires `views` plugin)
+- **`views_table`** - Per-view metrics table (views, users, duration, bounces, exits)
+- **`views_data`** - View metrics over time
+- **`views_top`** (Platform) - Top views per metric (count, duration, bounce rate, landings, exits, scroll depth)
+
 ### Dashboards (requires `dashboards` plugin)
+
+On Countly Platform with the new UI, the dashboard tools work with the new-UI dashboards (v2). Their widgets use the Platform widget format (drill, funnel, retention, profiles, active and online users), and `dashboards_data` returns each widget's results.
+
 - **`dashboards_list`** - List all available dashboards (with optional schema-only parameter)
 - **`dashboards_data`** - Get widgets and data for a specific dashboard with time period filtering
 - **`dashboards_create`** - Create a new dashboard with sharing settings, auto-refresh configuration, and theme
