@@ -71,7 +71,8 @@ import {
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
-  getAllToolDefinitions, 
+  getAllToolDefinitions,
+  getV2ToolDefinitionOverrides, 
   getAllToolMetadata,
 } from './tools/index.js';
 import { ToolContext } from './tools/types.js';
@@ -349,8 +350,10 @@ class CountlyMCPServer {
       if (!caps) {
         return { tools: filteredTools };
       }
+      const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
       return {
-        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins, caps.member),
+        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps.plugins, caps.member)
+          .map((tool) => overrides[tool.name] ?? tool),
       };
     });
 

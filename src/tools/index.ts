@@ -288,3 +288,16 @@ export function getAllToolMetadata() {
     contentToolMetadata,
   ];
 }
+
+// Countly Platform /v2 tool variants
+import { dashboardsV2ToolDefinitions } from './dashboards-v2.js';
+
+/**
+ * Tool definitions that replace the legacy ones when the connected server
+ * serves the Platform /v2 API. Same tool names, different schema/semantics.
+ */
+export function getV2ToolDefinitionOverrides(): Record<string, any> {
+  return {
+    ...dashboardsV2ToolDefinitions,
+  };
+}

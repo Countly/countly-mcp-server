@@ -41,6 +41,12 @@ Detection also reads the connected user's permissions (`/o/users/me`) and hides 
 
 If `/o/users/me` cannot be read (e.g. tokens restricted to specific apps), no tools are hidden for permission reasons. Calling a hidden tool returns an error naming the missing permission.
 
+### Countly Platform /v2 API
+
+When the server serves the Platform `/v2` API (Platform with the new UI), some tools switch to it, keeping their names. Their definitions in `tools/list` change accordingly. The legacy `/o` and `/i` implementation stays for Lite, Enterprise and Platform builds without `/v2`.
+
+- **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).
+
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.
 
 ### Categories Requiring Plugins

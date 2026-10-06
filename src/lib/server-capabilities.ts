@@ -26,6 +26,8 @@ export type ServerFlavor = 'lite' | 'enterprise' | 'platform' | 'unknown';
 export interface ServerCapabilities {
   architecture: ServerArchitecture;
   flavor: ServerFlavor;
+  /** Server answers the Platform /v2 REST API (Platform with the new UI) */
+  v2: boolean;
   /** Version string from /o/system/version, when readable */
   version?: string;
   /** Enabled plugin codes; null only when the flavor itself is unknown */
@@ -70,6 +72,7 @@ function resolvePlugins(flavor: ServerFlavor, plugins: string[] | null): Pick<Se
 const UNKNOWN: Omit<ServerCapabilities, 'detectedAt'> = {
   architecture: 'unknown',
   flavor: 'unknown',
+  v2: false,
   plugins: null,
   pluginsAssumed: false,
   member: null,
@@ -151,6 +154,7 @@ export async function detectServerCapabilities(
     return {
       architecture: 'platform',
       flavor: 'platform',
+      v2: true,
       version,
       ...resolvePlugins('platform', plugins),
       member,
@@ -180,6 +184,7 @@ export async function detectServerCapabilities(
     return {
       architecture: 'platform',
       flavor: 'platform',
+      v2: false,
       version,
       ...resolvePlugins('platform', plugins),
       member,
@@ -199,6 +204,7 @@ export async function detectServerCapabilities(
   return {
     architecture: 'legacy',
     flavor,
+    v2: false,
     version,
     ...resolvePlugins(flavor, plugins),
     member,
