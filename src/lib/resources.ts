@@ -154,9 +154,6 @@ async function getAppsForCache(
   }
   
   try {
-    // Debug: print headers before request
-     
-    console.error('[DEBUG] Axios headers for /o/apps/mine:', JSON.stringify(httpClient.defaults.headers.common));
     const authHeader = httpClient.defaults.headers.common['countly-token'];
     const params: any = {};
     // If auth is in headers, also try sending as query param for compatibility
