@@ -299,6 +299,9 @@ export function getAllToolMetadata() {
 
 // Countly Platform /v2 tool variants
 import { dashboardsV2ToolDefinitions } from './dashboards-v2.js';
+import { crashesV2ToolDefinitions } from './v2/crashes.js';
+import { funnelsV2ToolDefinitions } from './v2/funnels.js';
+import { loggerV2ToolDefinitions } from './v2/logger.js';
 
 /**
  * Tool definitions that replace the legacy ones when the connected server
@@ -307,5 +310,8 @@ import { dashboardsV2ToolDefinitions } from './dashboards-v2.js';
 export function getV2ToolDefinitionOverrides(): Record<string, any> {
   return {
     ...dashboardsV2ToolDefinitions,
+    ...crashesV2ToolDefinitions,
+    ...funnelsV2ToolDefinitions,
+    ...loggerV2ToolDefinitions,
   };
 }

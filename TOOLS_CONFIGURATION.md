@@ -50,6 +50,14 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `views_top`: top views per metric
   - `crash_group_breakdown`, `crash_group_users`: crash distribution over a field, and affected users
   - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
+- **Existing tools switched to `/v2`** where it is strictly better. Each keeps its name; its schema may gain options.
+  - `crash_groups_list`: server-side search and sorting, lean rows with shortened stack traces
+  - `funnels_list`: paging with totals
+  - `funnels_data`: adds median and p95 time between steps; conversion percentages are computed by the tool
+  - `funnels_step_users`, `funnels_dropoff_users`: full user profiles, paginated (they fall back to legacy uids when drill profiles are unavailable or a filter is used)
+  - `sdk_logs_list`: paging, plus filters by request type, SDK, time range, text and problem requests
+
+  Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API.
 - **Dashboards** (`dashboards_*`): new-UI dashboards are stored separately and are not visible through the legacy endpoints. On Platform the tools list, read, create and edit these boards. `dashboards_data` returns each widget's results, and widgets use the Platform widget format (drill, funnel, retention, profiles, active-profiles, online-profiles).
 
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.

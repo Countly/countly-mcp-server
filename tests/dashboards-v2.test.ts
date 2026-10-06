@@ -112,10 +112,10 @@ describe('dashboards tools on Platform', () => {
 
   it('switches tool definitions to the v2 variants', () => {
     const overrides = getV2ToolDefinitionOverrides();
-    expect(Object.keys(overrides).sort()).toEqual([
+    expect(Object.keys(overrides)).toEqual(expect.arrayContaining([
       'dashboards_create', 'dashboards_data', 'dashboards_delete', 'dashboards_list',
       'dashboards_update', 'dashboards_widget_add', 'dashboards_widget_remove', 'dashboards_widget_update',
-    ]);
+    ]));
   });
 
   it('returns widgets with their data', async () => {

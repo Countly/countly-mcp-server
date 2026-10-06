@@ -1,5 +1,7 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import { handleListCrashGroupsV2 } from './v2/crashes.js';
 
 // ============================================================================
 // RESOLVE_CRASH TOOL
@@ -596,6 +598,9 @@ export class CrashAnalyticsTools {
   }
 
   async listCrashGroups(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListCrashGroupsV2(this.context, args);
+    }
     return handleListCrashGroups(this.context, args);
   }
 
