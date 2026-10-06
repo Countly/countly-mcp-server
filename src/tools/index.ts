@@ -303,6 +303,8 @@ import { crashesV2ToolDefinitions } from './v2/crashes.js';
 import { funnelsV2ToolDefinitions } from './v2/funnels.js';
 import { loggerV2ToolDefinitions } from './v2/logger.js';
 import { drillV2ToolDefinitions } from './v2/drill.js';
+import { journeysV2ToolDefinitions } from './v2/journeys.js';
+import { contentV2ToolDefinitions } from './v2/content.js';
 
 /**
  * Tool definitions that replace the legacy ones when the connected server
@@ -315,5 +317,7 @@ export function getV2ToolDefinitionOverrides(): Record<string, any> {
     ...funnelsV2ToolDefinitions,
     ...loggerV2ToolDefinitions,
     ...drillV2ToolDefinitions,
+    ...journeysV2ToolDefinitions,
+    ...contentV2ToolDefinitions,
   };
 }

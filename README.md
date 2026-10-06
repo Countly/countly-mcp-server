@@ -28,7 +28,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ## Features
 
-- **161 Tools** across 33 categories for comprehensive Countly operations
+- **166 Tools** across 33 categories for comprehensive Countly operations
 - **Resources** for AI context - Access read-only Countly data (app configs, event schemas, analytics overviews)
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
@@ -60,7 +60,7 @@ Detection never hides tools on a guess: if the server cannot be reached or the u
 
 This server implements the full MCP specification with support for:
 
-### Tools (161 available)
+### Tools (166 available)
 Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
@@ -574,7 +574,7 @@ For HTTP mode, clients should connect to: `http://your-server:3000/mcp`
 
 ## Available Tools
 
-The server provides 161 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
+The server provides 166 tools across 33 categories for comprehensive Countly integration. Tools marked **(Platform)** exist only on Countly Platform with its `/v2` API. Tools marked **(v2 on Platform)** use the richer Platform `/v2` endpoints there, and the classic endpoints on Lite and Enterprise.
 
 ### Core Tools (OpenAI/ChatGPT Compatible)
 - **`ping`** - Check if Countly server is healthy and reachable
@@ -775,33 +775,40 @@ On Countly Platform with the new UI, the dashboard tools work with the new-UI da
 - **`hooks_delete`** - Delete a webhook/hook by its ID.
 - **`hooks_internal_triggers_get`** - Get list of available internal Countly events that can be used as triggers for hooks (e.g., /crashes/new, /cohort/enter, /i/apps/create).
 
-### Journeys (requires `journey_engine` plugin, Countly Enterprise)
-- **`journeys_list`** - List journey definitions for an app, including version summaries, status, and usage counters.
-- **`journeys_get`** - Get one journey definition by ID with all versions and their block graphs.
-- **`journeys_create`** - Create a new journey (definition plus first draft version) from a block graph.
-- **`journeys_update`** - Update a journey's name and/or the blocks of one of its versions.
-- **`journeys_delete`** - Soft-delete a journey definition and all its versions.
-- **`journeys_publish`** - Publish (activate) or unpublish (set back to draft) a journey version.
-- **`journeys_pause`** - Pause an active journey version and its running instances.
-- **`journeys_resume`** - Resume a paused journey version.
-- **`journeys_block_reference`** - Get the journey block JSON schema reference (block types, per-subtype fields, validation rules, sample graphs) for authoring blocks.
-- **`journeys_stats_summary`** - Get summary KPIs for a journey (users entered/engaged/completed/dropped off, content viewed/interacted) with period-over-period change.
-- **`journeys_stats_table`** - Get the per-block journey statistics table with pagination (long queries return a task id to poll).
-- **`journeys_stats_performance`** - Get time-series journey performance data for trend charts.
-- **`journeys_stats_uids`** - List user UIDs in a journey stat bucket (entered, completed, dropped off, etc.).
+### Journeys (requires `journey_engine` plugin)
+On Countly Platform all journey tools use the `/v2` API. Its first write on a journey created in the old dashboard moves that journey to the new UI.
+- **`journeys_list`** (v2 on Platform) - List journeys with status, versions and usage counters; on Platform with status/search filters, paging and counts per status
+- **`journeys_get`** (v2 on Platform) - Get one journey with its versions and block graph
+- **`journeys_create`** (v2 on Platform) - Create a new journey (definition plus first draft version) from a block graph; on Platform also with a description and conversion goal
+- **`journeys_update`** (v2 on Platform) - Update a journey's name, per-user limit and/or the blocks of one of its versions; on Platform also description and goal
+- **`journeys_delete`** (v2 on Platform) - Soft-delete a journey and all its versions
+- **`journeys_publish`** (v2 on Platform) - Publish (activate) a journey version; on Lite/Enterprise it can also unpublish to draft
+- **`journeys_pause`** (v2 on Platform) - Pause an active journey version and its running instances
+- **`journeys_resume`** (v2 on Platform) - Resume a paused journey version
+- **`journeys_complete`** (Platform) - End an active or paused journey for good
+- **`journeys_block_reference`** - Get the journey block JSON schema reference (block types, per-subtype fields, validation rules, sample graphs) for authoring blocks
+- **`journeys_templates`** (Platform) - Ready-made journey templates with their block graphs
+- **`journeys_stats_summary`** (v2 on Platform) - Summary KPIs for a journey (users entered/engaged/completed/dropped off) with period-over-period change; on Platform also goal conversion
+- **`journeys_stats_table`** (v2 on Platform) - Journey instances (one row per user run) with pagination
+- **`journeys_stats_performance`** (v2 on Platform) - Time-series journey performance data for trend charts
+- **`journeys_stats_uids`** (v2 on Platform) - List user UIDs behind a journey metric (entered, completed, dropped off, goal converted, ...)
+- **`journeys_stats_blocks`** (Platform) - Per-block funnel: users who entered and completed each block
+- **`journeys_stats_content`** (Platform) - In-app content engagement per message: shown, interacted, button clicks
+- **`journeys_stats_active_users`** (Platform) - Users active in a journey, with a daily/weekly/monthly breakdown
 
-### Content Blocks (requires `content` plugin, Countly Enterprise)
-- **`content_blocks_list`** - List all content blocks (in-app content such as banners, modals, surveys) for an app.
-- **`content_blocks_get`** - Get one content block by ID with its full definitions and metadata.
-- **`content_blocks_preview`** - Get a browser preview URL showing the content block rendered exactly as end users see it.
-- **`content_blocks_create`** - Create a content block that can be delivered through journeys.
-- **`content_blocks_update`** - Update an existing content block (title, type, blocks, favorite).
-- **`content_blocks_delete`** - Delete a content block (fails if the block is still used in a journey).
-- **`content_assets_list`** - List uploaded content assets (images/videos) with metadata.
-- **`content_assets_upload`** - Upload an image asset (base64, max 5MB) for use in content blocks.
-- **`content_assets_update`** - Update an asset's name and/or tags.
-- **`content_assets_delete`** - Delete an uploaded content asset.
-- **`content_langs_list`** - List languages eligible for content translations.
+### Content (requires `content` plugin)
+On Countly Platform these tools manage the new content messages (popup, banner, carousel, survey, push). Legacy content blocks are listed too, and can be read, previewed and deleted, but not edited.
+- **`content_blocks_list`** (v2 on Platform) - List content for an app; on Platform with search, status and format filters and paging
+- **`content_blocks_get`** (v2 on Platform) - Get one content block / message with its full definition
+- **`content_blocks_preview`** (v2 on Platform) - Get a browser preview URL showing the content rendered exactly as end users see it
+- **`content_blocks_create`** (v2 on Platform) - Create content that can be delivered through journeys; on Platform a content message built from slides
+- **`content_blocks_update`** (v2 on Platform) - Update existing content (on Lite/Enterprise: title, type, blocks, favorite; on Platform: name, status, slides, styling, placement, translations)
+- **`content_blocks_delete`** (v2 on Platform) - Delete content (fails while it is still used in a journey or campaign)
+- **`content_assets_list`** (v2 on Platform) - List uploaded content images with metadata; on Platform with search, tags and paging
+- **`content_assets_upload`** (v2 on Platform) - Upload an image asset (base64; max 5MB, or 10MB on Platform)
+- **`content_assets_update`** (v2 on Platform) - Update an asset's name and/or tags
+- **`content_assets_delete`** (v2 on Platform) - Delete an uploaded content asset
+- **`content_langs_list`** - List languages eligible for content translations
 
 All tools support flexible app identification via either `app_id` or `app_name` parameter.
 

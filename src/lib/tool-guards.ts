@@ -243,6 +243,11 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   funnels_trends: f('funnels', 'r'),
   funnels_user_progress: f('funnels', 'r'),
   drill_query: f('drill', 'r'),
+  journeys_complete: f('journey_engine', 'u'),
+  journeys_stats_blocks: f('journey_engine', 'r'),
+  journeys_stats_content: f('journey_engine', 'r'),
+  journeys_stats_active_users: f('journey_engine', 'r'),
+  journeys_templates: any,
 };
 
 /**

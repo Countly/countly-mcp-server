@@ -1,6 +1,24 @@
 import { ToolContext, ToolResult } from './types.js';
 import { withDefault } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleCreateJourneyV2,
+  handleDeleteJourneyV2,
+  handleGetJourneyV2,
+  handleJourneyInstancesV2,
+  handleJourneyLifecycleV2,
+  handleJourneyStatsActiveUsersV2,
+  handleJourneyStatsBlocksV2,
+  handleJourneyStatsContentV2,
+  handleJourneyStatsPerformanceV2,
+  handleJourneyStatsSummaryV2,
+  handleJourneyStatsUidsV2,
+  handleJourneyTemplatesV2,
+  handleListJourneysV2,
+  handleUpdateJourneyV2,
+  journeysPlatformToolDefinitions,
+} from './v2/journeys.js';
 
 /**
  * Journeys Module
@@ -704,11 +722,11 @@ Only "in-app-content" is fully implemented ("survey" sends content then waits fo
 response; "push-notificatiion" and "email" are stubs with no runtime effect).
 
 "in-app-content" fields:
-- "contentId" (string, required): content block id (see content_blocks_list).
+- "contentId" (string, required): content id (see content_blocks_list; on Countly
+  Platform both new content messages and legacy content blocks work).
 - "priority" (number, optional): push priority, defaults to 3 (low).
-- "expiration_type" (string, optional): "exact" or "dynamic".
-- "expiration_date" (string/date, optional): absolute expiry when expiration_type is "exact".
-- "duration" (string, optional): relative duration, e.g. "2d2h2m2s".
+- "expiry" (object, optional): how long the queued content stays valid, as
+  {"days": n, "hours": n, "minutes": n}. Defaults to 3000 hours.
 - "nextBlock" (string, optional): journey completes here if omitted.
 
 ## blockType: logical
@@ -718,7 +736,8 @@ subType values: "wait-period", "wait-date", "wait-trigger", "continue-if", "swit
 
 wait-period / wait-date:
 - "untilDate" (number, ms epoch): absolute resume time (wait-date). Takes precedence.
-- "waitPeriod" (number, ms): relative delay (wait-period).
+- "waitPeriod" (wait-period): relative delay, either milliseconds (number) or
+  {"days": n, "hours": n, "minutes": n, "seconds": n} (the form the Platform builder writes).
 - "nextBlock" (string, required): block to run when the wait elapses.
 
 wait-trigger:
@@ -739,7 +758,10 @@ switch:
 ## blockType: data_pipeline
 
 subType values: "record-event", "update-profile", "call-webhook", "run-code".
-"call-webhook" and "run-code" are NOT implemented - executing them errors the journey.
+"run-code" is NOT implemented. "call-webhook" works on Countly Platform only (older
+Enterprise builds error the journey): "url" (http/https, required), "method" ("get"
+or "post"), "headers" (object), "requestData" (string; query for GET, JSON body for
+POST; supports \${blockId.prop} variables).
 
 record-event:
 - "eventKey" (string, required): non-empty, must not start with "." or "$"
@@ -755,10 +777,14 @@ update-profile:
 
 ## blockType: end
 
-Terminal block: {"id": "block_9", "blockType": "end"}. Note: the publish-time
-validator requires a subType on every block it sees, so journeys commonly end by
-omitting "nextBlock" on the last functional block instead of using an explicit
-end block.
+Terminal block: {"id": "block_9", "blockType": "end", "subType": "journey-exit"}.
+The publish-time validator requires a subType on every block, so give end blocks
+"journey-exit", or end the journey by omitting "nextBlock" on the last block.
+
+Incoming-data triggers may also carry "subType2" ("session", "view", "custom-event",
+"crash", "consent", "push_action", "survey", "star_rating", "nps"); the Platform
+builder uses it to show the trigger kind. On Countly Platform, journeys_templates
+returns complete ready-made graphs.
 
 ## Hard validation rules (enforced at publish, not at save)
 
@@ -1119,6 +1145,8 @@ export const journeysToolDefinitions = [
   journeyStatsPerformanceToolDefinition,
   journeyStatsUidsToolDefinition,
   journeyBlockReferenceToolDefinition,
+  // Countly Platform only (hidden elsewhere via V2_ONLY_TOOLS)
+  ...journeysPlatformToolDefinitions,
 ];
 
 export const journeysToolHandlers = {
@@ -1135,61 +1163,122 @@ export const journeysToolHandlers = {
   'journeys_stats_performance': 'journeys_stats_performance',
   'journeys_stats_uids': 'journeys_stats_uids',
   'journeys_block_reference': 'journeys_block_reference',
+  'journeys_complete': 'journeys_complete',
+  'journeys_stats_blocks': 'journeys_stats_blocks',
+  'journeys_stats_content': 'journeys_stats_content',
+  'journeys_stats_active_users': 'journeys_stats_active_users',
+  'journeys_templates': 'journeys_templates',
 } as const;
 
 export class JourneysTools {
   constructor(private context: ToolContext) {}
 
   async journeys_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListJourneysV2(this.context, args);
+    }
     return handleListJourneys(this.context, args);
   }
 
   async journeys_get(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleGetJourneyV2(this.context, args);
+    }
     return handleGetJourney(this.context, args);
   }
 
   async journeys_create(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateJourneyV2(this.context, args);
+    }
     return handleCreateJourney(this.context, args);
   }
 
   async journeys_update(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateJourneyV2(this.context, args);
+    }
     return handleUpdateJourney(this.context, args);
   }
 
   async journeys_delete(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteJourneyV2(this.context, args);
+    }
     return handleDeleteJourney(this.context, args);
   }
 
   async journeys_publish(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyLifecycleV2(this.context, args, 'publish');
+    }
     return handlePublishJourney(this.context, args);
   }
 
   async journeys_pause(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyLifecycleV2(this.context, args, 'pause');
+    }
     return handlePauseJourney(this.context, args);
   }
 
   async journeys_resume(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyLifecycleV2(this.context, args, 'resume');
+    }
     return handleResumeJourney(this.context, args);
   }
 
   async journeys_stats_summary(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyStatsSummaryV2(this.context, args);
+    }
     return handleJourneyStatsSummary(this.context, args);
   }
 
   async journeys_stats_table(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyInstancesV2(this.context, args);
+    }
     return handleJourneyStatsTable(this.context, args);
   }
 
   async journeys_stats_performance(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyStatsPerformanceV2(this.context, args);
+    }
     return handleJourneyStatsPerformance(this.context, args);
   }
 
   async journeys_stats_uids(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyStatsUidsV2(this.context, args);
+    }
     return handleJourneyStatsUids(this.context, args);
   }
 
   async journeys_block_reference(args: any): Promise<ToolResult> {
     return handleJourneyBlockReference(this.context, args);
+  }
+
+  async journeys_complete(args: any): Promise<ToolResult> {
+    return handleJourneyLifecycleV2(this.context, args, 'complete');
+  }
+
+  async journeys_stats_blocks(args: any): Promise<ToolResult> {
+    return handleJourneyStatsBlocksV2(this.context, args);
+  }
+
+  async journeys_stats_content(args: any): Promise<ToolResult> {
+    return handleJourneyStatsContentV2(this.context, args);
+  }
+
+  async journeys_stats_active_users(args: any): Promise<ToolResult> {
+    return handleJourneyStatsActiveUsersV2(this.context, args);
+  }
+
+  async journeys_templates(args: any): Promise<ToolResult> {
+    return handleJourneyTemplatesV2(this.context, args);
   }
 }
 

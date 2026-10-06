@@ -367,6 +367,11 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'journeys_stats_performance': 'R',
       'journeys_stats_uids': 'R',
       'journeys_block_reference': 'R',
+      'journeys_complete': 'U',
+      'journeys_stats_blocks': 'R',
+      'journeys_stats_content': 'R',
+      'journeys_stats_active_users': 'R',
+      'journeys_templates': 'R',
     },
     requiresPlugin: 'journey_engine',
     availableByDefault: false,
@@ -614,6 +619,7 @@ export const V2_ONLY_TOOLS = new Set([
   'crash_group_breakdown', 'crash_group_users',
   'funnels_breakdown', 'funnels_trends', 'funnels_user_progress',
   'drill_query',
+  'journeys_complete', 'journeys_stats_blocks', 'journeys_stats_content', 'journeys_stats_active_users', 'journeys_templates',
 ]);
 
 /**
