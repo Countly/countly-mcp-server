@@ -1,6 +1,24 @@
 import { ToolContext, ToolResult } from './types.js';
 import { withDefault } from '../lib/validation.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleCreateJourneyV2,
+  handleDeleteJourneyV2,
+  handleGetJourneyV2,
+  handleJourneyInstancesV2,
+  handleJourneyLifecycleV2,
+  handleJourneyStatsActiveUsersV2,
+  handleJourneyStatsBlocksV2,
+  handleJourneyStatsContentV2,
+  handleJourneyStatsPerformanceV2,
+  handleJourneyStatsSummaryV2,
+  handleJourneyStatsUidsV2,
+  handleJourneyTemplatesV2,
+  handleListJourneysV2,
+  handleUpdateJourneyV2,
+  journeysPlatformToolDefinitions,
+} from './v2/journeys.js';
 
 /**
  * Journeys Module
@@ -246,6 +264,7 @@ export async function handleCreateJourney(
         type: 'text',
         text: `Error: Invalid blocks JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
       }],
+      isError: true,
     };
   }
 
@@ -337,6 +356,7 @@ export async function handleUpdateJourney(
   if (error || !version) {
     return {
       content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+      isError: true,
     };
   }
 
@@ -353,6 +373,7 @@ export async function handleUpdateJourney(
           type: 'text',
           text: `Error: Invalid blocks JSON - ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
         }],
+        isError: true,
       };
     }
   }
@@ -391,7 +412,7 @@ export async function handleUpdateJourney(
 
 export const deleteJourneyToolDefinition = {
   name: 'journeys_delete',
-  description: 'Soft-delete a journey definition and all its versions via /i/journey-engine/delete (status is set to "deleted"). Requires the journey_engine plugin (Countly Enterprise). To find journey IDs use journeys_list.',
+  description: 'Soft-delete a journey definition and all its versions via /i/journey-engine/delete (status is set to "deleted"). Requires the journey_engine plugin (Countly Enterprise). WARNING: no tool can restore a deleted journey. To find journey IDs use journeys_list.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -493,6 +514,7 @@ export async function handlePublishJourney(
     if (error || !version) {
       return {
         content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+        isError: true,
       };
     }
     resolvedVersionId = version._id;
@@ -563,6 +585,7 @@ export async function handlePauseJourney(
     if (error || !version) {
       return {
         content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+        isError: true,
       };
     }
     resolvedVersionId = version._id;
@@ -632,6 +655,7 @@ export async function handleResumeJourney(
     if (error || !version) {
       return {
         content: [{ type: 'text', text: error || 'Error: Could not resolve journey version.' }],
+        isError: true,
       };
     }
     resolvedVersionId = version._id;
@@ -656,7 +680,159 @@ export async function handleResumeJourney(
 // JOURNEY BLOCK REFERENCE TOOL
 // ============================================================================
 
+/** Countly Platform (/v2) version of the guide */
 const JOURNEY_BLOCK_REFERENCE = `# Countly Journey Engine - blocks schema reference
+
+Reference for authoring the "blocks" array used by journeys_create and journeys_update
+(POST /i/journey-engine/journeys/save). Derived from the journey engine source
+(enums, runtime execution code, and the publish-time validator).
+
+## Block common fields
+
+- "id" (string, required): unique block id within the journey; used as the link target.
+- "blockType" (string, required): one of "trigger", "engagement", "logical", "data_pipeline", "end".
+- "subType" (string, required for every block except "end"): see per-type lists below.
+- "nextBlock" (string, optional): id of the next block to execute. This is the ONLY linking
+  field the engine reads for linear flow; if absent, the journey ends after this block.
+  (Legacy samples use "next_block" - the engine does NOT read that; always use "nextBlock".)
+
+The FIRST block (blocks[0]) must be the trigger; the engine matches journeys by
+blocks[0].blockType == "trigger" and blocks[0].subType.
+
+Branching blocks link differently: "continue-if" uses "nextBlocks" (array),
+"switch" uses per-condition "nextBlock" entries inside "conditions".
+
+## blockType: trigger
+
+Valid subType values and when they fire:
+- "incoming-data": any incoming SDK data (sessions, views, custom events, crashes,
+  surveys, star ratings, NPS, push actions, consent)
+- "cohort-entry" / "cohort-exit": user enters/exits an auto cohort
+- "profile-group-entry" / "profile-group-exit": user enters/exits a manual profile group
+- "profile-update": user profile updated
+- "journey-exit": user exits another journey
+
+Fields:
+- "filters" (array, required): filter objects, OR-combined (any match fires the trigger).
+- "nextBlock" (string): first block after entry.
+
+Filter format - each element is either:
+1. A raw MongoDB-style query object matched against the incoming data, e.g.
+   {"key": "Login"} or {"$or": [{"cohort": "cohort1"}, {"cohort": "cohort2"}]}
+2. A {key, conditions} object - "key" is merged with the fields of "conditions"
+   into a single query, e.g. {"key": "[CLY]_session", "conditions": {"up.av": {"$in": ["1.0"]}}}
+
+## blockType: engagement
+
+subType values: "in-app-content", "survey", "push-notificatiion" (note the enum's spelling), "email".
+Only "in-app-content" is fully implemented ("survey" sends content then waits for a
+response; "push-notificatiion" and "email" are stubs with no runtime effect).
+
+"in-app-content" fields:
+- "contentId" (string, required): content id (see content_blocks_list; on Countly
+  Platform both new content messages and legacy content blocks work).
+- "priority" (number, optional): push priority, defaults to 3 (low).
+- "expiry" (object, optional): how long the queued content stays valid, as
+  {"days": n, "hours": n, "minutes": n}. Defaults to 3000 hours.
+- "nextBlock" (string, optional): journey completes here if omitted.
+
+## blockType: logical
+
+subType values: "wait-period", "wait-date", "wait-trigger", "continue-if", "switch",
+"repeat" ("repeat" is declared but not implemented - do not use).
+
+wait-period / wait-date:
+- "untilDate" (number, ms epoch): absolute resume time (wait-date). Takes precedence.
+- "waitPeriod" (wait-period): relative delay, either milliseconds (number) or
+  {"days": n, "hours": n, "minutes": n, "seconds": n} (the form the Platform builder writes).
+- "nextBlock" (string, required): block to run when the wait elapses.
+
+wait-trigger:
+- "filters" (array, required): same format as trigger filters; a matching event
+  for the user resumes the journey.
+- "nextBlock" (string, required).
+
+continue-if:
+- "condition" (object, required): MongoDB-style query evaluated against journey data.
+- "nextBlocks" (array of strings, required): [ifTrueBlockId, ifFalseBlockId].
+  Index 0 runs when true, index 1 when false. With only one element and a false
+  condition, the user is dropped.
+
+switch:
+- "conditions" (array, required): ordered list of {"condition": <query>, "nextBlock": <id>}.
+  First matching condition wins; if none match, the user is dropped.
+
+## blockType: data_pipeline
+
+subType values: "record-event", "update-profile", "call-webhook", "run-code".
+"run-code" is NOT implemented. "call-webhook" works on Countly Platform only (older
+Enterprise builds error the journey): "url" (http/https, required), "method" ("get"
+or "post"), "headers" (object), "requestData" (string; query for GET, JSON body for
+POST; supports \${blockId.prop} variables).
+
+record-event:
+- "eventKey" (string, required): non-empty, must not start with "." or "$"
+  (runtime also rejects keys containing ".").
+- "nextBlock" (string, optional).
+
+update-profile:
+- "updateStatement" (array, required): non-empty; each element is an object with
+  EXACTLY ONE key/value pair. A {"custom": {...}} statement merges into the user's
+  custom properties; any other key sets a top-level profile field.
+  Example: [{"name": "VIP"}, {"custom": {"tier": "gold"}}]
+- "nextBlock" (string, optional).
+
+## blockType: end
+
+Terminal block: {"id": "block_9", "blockType": "end", "subType": "journey-exit"}.
+The publish-time validator requires a subType on every block, so give end blocks
+"journey-exit", or end the journey by omitting "nextBlock" on the last block.
+
+Incoming-data triggers may also carry "subType2" ("session", "view", "custom-event",
+"crash", "consent", "push_action", "survey", "star_rating", "nps"); the Platform
+builder uses it to show the trigger kind. On Countly Platform, journeys_templates
+returns complete ready-made graphs.
+
+## Hard validation rules (enforced at publish, not at save)
+
+- "blocks" must be an array; every block must have a "subType".
+- record-event: "eventKey" required, non-empty, not starting with "." or "$".
+- update-profile: "updateStatement" required, non-empty array, each element an
+  object with exactly one non-empty string key.
+- Link integrity (nextBlock ids existing) is NOT validated - double-check ids.
+
+## Sample 1 - minimal journey (trigger -> in-app content)
+
+\`\`\`json
+[
+  {"id": "block_1", "blockType": "trigger", "subType": "incoming-data",
+   "filters": [{"key": "Login"}], "nextBlock": "block_2"},
+  {"id": "block_2", "blockType": "engagement", "subType": "in-app-content",
+   "contentId": "<content_block_id>", "priority": 1}
+]
+\`\`\`
+
+## Sample 2 - trigger -> wait -> engagement with branching
+
+\`\`\`json
+[
+  {"id": "block_1", "blockType": "trigger", "subType": "incoming-data",
+   "filters": [{"key": "Start"}], "nextBlock": "block_2"},
+  {"id": "block_2", "blockType": "logical", "subType": "wait-period",
+   "waitPeriod": 86400000, "nextBlock": "block_3"},
+  {"id": "block_3", "blockType": "logical", "subType": "continue-if",
+   "condition": {"$or": [{"AccountType": "Business"}, {"Country": "NL"}]},
+   "nextBlocks": ["block_4", "block_5"]},
+  {"id": "block_4", "blockType": "engagement", "subType": "in-app-content",
+   "contentId": "<content_block_id>", "priority": 1},
+  {"id": "block_5", "blockType": "data_pipeline", "subType": "update-profile",
+   "updateStatement": [{"custom": {"segment": "other"}}]}
+]
+\`\`\`
+`;
+
+/** Legacy (Countly Enterprise) version: legacy expiration fields, no call-webhook */
+const JOURNEY_BLOCK_REFERENCE_LEGACY = `# Countly Journey Engine - blocks schema reference
 
 Reference for authoring the "blocks" array used by journeys_create and journeys_update
 (POST /i/journey-engine/journeys/save). Derived from the journey engine source
@@ -808,11 +984,14 @@ export const journeyBlockReferenceToolDefinition = {
 };
 
 export async function handleJourneyBlockReference(
-  _context: ToolContext,
+  context: ToolContext,
   _input: Record<string, unknown>
 ): Promise<ToolResult> {
+  // Platform and Enterprise accept different block fields (expiry vs
+  // expiration_type/expiration_date/duration, call-webhook support)
+  const platform = await usesV2(context);
   return {
-    content: [{ type: 'text', text: JOURNEY_BLOCK_REFERENCE }],
+    content: [{ type: 'text', text: platform ? JOURNEY_BLOCK_REFERENCE : JOURNEY_BLOCK_REFERENCE_LEGACY }],
   };
 }
 
@@ -1119,6 +1298,8 @@ export const journeysToolDefinitions = [
   journeyStatsPerformanceToolDefinition,
   journeyStatsUidsToolDefinition,
   journeyBlockReferenceToolDefinition,
+  // Countly Platform only (hidden elsewhere via V2_ONLY_TOOLS)
+  ...journeysPlatformToolDefinitions,
 ];
 
 export const journeysToolHandlers = {
@@ -1135,61 +1316,122 @@ export const journeysToolHandlers = {
   'journeys_stats_performance': 'journeys_stats_performance',
   'journeys_stats_uids': 'journeys_stats_uids',
   'journeys_block_reference': 'journeys_block_reference',
+  'journeys_complete': 'journeys_complete',
+  'journeys_stats_blocks': 'journeys_stats_blocks',
+  'journeys_stats_content': 'journeys_stats_content',
+  'journeys_stats_active_users': 'journeys_stats_active_users',
+  'journeys_templates': 'journeys_templates',
 } as const;
 
 export class JourneysTools {
   constructor(private context: ToolContext) {}
 
   async journeys_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListJourneysV2(this.context, args);
+    }
     return handleListJourneys(this.context, args);
   }
 
   async journeys_get(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleGetJourneyV2(this.context, args);
+    }
     return handleGetJourney(this.context, args);
   }
 
   async journeys_create(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateJourneyV2(this.context, args);
+    }
     return handleCreateJourney(this.context, args);
   }
 
   async journeys_update(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateJourneyV2(this.context, args);
+    }
     return handleUpdateJourney(this.context, args);
   }
 
   async journeys_delete(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteJourneyV2(this.context, args);
+    }
     return handleDeleteJourney(this.context, args);
   }
 
   async journeys_publish(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyLifecycleV2(this.context, args, 'publish');
+    }
     return handlePublishJourney(this.context, args);
   }
 
   async journeys_pause(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyLifecycleV2(this.context, args, 'pause');
+    }
     return handlePauseJourney(this.context, args);
   }
 
   async journeys_resume(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyLifecycleV2(this.context, args, 'resume');
+    }
     return handleResumeJourney(this.context, args);
   }
 
   async journeys_stats_summary(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyStatsSummaryV2(this.context, args);
+    }
     return handleJourneyStatsSummary(this.context, args);
   }
 
   async journeys_stats_table(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyInstancesV2(this.context, args);
+    }
     return handleJourneyStatsTable(this.context, args);
   }
 
   async journeys_stats_performance(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyStatsPerformanceV2(this.context, args);
+    }
     return handleJourneyStatsPerformance(this.context, args);
   }
 
   async journeys_stats_uids(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleJourneyStatsUidsV2(this.context, args);
+    }
     return handleJourneyStatsUids(this.context, args);
   }
 
   async journeys_block_reference(args: any): Promise<ToolResult> {
     return handleJourneyBlockReference(this.context, args);
+  }
+
+  async journeys_complete(args: any): Promise<ToolResult> {
+    return handleJourneyLifecycleV2(this.context, args, 'complete');
+  }
+
+  async journeys_stats_blocks(args: any): Promise<ToolResult> {
+    return handleJourneyStatsBlocksV2(this.context, args);
+  }
+
+  async journeys_stats_content(args: any): Promise<ToolResult> {
+    return handleJourneyStatsContentV2(this.context, args);
+  }
+
+  async journeys_stats_active_users(args: any): Promise<ToolResult> {
+    return handleJourneyStatsActiveUsersV2(this.context, args);
+  }
+
+  async journeys_templates(args: any): Promise<ToolResult> {
+    return handleJourneyTemplatesV2(this.context, args);
   }
 }
 

@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, ChildProcess } from 'child_process';
+import { createServer as createNetServer, AddressInfo } from 'net';
 import axios, { AxiosInstance } from 'axios';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -32,6 +33,7 @@ describe('Transport Integration Tests', () => {
           ...process.env,
           COUNTLY_SERVER_URL: TEST_SERVER_URL,
           COUNTLY_AUTH_TOKEN: TEST_AUTH_TOKEN,
+          COUNTLY_AUTO_DETECT: 'false',
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -163,6 +165,7 @@ describe('Transport Integration Tests', () => {
             ...process.env,
             COUNTLY_SERVER_URL: TEST_SERVER_URL,
             COUNTLY_AUTH_TOKEN: TEST_AUTH_TOKEN,
+          COUNTLY_AUTO_DETECT: 'false',
           },
           stdio: ['ignore', 'pipe', 'pipe'],
         }
@@ -343,6 +346,138 @@ describe('Transport Integration Tests', () => {
       
       // Clean up stream
       response.data.destroy();
+    });
+  });
+
+  // Always-on (no Countly network access needed): `ping` and `tools/list`
+  // are answered locally. Regression test for the stateless transport being
+  // shared across requests, which made every request after the first fail
+  // with an empty HTTP 500.
+  describe('HTTP transport: multiple requests per process', () => {
+    let serverProcess: ChildProcess;
+    let mcpUrl: string;
+    let stderrData = '';
+
+    const getFreePort = () => new Promise<number>((resolve, reject) => {
+      const srv = createNetServer();
+      srv.once('error', reject);
+      srv.listen(0, '127.0.0.1', () => {
+        const { port } = srv.address() as AddressInfo;
+        srv.close(() => resolve(port));
+      });
+    });
+
+    const rpc = async (id: number, method: string, params: Record<string, unknown> = {}) => {
+      const res = await fetch(mcpUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+      });
+      const text = await res.text();
+      let body: any;
+      if ((res.headers.get('content-type') || '').includes('text/event-stream')) {
+        const dataLine = text.split('\n').find(line => line.startsWith('data:'));
+        body = dataLine ? JSON.parse(dataLine.slice('data:'.length)) : undefined;
+      } else {
+        body = text ? JSON.parse(text) : undefined;
+      }
+      return { status: res.status, body };
+    };
+
+    beforeAll(async () => {
+      const port = await getFreePort();
+      // Nothing listens here, so tool calls fail fast without network access
+      const deadCountlyPort = await getFreePort();
+      mcpUrl = `http://localhost:${port}/mcp`;
+      serverProcess = spawn(
+        'node',
+        [join(projectRoot, 'build/index.js'), '--http', '--port', String(port), '--hostname', 'localhost'],
+        {
+          env: {
+            ...process.env,
+            COUNTLY_SERVER_URL: `http://127.0.0.1:${deadCountlyPort}`,
+            COUNTLY_AUTH_TOKEN: TEST_AUTH_TOKEN,
+            COUNTLY_AUTO_DETECT: 'false',
+            ENABLE_ANALYTICS: 'false',
+          },
+          stdio: ['ignore', 'ignore', 'pipe'],
+        }
+      );
+      serverProcess.stderr?.on('data', (data) => {
+        stderrData += data.toString();
+      });
+
+      // Wait until /health answers rather than sleeping a fixed time.
+      const deadline = Date.now() + 10000;
+      for (;;) {
+        try {
+          const res = await fetch(`http://localhost:${port}/health`);
+          if (res.ok) {
+            break;
+          }
+        } catch {
+          // not listening yet
+        }
+        if (Date.now() > deadline) {
+          throw new Error(`HTTP server did not start:\n${stderrData}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }, 15000);
+
+    afterAll(async () => {
+      if (serverProcess) {
+        serverProcess.kill();
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    });
+
+    it('answers sequential requests to the same process', async () => {
+      for (let id = 1; id <= 3; id++) {
+        const { status, body } = await rpc(id, 'ping');
+        expect(status).toBe(200);
+        expect(body).toEqual({ jsonrpc: '2.0', id, result: {} });
+      }
+
+      const list = await rpc(4, 'tools/list');
+      expect(list.status).toBe(200);
+      expect(list.body.id).toBe(4);
+      expect(Array.isArray(list.body.result.tools)).toBe(true);
+      expect(list.body.result.tools.length).toBeGreaterThan(0);
+    });
+
+    it('lists tools with behavior annotations', async () => {
+      const { body } = await rpc(20, 'tools/list');
+      const tools: any[] = body.result.tools;
+      expect(tools.filter(t => !t.annotations).map(t => t.name)).toEqual([]);
+      const byName = Object.fromEntries(tools.map(t => [t.name, t.annotations]));
+      expect(byName.apps_list).toMatchObject({ readOnlyHint: true });
+      expect(byName.apps_delete).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    });
+
+    it('returns tool failures as isError results', async () => {
+      const { status, body } = await rpc(21, 'tools/call', { name: 'apps_list', arguments: {} });
+      expect(status).toBe(200);
+      expect(body.error).toBeUndefined();
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0].text).toMatch(/^Error executing tool apps_list:/);
+    });
+
+    it('keeps unknown tools a protocol error', async () => {
+      const { body } = await rpc(22, 'tools/call', { name: 'no_such_tool', arguments: {} });
+      expect(body.error.code).toBe(-32601);
+    });
+
+    it('answers concurrent requests without mixing up responses', async () => {
+      const ids = [10, 11, 12, 13, 14];
+      const results = await Promise.all(ids.map(id => rpc(id, 'ping')));
+      results.forEach((r, i) => {
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({ jsonrpc: '2.0', id: ids[i], result: {} });
+      });
     });
   });
 

@@ -564,6 +564,14 @@ describe('app allow-list', () => {
     expect(countlyRequests).toHaveLength(0);
   });
 
+  it('checks <appId>***key only in fields that hold such references', async () => {
+    currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
+    // an event that merely looks like a composite key is data in a plain field
+    const plain = await callTool('query_data', { app_id: 'aaaaaaaaaaaaaaaaaaaaaaa1', query_type: 'events', event: '0123456789abcdef01234567***purchase' });
+    expect(plain.result, JSON.stringify(plain)).toBeDefined();
+    // (selectedEvents naming another app is refused: see the nested app ids test above)
+  });
+
   it('accepts nested app ids that are all in scope', async () => {
     currentContext = context({ apps: ['aaaaaaaaaaaaaaaaaaaaaaa1'] });
     const res = await callTool('email_reports_core_create', {

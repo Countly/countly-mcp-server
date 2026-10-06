@@ -3,6 +3,9 @@
  * Allows controlling which tool categories and CRUD operations are available
  */
 
+import { isToolPermitted } from './tool-guards.js';
+import type { MemberPermissions } from './user-permissions.js';
+
 export type CrudOperation = 'C' | 'R' | 'U' | 'D';
 
 export interface ToolsConfig {
@@ -100,6 +103,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'crashes_unresolve': 'U',
       'crashes_hide': 'U',
       'crashes_show': 'U',
+      'crash_group_breakdown': 'R',  // Platform /v2 only
+      'crash_group_users': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'crashes',
     availableByDefault: false,
@@ -110,6 +115,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'notes_list': 'R',
       'notes_create': 'C',
       'notes_delete': 'D',
+      'notes_update': 'U',
     },
     availableByDefault: true,
   },
@@ -119,6 +125,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'events_create': 'C',
       'events_list': 'R',
       'events_delete': 'D',
+      'events_summary': 'R',  // Platform /v2 only
+      'events_top': 'R',  // Platform /v2 only
+      'events_movers': 'R',  // Platform /v2 only
     },
     availableByDefault: true,
   },
@@ -137,6 +146,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
     operations: {
       'views_table': 'R',
       'views_data': 'R',
+      'views_top': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'views',
     availableByDefault: false,
@@ -149,7 +159,6 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'databases_document': 'R',
       'collections_aggregate': 'R',
       'collections_indexes': 'R',
-      'databases_stats': 'R',
     },
     requiresPlugin: 'dbviewer',
     availableByDefault: false,
@@ -177,6 +186,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'drill_bookmarks_create': 'C',
       'drill_bookmarks_delete': 'D',
       'queriable_fields_list': 'R',
+      'drill_query': 'R',  // Platform /v2 only
+      'drill_saved_query_run': 'R',  // Platform /v2 only
+      'drill_property_values': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'drill',
     availableByDefault: false,
@@ -225,6 +237,9 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'funnels_create': 'C',
       'funnels_update': 'U',
       'funnels_delete': 'D',
+      'funnels_breakdown': 'R',  // Platform /v2 only
+      'funnels_trends': 'R',  // Platform /v2 only
+      'funnels_user_progress': 'R',  // Platform /v2 only
     },
     requiresPlugin: 'funnels',
     availableByDefault: false,
@@ -302,7 +317,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'sdk_stats_get': 'R',
       'sdk_config_get': 'R',
     },
-    requiresPlugin: 'sdks',
+    requiresPlugin: 'sdk',
     availableByDefault: false,
   },
   compliance_hub: {
@@ -324,7 +339,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'filtering_rules_delete': 'D',
       'filtering_rules_toggle_status': 'U',
     },
-    requiresPlugin: 'blocks',
+    requiresPlugin: 'block',
     availableByDefault: false,
   },
   datapoint: {
@@ -397,6 +412,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'hooks_create': 'C',
       'hooks_update': 'U',
       'hooks_delete': 'D',
+      'hooks_get': 'R',
     },
     requiresPlugin: 'hooks',
     availableByDefault: false,
@@ -417,6 +433,11 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'journeys_stats_performance': 'R',
       'journeys_stats_uids': 'R',
       'journeys_block_reference': 'R',
+      'journeys_complete': 'U',
+      'journeys_stats_blocks': 'R',
+      'journeys_stats_content': 'R',
+      'journeys_stats_active_users': 'R',
+      'journeys_templates': 'R',
     },
     requiresPlugin: 'journey_engine',
     availableByDefault: false,
@@ -437,6 +458,85 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'content_langs_list': 'R',
     },
     requiresPlugin: 'content',
+    availableByDefault: false,
+  },
+  // Platform /v2 only categories
+  flows: {
+    area: 'Funnels',
+    operations: {
+      'flows_list': 'R',
+      'flows_get': 'R',
+      'flows_data': 'R',
+      'flows_dropoff': 'R',
+    },
+    requiresPlugin: 'flows',
+    availableByDefault: false,
+  },
+  ratings: {
+    area: 'Content',
+    operations: {
+      'ratings_widgets_list': 'R',
+      'ratings_stats': 'R',
+      'ratings_comments': 'R',
+    },
+    requiresPlugin: 'star-rating',
+    availableByDefault: false,
+  },
+  campaigns: {
+    area: 'Content',
+    operations: {
+      'campaigns_list': 'R',
+      'campaigns_get': 'R',
+      'campaigns_results': 'R',
+    },
+    requiresPlugin: 'campaigns',
+    availableByDefault: false,
+  },
+  ai_assistants: {
+    area: 'Events',
+    operations: {
+      'ai_assistants_analytics': 'R',
+    },
+    requiresPlugin: 'ai-assistants',
+    availableByDefault: false,
+  },
+  notifications: {
+    area: 'Other',
+    operations: {
+      'notifications_list': 'R',
+    },
+    availableByDefault: true,
+  },
+  tasks: {
+    area: 'Other',
+    operations: {
+      'tasks_list': 'R',
+      'task_result': 'R',
+    },
+    availableByDefault: true,
+  },
+  geo: {
+    area: 'Settings',
+    operations: {
+      'geo_locations_list': 'R',
+    },
+    requiresPlugin: 'geo',
+    availableByDefault: false,
+  },
+  revenue: {
+    area: 'Events',
+    operations: {
+      'revenue_iap_events': 'R',
+    },
+    requiresPlugin: 'revenue',
+    availableByDefault: false,
+  },
+  crashes_jira: {
+    area: 'Crashes',
+    operations: {
+      'crash_jira_issues': 'R',
+    },
+    requiresPlugin: 'crashes-jira',
     availableByDefault: false,
   },
 };
@@ -709,9 +809,9 @@ export const TOOL_APP_SCOPE: Readonly<Record<string, ToolAppScope>> = {
   app_users_delete: 'app',
 
   // drill: bookmarks filtered by app_id / md5(app_id+event); meta keyed by app_id
-  drill_bookmarks_list: 'app',
+  drill_bookmarks_list: 'unscoped', // scope 'mine' sends no app_id and lists the member's saved queries across apps
   drill_bookmarks_create: 'app',
-  drill_bookmarks_delete: 'app', // {_id, app_id} on find and remove
+  drill_bookmarks_delete: 'unscoped', // on Platform /v2, DELETE /v2/drill/queries/:id finds the query by _id alone
   queriable_fields_list: 'app',
   metadata_get: 'app',
 
@@ -827,31 +927,68 @@ export const TOOL_APP_SCOPE: Readonly<Record<string, ToolAppScope>> = {
 
   // journeys: {_id, appId}
   journeys_list: 'app',
-  journeys_get: 'app',
+  journeys_get: 'unscoped', // on Platform /v2 the journey is loaded by _id alone (getJourneyDefinitionDoc), rights on its own app; app_id is not compared
   journeys_create: 'app',
-  journeys_update: 'app',
-  journeys_delete: 'app',
-  journeys_publish: 'app',
-  journeys_pause: 'app',
-  journeys_resume: 'app',
-  journeys_stats_summary: 'app',
+  journeys_update: 'unscoped', // same /v2 id-only journey lookup
+  journeys_delete: 'unscoped', // same /v2 id-only journey lookup
+  journeys_publish: 'unscoped', // same /v2 id-only journey lookup
+  journeys_pause: 'unscoped', // same /v2 id-only journey lookup
+  journeys_resume: 'unscoped', // same /v2 id-only journey lookup
+  journeys_stats_summary: 'unscoped', // same /v2 id-only journey lookup (loadStatsContext)
   journeys_stats_table: 'unscoped', // task_id returns long_tasks.findOne({_id}) with no app filter
-  journeys_stats_performance: 'app',
-  journeys_stats_uids: 'app',
+  journeys_stats_performance: 'unscoped', // same /v2 id-only journey lookup (loadStatsContext)
+  journeys_stats_uids: 'unscoped', // same /v2 id-only journey lookup (loadStatsContext)
   journeys_block_reference: 'safe', // static documentation, no request
 
   // content: {_id, app} / content_assets<app_id>
   content_blocks_list: 'app',
-  content_blocks_get: 'app',
+  content_blocks_get: 'unscoped', // on Platform /v2, /v2/content/messages/:id loads by _id alone (getMessageById); app not compared
   content_blocks_preview: 'app',
   content_blocks_create: 'app',
-  content_blocks_update: 'app',
-  content_blocks_delete: 'app',
+  content_blocks_update: 'unscoped', // same /v2 id-only message lookup
+  content_blocks_delete: 'unscoped', // same /v2 id-only message lookup
   content_assets_list: 'app',
   content_assets_upload: 'app',
-  content_assets_update: 'app',
-  content_assets_delete: 'app',
+  content_assets_update: 'unscoped', // on Platform /v2, /v2/content/assets/:id loads by _id alone (getAssetById); app not compared
+  content_assets_delete: 'unscoped', // same /v2 id-only asset lookup
   content_langs_list: 'app',
+  // Added on main for Countly Platform /v2 (audit 2026-10-06)
+  crash_group_breakdown: 'app', // /v2/crashes/crashgroups/:id/breakdown: drill a = params.app_id, group matched inside it
+  crash_group_users: 'app', // /v2/crashes/crashgroups/:id/users: per-app collection app_crashusers<app_id>
+  notes_update: 'app', // the tool stops unless note_id is among GET /v2/notes?app_id; a note's app_id never changes
+  events_summary: 'app', // /v2/events/summary: events{_id: app_id} + events_data ids prefixed <app_id>_
+  events_top: 'app', // /v2/events/top: same aggregation, keyed by params.app_id
+  events_movers: 'app', // /v2/events/movers: same aggregation, keyed by params.app_id
+  views_top: 'app', // /v2/views/top: app_viewdata ids prefixed <app_id>_
+  drill_query: 'app', // /v2/drill/execute: scope.appIds each checked by hasReadRight; scans a IN appIds
+  drill_saved_query_run: 'unscoped', // /v2/drill/queries/:id(/data) loads the query by _id alone and runs on its own appIds
+  drill_property_values: 'app', // /v2/drill/segmentation_big_meta: hasReadRight + meta values for app_id
+  funnels_breakdown: 'app', // /v2/funnels/breakdown: funnels.findOne({_id, app_id})
+  funnels_trends: 'app', // /v2/funnels/trends: same {_id, app_id} lookup
+  funnels_user_progress: 'app', // /v2/funnels/user: funnels {app_id}, progress for app_id
+  hooks_get: 'unscoped', // no app argument; /v2/hooks/:id finds the hook by _id alone
+  journeys_complete: 'unscoped', // POST /v2/journey_engine/journeys/:id/complete: id-only journey lookup
+  journeys_stats_blocks: 'unscoped', // loadStatsContext: journey by _id, rights on its own app
+  journeys_stats_content: 'unscoped', // same loadStatsContext
+  journeys_stats_active_users: 'unscoped', // same loadStatsContext
+  journeys_templates: 'safe', // /v2/journey_engine/templates: static catalog, no app data
+  flows_list: 'app', // /v2/flows: _id regex ^<app_id>
+  flows_get: 'app', // /v2/flows/info/:id: {_id, app_id}
+  flows_data: 'app', // /v2/flows/data/:id: id must start with <app_id>_, schema {_id, app_id}
+  flows_dropoff: 'app', // /v2/flows/dropoff: drill scan a = params.app_id
+  ratings_widgets_list: 'app', // /v2/star-rating/widgets: hasReadRight + {app_id}
+  ratings_stats: 'unscoped', // /v2/star-rating/widgets/:id/stats: widget by id alone, its own app
+  ratings_comments: 'unscoped', // /v2/star-rating/widgets/:id/comments: same id-only lookup
+  campaigns_list: 'app', // /v2/campaigns: preMatch {app: app_id}
+  campaigns_get: 'app', // /v2/campaigns/:id: loadCampaign {_id, app}
+  campaigns_results: 'app', // /v2/campaigns/:id/results: loadCampaign {_id, app}, drill funnel for app_id
+  ai_assistants_analytics: 'app', // /v2/ai-assistants/analytics: ClickHouse a IN [app_id]; the tool also requires app_id in getApps()
+  notifications_list: 'unscoped', // /v2/notifications: the member's inbox across every app
+  tasks_list: 'unscoped', // /v2/tasks: all_apps lists every readable app's tasks
+  task_result: 'unscoped', // /v2/tasks/:id/result: long_tasks by _id alone
+  geo_locations_list: 'app', // /v2/geo/locations: {app: app_id} plus app-less global locations, no other app's data
+  revenue_iap_events: 'app', // /v2/revenue/iap-events: plugin config for app_id (validateRead)
+  crash_jira_issues: 'app', // /v2/crashes-jira/issues: per-app collection crashes_jira<app_id>
 };
 
 const ALL_CRUD: readonly CrudOperation[] = ['C', 'R', 'U', 'D'];
@@ -997,9 +1134,18 @@ export function loadToolsConfig(env: NodeJS.ProcessEnv = process.env): ToolsConf
  * Check if a specific tool is allowed based on configuration
  */
 export function isToolAllowed(toolName: string, config: ToolsConfig): boolean {
-  // A tool is listed when its plainest call (no arguments) is allowed; see
-  // isToolCallAllowed for the per-call check of argument-dependent tools.
-  return isToolCallAllowed(toolName, {}, config);
+  // A tool is listed when at least one kind of its calls is allowed (see
+  // getCallShapes: COUNTLY_TOOLS_ALERTS=U still offers alerts_create, for
+  // updating an existing alert); isToolCallAllowed then checks each call
+  // against what its own arguments need.
+  for (const [category, categoryData] of Object.entries(TOOL_CATEGORIES)) {
+    if (Object.prototype.hasOwnProperty.call(categoryData.operations, toolName)) {
+      const allowedOperations = config[category];
+      const shapes = getCallShapes(toolName) ?? [[categoryData.operations[toolName]]];
+      return !!allowedOperations && shapes.some((shape) => shape.every((op) => allowedOperations.has(op)));
+    }
+  }
+  return true;
 }
 
 /**
@@ -1028,6 +1174,70 @@ export function filterTools<T extends { name: string }>(
   config: ToolsConfig
 ): T[] {
   return tools.filter(tool => isToolAllowed(tool.name, config));
+}
+
+/**
+ * Arguments that turn an otherwise permitted tool into a different CRUD
+ * operation. formulas_run is a read, but mode: "saved" also persists the
+ * formula, so it needs 'C' on the formulas category. Hiding formulas_run
+ * entirely would take ad-hoc formula runs away from read-only deployments,
+ * so the restriction applies to the argument instead of the tool.
+ */
+const ARGUMENT_OPERATIONS: Record<string, { category: string; arg: string; value: string; operation: CrudOperation }> = {
+  formulas_run: { category: 'formulas', arg: 'mode', value: 'saved', operation: 'C' },
+};
+
+/**
+ * Explain why a call to an allowed tool is refused because of its arguments,
+ * or return undefined when the call may proceed.
+ */
+export function getArgumentRefusal(toolName: string, args: any, config: ToolsConfig): string | undefined {
+  const rule = ARGUMENT_OPERATIONS[toolName];
+  if (!rule || args?.[rule.arg] !== rule.value || config[rule.category]?.has(rule.operation)) {
+    return undefined;
+  }
+  if (toolName === 'formulas_run') {
+    const alternative = isToolAllowed('formulas_save', config) ? ', or formulas_save to persist it' : '';
+    return 'formulas_run with mode "saved" persists the formula, which this deployment does not allow ' +
+      `(the formulas category lacks Create). Use mode "unsaved" to run it without saving${alternative}.`;
+  }
+  return `Tool "${toolName}" with ${rule.arg} "${rule.value}" is not allowed by this deployment's tools configuration.`;
+}
+
+/**
+ * Whether the tools configuration removes argument values from this tool,
+ * leaving only the behavior its CRUD label describes.
+ */
+export function hasRestrictedArguments(toolName: string, config: ToolsConfig): boolean {
+  const rule = ARGUMENT_OPERATIONS[toolName];
+  return !!rule && !config[rule.category]?.has(rule.operation);
+}
+
+/**
+ * Remove argument values the tools configuration would refuse from a tool's
+ * input schema, so the model is not offered them. Returns the tool unchanged
+ * when nothing applies.
+ */
+export function restrictToolArguments<T extends { name: string; inputSchema?: any }>(tool: T, config: ToolsConfig): T {
+  const rule = ARGUMENT_OPERATIONS[tool.name];
+  const property = tool.inputSchema?.properties?.[rule?.arg ?? ''];
+  if (!rule || config[rule.category]?.has(rule.operation) || !Array.isArray(property?.enum)) {
+    return tool;
+  }
+  const restricted = {
+    ...property,
+    enum: property.enum.filter((v: unknown) => v !== rule.value),
+  };
+  if (tool.name === 'formulas_run') {
+    restricted.description = 'Only "unsaved" (ad-hoc run) is available: this deployment does not allow saving formulas. Defaults to "unsaved".';
+  }
+  return {
+    ...tool,
+    inputSchema: {
+      ...tool.inputSchema,
+      properties: { ...tool.inputSchema.properties, [rule.arg]: restricted },
+    },
+  };
 }
 
 /**
@@ -1135,4 +1345,83 @@ export function getPluginRequirements(): Record<string, string> {
   }
   
   return requirements;
+}
+
+/**
+ * Plugin required by a tool, or undefined when the tool works on any server
+ */
+/**
+ * Tools whose endpoint belongs to a plugin even though their category is
+ * otherwise core (available by default).
+ */
+export const TOOL_PLUGIN_REQUIREMENTS: Record<string, string> = {
+  slipping_users: 'slipping-away-users',
+};
+
+export function getToolRequiredPlugin(toolName: string): string | undefined {
+  if (TOOL_PLUGIN_REQUIREMENTS[toolName]) {
+    return TOOL_PLUGIN_REQUIREMENTS[toolName];
+  }
+  for (const categoryData of Object.values(TOOL_CATEGORIES)) {
+    if (toolName in categoryData.operations) {
+      return categoryData.availableByDefault === false ? categoryData.requiresPlugin : undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Tools backed only by Countly Platform's /v2 API. Hidden unless the server
+ * is known to serve /v2.
+ */
+export const V2_ONLY_TOOLS = new Set([
+  'events_summary', 'events_top', 'events_movers',
+  'views_top',
+  'crash_group_breakdown', 'crash_group_users',
+  'funnels_breakdown', 'funnels_trends', 'funnels_user_progress',
+  'drill_query',
+  'notes_update',
+  'journeys_complete', 'journeys_stats_blocks', 'journeys_stats_content', 'journeys_stats_active_users', 'journeys_templates',
+  'flows_list', 'flows_get', 'flows_data', 'flows_dropoff',
+  'ratings_widgets_list', 'ratings_stats', 'ratings_comments',
+  'campaigns_list', 'campaigns_get', 'campaigns_results',
+  'ai_assistants_analytics',
+  'notifications_list',
+  'tasks_list', 'task_result',
+  'geo_locations_list',
+  'revenue_iap_events',
+  'crash_jira_issues',
+  'hooks_get',
+  'drill_saved_query_run', 'drill_property_values',
+]);
+
+/**
+ * Whether a tool can run on a server with the given enabled plugins and API.
+ * `plugins === null` means the plugin set is unknown: the tool stays visible.
+ */
+export function isToolSupported(
+  toolName: string,
+  plugins: string[] | null,
+  v2 = false
+): boolean {
+  if (V2_ONLY_TOOLS.has(toolName) && !v2) {
+    return false;
+  }
+  const required = getToolRequiredPlugin(toolName);
+  return !required || !plugins || plugins.includes(required);
+}
+
+/**
+ * Filter tool definitions by configuration and by what the server supports
+ */
+export function filterToolsByServer<T extends { name: string }>(
+  tools: T[],
+  config: ToolsConfig,
+  server: { plugins: string[] | null; member?: MemberPermissions | null; v2?: boolean }
+): T[] {
+  return tools.filter(
+    (tool) => isToolAllowed(tool.name, config)
+      && isToolSupported(tool.name, server.plugins, server.v2 === true)
+      && isToolPermitted(tool.name, server.member ?? null, server.v2 === true)
+  );
 }

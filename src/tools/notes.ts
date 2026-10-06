@@ -1,5 +1,13 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleCreateNoteV2,
+  handleDeleteNoteV2,
+  handleListNotesV2,
+  handleUpdateNoteV2,
+  updateNoteV2ToolDefinition,
+} from './v2/notes.js';
 
 // ============================================================================
 // CREATE_NOTE TOOL
@@ -15,7 +23,7 @@ export const createNoteToolDefinition = {
       app_name: { type: 'string', description: 'Application name (alternative to app_id). Must match an existing app exactly; call apps_list to find valid names.' },
       note: { type: 'string', description: 'Note body text shown in the dashboard.' },
       ts: { type: 'number', description: 'Note anchor timestamp. Unix seconds (< 10^10) are auto-converted to milliseconds; milliseconds are passed through.' },
-      noteType: { type: 'string', description: 'Visibility tier, typically "public" or "private".' },
+      noteType: { type: 'string', description: 'Visibility tier, typically "public" or "private". Defaults to "private" (visible to the creator only).' },
       color: { type: 'string', description: 'Badge color. Defaults to "turquoise" when omitted.', enum: ['turquoise', 'yellow', 'orange', 'pink', 'blue'] },
       category: { type: 'string', description: 'Optional placement category, e.g. "sessionHomeWidget" to pin the note on the session dashboard graph.' },
       emails: { type: 'array', items: { type: 'string' }, description: 'Optional email addresses to notify.' },
@@ -46,14 +54,19 @@ export async function handleCreateNote(context: ToolContext, args: any): Promise
     app_id,
     note,
     ts: timestamp,
-    noteType,
+    // Required by Countly; private (owner only) is the safe default
+    noteType: noteType || 'private',
     emails: emails || [],
     color: colorCode,
     category: category || null,
   };
   
+  // Countly binds the note to the top-level app_id it permission-checked and
+  // ignores args.app_id, so without this the note is saved with app_id
+  // "undefined" and never shows up in notes_list.
   const params = {
     ...context.getAuthParams(),
+    app_id,
     args: JSON.stringify(noteArgs),
   };
 
@@ -142,8 +155,13 @@ startTime = now - (30 * 24 * 60 * 60 * 1000);
 
   );
   
-  const notes = response.data?.notes || response.data || [];
-  const noteCount = Array.isArray(notes) ? notes.length : Object.keys(notes).length;
+  // Countly answers a DataTables envelope ({aaData, iTotalRecords}); older
+  // servers return {notes: [...]} or a bare array
+  const data = response.data;
+  const notes = data?.aaData ?? data?.notes ?? data ?? [];
+  const noteCount = Array.isArray(notes)
+    ? notes.length
+    : typeof data?.iTotalRecords === 'number' ? data.iTotalRecords : Object.keys(notes).length;
   
   return {
     content: [
@@ -208,27 +226,49 @@ export const notesToolDefinitions = [
   createNoteToolDefinition,
   listNotesToolDefinition,
   deleteNoteToolDefinition,
+  // Countly Platform only (hidden elsewhere via V2_ONLY_TOOLS)
+  updateNoteV2ToolDefinition,
 ];
 
 export const notesToolHandlers = {
   'notes_create': 'createNote',
   'notes_list': 'listNotes',
   'notes_delete': 'deleteNote',
+  'notes_update': 'updateNote',
 } as const;
 
 export class NotesTools {
   constructor(private context: ToolContext) {}
 
   async createNote(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateNoteV2(this.context, args);
+    }
     return handleCreateNote(this.context, args);
   }
 
   async listNotes(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListNotesV2(this.context, args);
+    }
     return handleListNotes(this.context, args);
   }
 
   async deleteNote(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteNoteV2(this.context, args);
+    }
     return handleDeleteNote(this.context, args);
+  }
+
+  async updateNote(args: any): Promise<ToolResult> {
+    if (!(await usesV2(this.context))) {
+      return {
+        content: [{ type: 'text', text: 'notes_update needs Countly Platform (/v2 API). On this server delete the note and create a new one.' }],
+        isError: true,
+      } as ToolResult;
+    }
+    return handleUpdateNoteV2(this.context, args);
   }
 }
 

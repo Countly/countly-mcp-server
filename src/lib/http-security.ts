@@ -48,6 +48,33 @@ export function resolveCorsOrigin(
 }
 
 /**
+ * Decide whether a request to `/mcp` may proceed given its `Origin` header.
+ *
+ * When the server holds its own Countly token (COUNTLY_AUTH_TOKEN or
+ * COUNTLY_AUTH_TOKEN_FILE), any caller that reaches `/mcp` without a token
+ * acts with it. MCP clients (desktop apps, IDEs, CLIs, server-side
+ * connectors) send no `Origin` header, but a browser always does on a
+ * cross-origin request, and also on a DNS-rebound one, where CORS never
+ * applies because the page looks same-origin. Page scripts cannot set or
+ * forge `Origin`. So a request carrying an `Origin` is a web page driving
+ * the operator's browser, and it is refused unless that origin is listed
+ * explicitly in COUNTLY_CORS_ALLOWED_ORIGINS; the `*` default does not count.
+ *
+ * Without a server-side token every caller brings its own, a page gains
+ * nothing, and the check is skipped.
+ */
+export function isOriginPermitted(
+  allowed: CorsAllowed,
+  requestOrigin: string | undefined,
+  serverHoldsToken: boolean
+): boolean {
+  if (!serverHoldsToken || !requestOrigin) {
+    return true;
+  }
+  return allowed !== '*' && allowed.includes(requestOrigin);
+}
+
+/**
  * Simple in-memory sliding-window rate limiter, keyed by client IP.
  *
  * Each IP may make at most `maxRequests` requests per `windowMs` milliseconds.
@@ -338,6 +365,37 @@ export function readLimitedBody(
     req.on('aborted', () => finish({ ok: false, body: '' }));
     req.on('error', () => finish({ ok: false, body: '' }));
   });
+}
+
+/**
+ * True when `host` is a plain `Host` header value: a DNS name or IPv4
+ * address, or a bracketed IPv6 address, with an optional port.
+ *
+ * The welcome page prints a shell command (`claude mcp add ... <url>`) built
+ * from the request's Host header. HTML escaping protects the markup, but text
+ * copied from the page is decoded before the shell sees it, so a forged Host
+ * such as `a.test$(cmd)` would run on the reader's machine. Only values that
+ * cannot carry shell syntax are accepted; anything else is replaced by the
+ * server's own address.
+ */
+export function isPlainHostHeader(host: string): boolean {
+  return /^(?:\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?)(?::\d{1,5})?$/.test(host);
+}
+
+/**
+ * Escape a string for interpolation into HTML text or a quoted attribute.
+ *
+ * The welcome page builds its copy-pasteable endpoint URL from the request's
+ * `Host` header (and `X-Forwarded-Proto` behind a trusted proxy), both of
+ * which the caller controls, so they must never reach the markup raw.
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**

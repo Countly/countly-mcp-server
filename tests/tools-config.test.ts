@@ -55,6 +55,15 @@ describe('Tools Configuration', () => {
       'journeys',
       'content',
       'metadata',
+      'flows',
+      'ratings',
+      'campaigns',
+      'ai_assistants',
+      'notifications',
+      'tasks',
+      'geo',
+      'revenue',
+      'crashes_jira',
     ];
     const actualCategories = Object.keys(TOOL_CATEGORIES);
     expect(actualCategories.sort()).toEqual(expectedCategories.sort());
@@ -65,18 +74,18 @@ describe('Tools Configuration', () => {
       core: 3,
       apps: 6,
       analytics: 6,
-      crashes: 10,
-      notes: 3,
-      events: 3,
+      crashes: 12,
+      notes: 4,
+      events: 6,
       alerts: 3,
-      views: 2,
-      database: 6,
+      views: 3,
+      database: 5,
       dashboard_users: 1,
       app_users: 3,
-      drill: 4,
+      drill: 7,
       user_profiles: 3,
       cohorts: 5,
-      funnels: 7,
+      funnels: 10,
       formulas: 4,
       live: 6,
       retention: 1,
@@ -91,10 +100,19 @@ describe('Tools Configuration', () => {
       email_reports: 7,
       dashboards: 8,
       times_of_day: 1,
-      hooks: 5,
-      journeys: 13,
+      hooks: 6,
+      journeys: 18,
       content: 11,
       metadata: 1,
+      flows: 4,
+      ratings: 3,
+      campaigns: 3,
+      ai_assistants: 1,
+      notifications: 1,
+      tasks: 2,
+      geo: 1,
+      revenue: 1,
+      crashes_jira: 1,
     };
     for (const [category, config] of Object.entries(TOOL_CATEGORIES)) {
       const toolCount = Object.keys(config.operations).length;
@@ -112,12 +130,12 @@ describe('Tools Configuration', () => {
       }
     });
 
-    it('should have total of 151 tools', () => {
+    it('should have total of 186 tools', () => {
       const totalTools = Object.values(TOOL_CATEGORIES).reduce(
         (sum, config) => sum + Object.keys(config.operations).length,
         0
       );
-      expect(totalTools).toBe(151);
+      expect(totalTools).toBe(186);
     });
   });
 
@@ -304,6 +322,19 @@ describe('Tools Configuration', () => {
       };
       
       expect(isToolAllowed('apps_list', config)).toBe(false);
+    });
+
+    it('offers alerts_create to an update-only config (updating an existing alert), and checks each call', () => {
+      const config = { alerts: new Set<'C' | 'R' | 'U' | 'D'>(['U']) };
+      expect(isToolAllowed('alerts_create', config)).toBe(true);
+      expect(isToolCallAllowed('alerts_create', { alert_config: { _id: 'a1' } }, config)).toBe(true);
+      expect(isToolCallAllowed('alerts_create', { alert_config: { alertName: 'x' } }, config)).toBe(false);
+      expect(filterTools([{ name: 'alerts_create' }], config)).toEqual([{ name: 'alerts_create' }]);
+    });
+
+    it('does not offer events_create, whose every call needs C and U, to an update-only config', () => {
+      const config = { events: new Set<'C' | 'R' | 'U' | 'D'>(['U']) };
+      expect(isToolAllowed('events_create', config)).toBe(false);
     });
 
     it('should return true for unknown tools (forward compatibility)', () => {
@@ -616,9 +647,9 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('remote_config')).toBe('remote-config');
       expect(getRequiredPlugin('ab_testing')).toBe('ab-testing');
       expect(getRequiredPlugin('logger')).toBe('logger');
-      expect(getRequiredPlugin('sdks')).toBe('sdks');
+      expect(getRequiredPlugin('sdks')).toBe('sdk');
       expect(getRequiredPlugin('compliance_hub')).toBe('compliance-hub');
-      expect(getRequiredPlugin('filtering_rules')).toBe('blocks');
+      expect(getRequiredPlugin('filtering_rules')).toBe('block');
       expect(getRequiredPlugin('datapoint')).toBe('server-stats');
       expect(getRequiredPlugin('server_logs')).toBe('errorlogs');
       expect(getRequiredPlugin('email_reports')).toBe('reports');
@@ -786,7 +817,9 @@ describe('Tool Handler Validation', () => {
     // running custom code, sending a notification - is 'C'/'U' no matter which HTTP
     // verb or endpoint namespace it happens to use. Rendering or recomputing an
     // already-saved object stays 'R' (email_reports_preview takes a saved report_id
-    // and explicitly does not deliver; formulas_run only recomputes readable data).
+    // and explicitly does not deliver; formulas_run only recomputes readable data, and
+    // its persisting mode "saved" is refused without Create, see
+    // tests/formulas-readonly.test.ts).
     const SIDE_EFFECTING_TOOLS = [
       'hooks_test', // /i/hook/test runs the effects: real email, webhook, custom code
       'hooks_create',

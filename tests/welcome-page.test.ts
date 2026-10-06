@@ -35,6 +35,39 @@ const welcomePage = (() => {
 })();
 
 describe('welcome page', () => {
+  describe('caller-controlled values', () => {
+    it('only uses a plain host[:port] from the Host header, since it ends up in a shell command', () => {
+      // HTML escaping does not stop `$(...)` in a copied `claude mcp add` line.
+      expect(indexSource).toMatch(/isPlainHostHeader\(requestHost\) \? requestHost :/);
+    });
+
+    it('keeps the Host-derived page out of shared caches', () => {
+      // A plain but attacker-chosen hostname passes isPlainHostHeader. Without
+      // no-store, a cache that ignores Host could serve it to everyone as the
+      // endpoint to register, sending their tokens to that host.
+      const write = indexSource.slice(indexSource.indexOf("'Content-Type': 'text/html; charset=utf-8'") - 200, indexSource.indexOf("'Content-Type': 'text/html; charset=utf-8'") + 200);
+      expect(write).toContain("'Cache-Control': 'no-store'");
+      expect(write).toContain("'Vary': 'Host'");
+    });
+
+    it('HTML-escapes the endpoint URL built from the Host header', () => {
+      // pageEndpointUrl is derived from req.headers.host (and X-Forwarded-Proto
+      // behind a trusted proxy). Unescaped, a forged Host reflected markup
+      // straight into the page.
+      expect(indexSource).toMatch(/const pageEndpointUrl = escapeHtml\(/);
+    });
+
+    it('does not build the query-string URL from the Host header', () => {
+      // new URL(req.url, `http://${host}`) threw on a malformed Host and
+      // returned a 500 for an otherwise valid /mcp request.
+      expect(indexSource).not.toMatch(/new URL\(req\.url[^)]*req\.headers\.host/);
+    });
+
+    it('accepts only http or https from X-Forwarded-Proto', () => {
+      expect(indexSource).toMatch(/forwardedProto === 'http' \|\| forwardedProto === 'https'/);
+    });
+  });
+
   describe('install instructions', () => {
     it('never references a scoped @countly/ package', () => {
       // The published package is unscoped. `npx -y @countly/countly-mcp-server`

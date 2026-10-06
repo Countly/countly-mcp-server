@@ -183,29 +183,37 @@ export function resolveAppIdentifier(
 }
 
 /**
- * The apps in a `/o/apps/mine` response: those the member administers
- * (`admin_of`) and those they only use (`user_of`), once each. A member with
- * user rights only, or a token limited to reading, has everything under
- * `user_of`, so reading `admin_of` alone lists nothing for them.
- * @param data - the response body
- * @returns the apps, or an empty list for an unrecognised shape
+ * Normalize a /o/apps/mine response into a flat app list.
+ *
+ * Countly always returns `{admin_of: {...}, user_of: {...}}`. The key names are
+ * legacy, but the server fills them from the member's `permission` object
+ * (`permission._.a` → admin_of, `permission._.u` + `_.a` → user_of) and falls
+ * back to the legacy `admin_of`/`user_of` arrays only for members without one.
+ * A user with only read access has the app under `user_of` with an empty
+ * `admin_of`, so both maps are merged, de-duplicated by `_id` (admin entries
+ * take precedence).
+ * Plain arrays and `{apps: [...]}` shapes are also accepted.
  */
-export function appsFromMineResponse(data: unknown): CountlyApp[] {
+export function parseAppsMineResponse(data: any): CountlyApp[] {
   if (Array.isArray(data)) {
-    return data as CountlyApp[];
+    return data;
   }
-  if (!data || typeof data !== 'object') {
-    return [];
-  }
-  const body = data as { admin_of?: Record<string, CountlyApp>; user_of?: Record<string, CountlyApp>; apps?: CountlyApp[] };
-  if (body.admin_of || body.user_of) {
-    const byId = new Map<string, CountlyApp>();
-    for (const app of [...Object.values(body.admin_of ?? {}), ...Object.values(body.user_of ?? {})]) {
-      if (app && !byId.has(String(app._id))) {
-        byId.set(String(app._id), app);
+  if (data && (data.admin_of || data.user_of)) {
+    const merged = new Map<string, CountlyApp>();
+    for (const group of [data.admin_of, data.user_of]) {
+      if (!group || typeof group !== 'object') {
+        continue;
+      }
+      for (const app of Object.values(group) as CountlyApp[]) {
+        if (app && app._id && !merged.has(app._id)) {
+          merged.set(app._id, app);
+        }
       }
     }
-    return [...byId.values()];
+    return [...merged.values()];
   }
-  return Array.isArray(body.apps) ? body.apps : [];
+  if (data && Array.isArray(data.apps)) {
+    return data.apps;
+  }
+  return [];
 }

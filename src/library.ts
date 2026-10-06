@@ -46,7 +46,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, appsFromMineResponse, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, parseAppsMineResponse, type CountlyApp } from './lib/app-cache.js';
 import { getPrompt, listPrompts } from './lib/prompts.js';
 import {
   ADMIN_ONLY_TOOLS,
@@ -447,6 +447,22 @@ const APP_ID = /^[0-9a-fA-F]{24}$/;
 /** An event or segment key prefixed with its app id: `<24-hex id>***key`. */
 const APP_PREFIXED_KEY = /^([0-9a-fA-F]{24})\*\*\*/;
 
+/**
+ * Fields whose values are `<appId>***key` references, so the app in them is
+ * checked: dashboard widget `events` and `funnel_type`, email report
+ * `selectedEvents`, hook trigger `event`. A string of that shape anywhere else
+ * (an event that happens to be named so) is data.
+ */
+const COMPOSITE_KEYS: ReadonlySet<string> = new Set(['events', 'selectedevents', 'funneltype']);
+/** Composite only when nested (a hook trigger's `event`): a top-level `event`
+ *  argument is a plain event key (query_data). */
+const NESTED_COMPOSITE_KEYS: ReadonlySet<string> = new Set(['event']);
+
+function isCompositeKey(key: string, nested: boolean): boolean {
+  const name = key.toLowerCase().replace(/[_-]/g, '');
+  return COMPOSITE_KEYS.has(name) || (nested && NESTED_COMPOSITE_KEYS.has(name));
+}
+
 /** Nesting deeper than this is refused rather than left unchecked. */
 const MAX_ARG_DEPTH = 32;
 
@@ -528,23 +544,25 @@ function assertAppsInScope(args: Record<string, unknown>, allowed: ReadonlySet<s
     }
     // booleans and the like cannot name an app
   };
-  const walk = (value: unknown, depth: number): void => {
+  // `composite`: the value sits under a field that holds `<appId>***key`
+  // references (see COMPOSITE_KEYS); anywhere else such a string is data.
+  const walk = (value: unknown, depth: number, composite: boolean): void => {
     if (depth > MAX_ARG_DEPTH) {
       throw new McpError(ErrorCode.InvalidParams, 'Arguments are nested too deeply to check');
     }
     if (typeof value === 'string') {
-      const prefixed = APP_PREFIXED_KEY.exec(value);
+      const prefixed = composite ? APP_PREFIXED_KEY.exec(value) : null;
       if (prefixed) {
         checkId(prefixed[1]);
       }
       const parsed = parseJsonString(value);
       if (parsed.ok) {
-        walk(parsed.value, depth + 1);
+        walk(parsed.value, depth + 1, composite);
       }
       return;
     }
     if (Array.isArray(value)) {
-      value.forEach((item) => walk(item, depth + 1));
+      value.forEach((item) => walk(item, depth + 1, composite));
       return;
     }
     if (value && typeof value === 'object') {
@@ -552,11 +570,11 @@ function assertAppsInScope(args: Record<string, unknown>, allowed: ReadonlySet<s
         if (isAppKey(key)) {
           checkAppValue(child, depth + 1);
         }
-        walk(child, depth + 1);
+        walk(child, depth + 1, isCompositeKey(key, depth > 0));
       }
     }
   };
-  walk(args, 0);
+  walk(args, 0, false);
 }
 
 // ============================================================================
@@ -590,7 +608,7 @@ async function fetchApps(client: AxiosInstance, cache: AppCache): Promise<Countl
     return cache.getAll();
   }
   const response = await client.get('/o/apps/mine');
-  const apps: CountlyApp[] = appsFromMineResponse(response.data);
+  const apps: CountlyApp[] = parseAppsMineResponse(response.data);
   cache.update(apps);
   return apps;
 }

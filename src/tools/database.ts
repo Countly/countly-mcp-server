@@ -1,3 +1,4 @@
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
@@ -7,13 +8,33 @@ import { safeApiCall } from '../lib/error-handler.js';
 
 export const listDatabasesToolDefinition = {
   name: 'databases_list',
-  description: 'List MongoDB databases and collections exposed by the Countly dbviewer (typically countly, countly_drill, countly_out, countly_fs) via /o/db. Requires the dbviewer plugin. Takes no arguments.',
+  description: 'List databases and collections exposed by the Countly dbviewer (typically countly, countly_drill, countly_out, countly_fs) via /o/db. On Countly Platform it also lists ClickHouse databases (prefixed "clickhouse_", e.g. clickhouse_countly_drill with drill_events and app_users), where raw events and user profiles live. Requires the dbviewer plugin. Takes no arguments.',
   inputSchema: {
     type: 'object',
     properties: {},
     required: [],
   },
 };
+
+const CLICKHOUSE_PREFIX = 'clickhouse_';
+
+/**
+ * ClickHouse databases (Countly Platform) have no aggregation pipelines or
+ * MongoDB-style indexes, so these tools only apply to MongoDB databases.
+ */
+function clickhouseUnsupported(database: unknown, toolName: string): ToolResult | null {
+  if (typeof database !== 'string' || !database.startsWith(CLICKHOUSE_PREFIX)) {
+    return null;
+  }
+  return {
+    content: [{
+      type: 'text',
+      text: `${toolName} does not support ClickHouse databases (${database}). Use databases_query for filtered reads, ` +
+        'or drill_query for counts, unique users, sums and breakdowns over drill_events.',
+    }],
+    isError: true,
+  } as ToolResult;
+}
 
 export async function handleListDatabases(context: ToolContext, _: any): Promise<ToolResult> {
   const params = {
@@ -47,7 +68,7 @@ export async function handleListDatabases(context: ToolContext, _: any): Promise
 
 export const queryDatabaseToolDefinition = {
   name: 'databases_query',
-  description: 'Run a raw MongoDB find() query on a Countly collection with filter, projection, sort, and pagination via /o/db. Requires the dbviewer plugin. For a single document by _id use databases_document; for aggregation pipelines use collections_aggregate.',
+  description: 'Run a raw find() query on a Countly collection with filter, projection, sort, and pagination via /o/db. Requires the dbviewer plugin. On Countly Platform, ClickHouse tables (database "clickhouse_countly_drill": drill_events, app_users) are queried the same way: the Mongo-style filter is translated to SQL. drill_events columns include a (app id), e (event key, custom events are "[CLY]_custom" with the name in n), n, uid, ts, c, s, dur, sg.<segment>, up.<user property>; always filter by a. For a single document by _id use databases_document; for aggregation pipelines use collections_aggregate (MongoDB only; on ClickHouse use drill_query).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -196,7 +217,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 
 export const aggregateCollectionToolDefinition = {
   name: 'collections_aggregate',
-  description: 'Run a MongoDB aggregation pipeline on a collection via /o/db. Requires the dbviewer plugin. For simple find queries use databases_query.',
+  description: 'Run a read-only MongoDB aggregation pipeline on a collection via /o/db; write and introspection stages such as $out, $merge and $currentOp are rejected. Requires the dbviewer plugin. MongoDB databases only: for ClickHouse databases on Countly Platform use databases_query or drill_query. For simple find queries use databases_query.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -215,8 +236,75 @@ export const aggregateCollectionToolDefinition = {
   },
 };
 
+/**
+ * Aggregation stages collections_aggregate may send, mirroring the stage
+ * allow-list of Countly's dbviewer aggregation guard
+ * (plugins/dbviewer/api/parts/aggregation_guard.js: STAGES_USER plus
+ * STAGES_GLOBAL_ADMIN_ONLY). The MCP server cannot tell whether the token
+ * belongs to a global admin, so it allows the union and Countly narrows the
+ * joins per role.
+ *
+ * This is an allow-list, so it fails closed: writes ($out, $merge),
+ * server/cluster introspection ($currentOp, $collStats, ...), $documents and
+ * any stage a future MongoDB adds are refused until reviewed here. Only stage
+ * names are checked. Countly's guard also validates every operator at every
+ * depth and the join targets; those depend on its MongoDB version and the
+ * caller's role, so they stay server-side rather than being copied here to
+ * drift.
+ */
+const ALLOWED_STAGES = new Set([
+  '$addFields', '$bucket', '$bucketAuto', '$count', '$densify', '$facet',
+  '$fill', '$geoNear', '$group', '$limit', '$match', '$project',
+  '$querySettings', '$redact', '$replaceRoot', '$replaceWith', '$sample',
+  '$search', '$searchMeta', '$set', '$setWindowFields', '$skip', '$sort',
+  '$sortByCount', '$unset', '$unwind', '$vectorSearch',
+  // joins and unions: global admins only, enforced by Countly
+  '$lookup', '$graphLookup', '$unionWith',
+]);
+
+/**
+ * collections_aggregate is classified as a read operation, so it stays
+ * available under COUNTLY_TOOLS_ALL=R. Return the first top-level stage that
+ * is not on the allow-list, or undefined. Input that is not a JSON array is
+ * left for Countly to reject as an invalid pipeline.
+ */
+export function findDisallowedStage(aggregation: unknown): string | undefined {
+  let pipeline = aggregation;
+  if (typeof pipeline === 'string') {
+    try {
+      pipeline = JSON.parse(pipeline);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!Array.isArray(pipeline)) {
+    return undefined;
+  }
+  for (const stage of pipeline) {
+    if (stage && typeof stage === 'object' && !Array.isArray(stage)) {
+      const found = Object.keys(stage).find((key) => key.startsWith('$') && !ALLOWED_STAGES.has(key));
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return undefined;
+}
+
 export async function handleAggregateCollection(context: ToolContext, args: any): Promise<ToolResult> {
   const { database = 'countly', collection, aggregation } = args;
+  const unsupported = clickhouseUnsupported(database, 'collections_aggregate');
+  if (unsupported) {
+    return unsupported;
+  }
+
+  const disallowedStage = findDisallowedStage(aggregation);
+  if (disallowedStage) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `collections_aggregate is read-only and does not allow the ${disallowedStage} stage. Allowed stages: ${[...ALLOWED_STAGES].join(', ')}.`
+    );
+  }
   
   const params: any = {
     ...context.getAuthParams(),
@@ -279,6 +367,10 @@ export const getCollectionIndexesToolDefinition = {
 
 export async function handleGetCollectionIndexes(context: ToolContext, args: any): Promise<ToolResult> {
   const { database = 'countly', collection } = args;
+  const unsupportedIndexes = clickhouseUnsupported(database, 'collections_indexes');
+  if (unsupportedIndexes) {
+    return unsupportedIndexes;
+  }
   
   const params = {
     ...context.getAuthParams(),
@@ -309,52 +401,6 @@ export async function handleGetCollectionIndexes(context: ToolContext, args: any
 }
 
 // ============================================================================
-// GET_DB_STATISTICS TOOL
-// ============================================================================
-
-export const getDbStatisticsToolDefinition = {
-  name: 'databases_stats',
-  description: 'Get live MongoDB process statistics ("mongotop" per-collection timings or "mongostat" server-wide counters) via /o/db/mongotop or /o/db/mongostat. Requires the dbviewer plugin.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      stat_type: {
-        type: 'string',
-        enum: ['mongotop', 'mongostat'],
-        description: 'Which statistic set to fetch: "mongotop" (per-collection read/write time) or "mongostat" (server-wide ops/second, connections, memory).'
-      },
-    },
-    required: ['stat_type'],
-  },
-};
-
-export async function handleGetDbStatistics(context: ToolContext, args: any): Promise<ToolResult> {
-  const { stat_type } = args;
-  
-  const params = {
-    ...context.getAuthParams(),
-  };
-
-  const endpoint = stat_type === 'mongotop' ? '/o/db/mongotop' : '/o/db/mongostat';
-  const response = await safeApiCall(
-
-    () => context.httpClient.get(endpoint, { params }),
-
-    'Failed to execute request to API request'
-
-  );
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `MongoDB ${stat_type} statistics:\n${JSON.stringify(response.data, null, 2)}`,
-      },
-    ],
-  };
-}
-
-// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -364,7 +410,6 @@ export const databaseToolDefinitions = [
   getDocumentToolDefinition,
   aggregateCollectionToolDefinition,
   getCollectionIndexesToolDefinition,
-  getDbStatisticsToolDefinition,
 ];
 
 export const databaseToolHandlers = {
@@ -373,7 +418,6 @@ export const databaseToolHandlers = {
   'databases_document': 'getDocument',
   'collections_aggregate': 'aggregateCollection',
   'collections_indexes': 'getCollectionIndexes',
-  'databases_stats': 'getDbStatistics',
 } as const;
 
 export class DatabaseTools {
@@ -397,10 +441,6 @@ export class DatabaseTools {
 
   async getCollectionIndexes(args: any): Promise<ToolResult> {
     return handleGetCollectionIndexes(this.context, args);
-  }
-
-  async getDbStatistics(args: any): Promise<ToolResult> {
-    return handleGetDbStatistics(this.context, args);
   }
 }
 

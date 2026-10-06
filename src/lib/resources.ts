@@ -6,7 +6,7 @@
  */
 
 import { AxiosInstance } from 'axios';
-import { AppCache, appsFromMineResponse, CountlyApp } from './app-cache.js';
+import { AppCache, CountlyApp, parseAppsMineResponse } from './app-cache.js';
 
 export interface Resource {
   uri: string;
@@ -154,9 +154,6 @@ async function getAppsForCache(
   }
   
   try {
-    // Debug: print headers before request
-     
-    console.error('[DEBUG] Axios headers for /o/apps/mine:', JSON.stringify(httpClient.defaults.headers.common));
     const authHeader = httpClient.defaults.headers.common['countly-token'];
     const params: any = {};
     // If auth is in headers, also try sending as query param for compatibility
@@ -165,7 +162,7 @@ async function getAppsForCache(
     }
     const response = await httpClient.get('/o/apps/mine', { params });
     
-    const apps: CountlyApp[] = appsFromMineResponse(response.data);
+    const apps = parseAppsMineResponse(response.data);
     
     appCache.update(apps);
     return apps;

@@ -36,26 +36,51 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, AppCacheRegistry, appsFromMineResponse, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, AppCacheRegistry, parseAppsMineResponse, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
 import { FAVICON_SVG } from './lib/favicon.js';
 import {
   ConcurrencyLimiter,
+  escapeHtml,
   extractClientIp,
+  isPlainHostHeader,
   formatRequestLog,
+  isOriginPermitted,
   parseCorsAllowed,
   RateLimiter,
   readLimitedBody,
   resolveCorsOrigin,
   sanitizeForLog,
 } from './lib/http-security.js';
-import { loadToolsConfig, filterTools, getConfigSummary, isToolCallAllowed, TOOL_CATEGORIES, type ToolsConfig } from './lib/tools-config.js';
+import {
+  describeCapabilities,
+  detectServerCapabilities,
+  ServerCapabilitiesCache,
+  type ServerCapabilities,
+} from './lib/server-capabilities.js';
+import { describeGuard, isToolPermitted } from './lib/tool-guards.js';
+import {
+  loadToolsConfig,
+  filterTools,
+  filterToolsByServer,
+  getArgumentRefusal,
+  restrictToolArguments,
+  getConfigSummary,
+  getToolRequiredPlugin,
+  isToolCallAllowed,
+  isToolSupported,
+  V2_ONLY_TOOLS,
+  TOOL_CATEGORIES,
+  type ToolsConfig,
+} from './lib/tools-config.js';
+import { withAnnotations } from './lib/tool-annotations.js';
 import { listResources, readResource } from './lib/resources.js';
 import { listPrompts, getPrompt } from './lib/prompts.js';
 import { 
-  getAllToolDefinitions, 
+  getAllToolDefinitions,
+  getV2ToolDefinitionOverrides, 
   getAllToolMetadata,
 } from './tools/index.js';
 import { ToolContext } from './tools/types.js';
@@ -198,6 +223,12 @@ class CountlyMCPServer {
    */
   private appCacheRegistry: AppCacheRegistry;
   private toolsConfig: ToolsConfig;
+  /**
+   * Detected backend flavor + plugin set per server URL and token. Used to
+   * hide tools the connected Countly (Lite / Enterprise / Platform) lacks.
+   */
+  private capabilitiesCache = new ServerCapabilitiesCache();
+  private autoDetect = (process.env.COUNTLY_AUTO_DETECT || '').toLowerCase() !== 'false';
   private loopDetector: LoopDetector;
   private lastTokenInUrlWarnAt: number = 0;
   /**
@@ -244,7 +275,62 @@ class CountlyMCPServer {
       console.error(getConfigSummary(this.toolsConfig));
     }
     
-    this.server = new Server(
+    this.server = this.createServer();
+    
+    // Initialize config from environment variables using lib/config.ts
+    // Auth token can be loaded from environment or overridden per-request from client metadata
+    this.config = buildConfig(process.env, undefined, testMode);
+
+    this.httpClient = axios.create({
+      baseURL: this.config.serverUrl,
+      timeout: this.config.timeout,
+    });
+
+    // Set auth header if token is available from environment
+    if (this.config.authToken) {
+      this.setAuthHeader(this.config.authToken);
+    }
+  }
+
+  /**
+   * Resolve the token for the current request.
+   * Priority: tool arguments > MCP metadata > per-request HTTP state (header
+   * or URL parameter) > COUNTLY_AUTH_TOKEN > COUNTLY_AUTH_TOKEN_FILE.
+   *
+   * The server-level env/file token is looked up last, explicitly: by
+   * default resolveAuthToken also reads process.env, and calling it that way
+   * first let a configured env token silently override the token a caller
+   * sent in X-Countly-Auth-Token.
+   */
+  private resolveRequestToken(metadata: any, args: any): string | undefined {
+    return resolveAuthToken({ metadata, args, env: {} })
+      || this.requestContext.getStore()?.authToken
+      || resolveAuthToken({ env: process.env });
+  }
+
+  /**
+   * Extract auth token for a tool call; see resolveRequestToken for priority.
+   */
+  private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
+    const metadata = (request as any)?._meta || (request as any)?.meta;
+    const authToken = this.resolveRequestToken(metadata, args);
+
+    if (!authToken) {
+      throw createMissingAuthError();
+    }
+
+    return { authToken };
+  }
+
+  /**
+   * Build a fully configured MCP Server instance with all handlers registered.
+   * Stdio mode uses a single instance for the life of the process; HTTP mode
+   * (stateless) builds one per request, because the SDK refuses to reuse a
+   * stateless transport across requests and a Server can only be bound to
+   * one transport at a time.
+   */
+  private createServer(): Server {
+    const server = new Server(
       {
         name: 'countly-mcp-server',
         version: PACKAGE_VERSION,
@@ -265,65 +351,45 @@ class CountlyMCPServer {
       }
     );
 
-    this.setupToolHandlers();
-    this.setupResourceHandlers();
-    this.setupPromptHandlers();
-    
-    // Initialize config from environment variables using lib/config.ts
-    // Auth token can be loaded from environment or overridden per-request from client metadata
-    this.config = buildConfig(process.env, undefined, testMode);
+    this.setupToolHandlers(server);
+    this.setupResourceHandlers(server);
+    this.setupPromptHandlers(server);
 
-    this.httpClient = axios.create({
-      baseURL: this.config.serverUrl,
-      timeout: this.config.timeout,
-    });
-
-    // Set auth header if token is available from environment
-    if (this.config.authToken) {
-      this.setAuthHeader(this.config.authToken);
-    }
+    return server;
   }
 
-  /**
-   * Extract auth token from request metadata, arguments, or environment
-   * Priority: request metadata > arguments > current config (set from headers) > environment variables > file
-   * Uses lib/auth.ts resolveAuthToken function
-   */
-  private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
-    const metadata = (request as any)?._meta || (request as any)?.meta;
-
-    // Try to get from metadata or args first
-    let authToken = resolveAuthToken({ metadata, args });
-
-    // Per-request HTTP state from AsyncLocalStorage (HTTP middleware sets it)
-    if (!authToken) {
-      const reqState = this.requestContext.getStore();
-      if (reqState?.authToken) {
-        authToken = reqState.authToken;
-      }
-    }
-
-    // Server-level config fallback (env / file in stdio mode)
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
-
-    if (!authToken) {
-      throw createMissingAuthError();
-    }
-
-    return { authToken };
-  }
-
-  private setupToolHandlers() {
-    // Use the modular tool definitions from tools/index.ts and filter by configuration
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+  private setupToolHandlers(server: Server) {
+    // Use the modular tool definitions from tools/index.ts, filter by
+    // configuration, then by what the connected Countly server supports
+    server.setRequestHandler(ListToolsRequestSchema, async (request) => {
       const allTools = getAllToolDefinitions();
-      const filteredTools = filterTools(allTools, this.toolsConfig);
-      return { tools: filteredTools };
+      const filteredTools = filterTools(allTools, this.toolsConfig)
+        .map((tool) => restrictToolArguments(tool, this.toolsConfig));
+      const { client, authToken } = this.buildPerRequestClient(request);
+      const serverUrl = this.requestContext.getStore()?.serverUrl || this.config.serverUrl;
+      const caps = await this.getServerCapabilities(client, serverUrl, authToken);
+      if (!caps) {
+        // Detection disabled: expose every configured tool, as documented.
+        // Detection on but inconclusive: hide only tools that certainly need
+        // the Platform /v2 API.
+        return {
+          tools: (this.autoDetect
+            ? filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null })
+            : filteredTools
+          ).map((tool) => withAnnotations(tool, this.toolsConfig)),
+        };
+      }
+      const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
+      return {
+        tools: filterToolsByServer(filteredTools, this.toolsConfig, caps)
+          .map((tool) => withAnnotations(
+            overrides[tool.name] ? restrictToolArguments(overrides[tool.name], this.toolsConfig) : tool,
+            this.toolsConfig
+          )),
+      };
     });
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       const startTime = Date.now();
 
@@ -373,8 +439,50 @@ class CountlyMCPServer {
           appCache: perTenantAppCache,
           getApps: async () =>
             await this.getAppsWithContext(perReqHttpClient, perTenantAppCache, authToken),
+          getServerCapabilities: async () =>
+            await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken),
         };
-        
+
+        // Refuse tools the connected server or user can't use, with an
+        // explanation the model can act on (instead of a raw 400/401 later).
+        const requiredPlugin = getToolRequiredPlugin(name);
+        const caps = await this.getServerCapabilities(perReqHttpClient, serverUrl, authToken);
+        if (caps && !isToolPermitted(name, caps.member, caps.v2)) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Tool "${name}" is not available: it requires ${describeGuard(name, caps.v2)}, ` +
+                'which the connected Countly user does not have.',
+            }],
+            isError: true,
+          };
+        }
+        if (this.autoDetect && V2_ONLY_TOOLS.has(name) && !caps?.v2) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Tool "${name}" is not available: it needs the Countly Platform /v2 API, ` +
+                `which this server does not serve${caps ? ` (${describeCapabilities(caps)})` : ''}.`,
+            }],
+            isError: true,
+          };
+        }
+        if (requiredPlugin) {
+          if (caps && !isToolSupported(name, caps.plugins, caps.v2)) {
+            return {
+              content: [{
+                type: 'text',
+                text: `Tool "${name}" is not available: it requires the "${requiredPlugin}" plugin, ` +
+                  (caps.pluginsAssumed
+                    ? `which is not in the default plugin set of ${describeCapabilities(caps)} ` +
+                      '(this token cannot list the server\'s plugins).'
+                    : `which is not enabled on this server (${describeCapabilities(caps)}).`),
+              }],
+              isError: true,
+            };
+          }
+        }
+
         // Get all tool metadata and filter based on tools configuration
         const toolMetadataList = getAllToolMetadata();
         const allowedToolNames = new Set(
@@ -412,6 +520,16 @@ class CountlyMCPServer {
           );
         }
         
+        // Some arguments change what an allowed tool does (formulas_run with
+        // mode "saved" persists the formula), so check them against the
+        // tools configuration too.
+        const argumentRefusal = getArgumentRefusal(name, args, this.toolsConfig);
+        if (argumentRefusal) {
+          return {
+            content: [{ type: 'text', text: argumentRefusal }],
+            isError: true,
+          };
+        }
         // The tool is enabled, but some tools write depending on their
         // arguments (see TOOL_OPERATION_RULES): check what this call needs.
         if (!isToolCallAllowed(name, args, this.toolsConfig)) {
@@ -450,22 +568,28 @@ class CountlyMCPServer {
           name
         );
         
-        if (error instanceof McpError) {
+        // An unknown tool is a protocol error. Anything that failed while
+        // running the tool goes back as an isError result, as the MCP spec
+        // asks, so the model sees the message and can correct its call.
+        if (error instanceof McpError && error.code === ErrorCode.MethodNotFound) {
           throw error;
         }
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Error executing tool ${name}: ${error instanceof Error ? error.message : String(error)}`
-        );
+        return {
+          content: [{
+            type: 'text',
+            text: `Error executing tool ${name}: ${error instanceof Error ? error.message : String(error)}`,
+          }],
+          isError: true,
+        };
       }
       // No finally {} needed — per-request httpClient and cache are local to
       // this handler. Nothing shared was mutated.
     });
   }
 
-  private setupResourceHandlers() {
+  private setupResourceHandlers(server: Server) {
     // Handle resources/list requests
-    this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+    server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -485,7 +609,7 @@ class CountlyMCPServer {
     });
 
     // Handle resources/read requests
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -512,9 +636,9 @@ class CountlyMCPServer {
     });
   }
 
-  private setupPromptHandlers() {
+  private setupPromptHandlers(server: Server) {
     // Handle prompts/list requests
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
       try {
         const prompts = listPrompts();
         
@@ -534,7 +658,7 @@ class CountlyMCPServer {
     });
 
     // Handle prompts/get requests
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       try {
         const { name, arguments: args } = request.params;
         
@@ -654,17 +778,8 @@ class CountlyMCPServer {
   } {
     const metadata = request?._meta || request?.meta;
     const args = request?.params || {};
-    let authToken = resolveAuthToken({ metadata, args });
+    const authToken = this.resolveRequestToken(metadata, args);
     const reqState = this.requestContext.getStore();
-    if (!authToken && reqState?.authToken) {
-      authToken = reqState.authToken;
-    }
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
-    if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-      authToken = process.env.COUNTLY_AUTH_TOKEN;
-    }
     const serverUrl = reqState?.serverUrl || this.config.serverUrl;
     const client = this.createRequestHttpClient(
       authToken,
@@ -686,7 +801,7 @@ class CountlyMCPServer {
     const params = authToken ? { auth_token: authToken } : {};
     const response = await client.get('/o/apps/mine', { params });
 
-    const apps: CountlyApp[] = appsFromMineResponse(response.data);
+    const apps = parseAppsMineResponse(response.data);
 
     cache.update(apps);
     return apps;
@@ -700,6 +815,33 @@ class CountlyMCPServer {
   ): Promise<string> {
     const apps = await this.getAppsWithContext(client, cache, authToken);
     return resolveAppIdentifier(args, apps);
+  }
+
+  /**
+   * Detect (or return cached) flavor + plugins of the Countly server behind
+   * this server URL and token. Returns null when detection is disabled or
+   * impossible, in which case callers must not hide any tools.
+   */
+  private async getServerCapabilities(
+    client: AxiosInstance,
+    serverUrl: string | undefined,
+    authToken: string | undefined
+  ): Promise<ServerCapabilities | null> {
+    if (!this.autoDetect || !serverUrl || !authToken) {
+      return null;
+    }
+    try {
+      return await this.capabilitiesCache.get(serverUrl, authToken, async () => {
+        const caps = await detectServerCapabilities(client, authToken);
+        console.error(
+          `Detected ${describeCapabilities(caps)} (architecture: ${caps.architecture}, ` +
+          `plugins: ${caps.plugins ? `${caps.plugins.length}${caps.pluginsAssumed ? ' (assumed defaults)' : ''}` : 'unknown'})`
+        );
+        return caps;
+      });
+    } catch {
+      return null;
+    }
   }
 
   async run(transportType: 'stdio' | 'http' = 'stdio', httpConfig?: HttpConfig) {
@@ -720,6 +862,15 @@ class CountlyMCPServer {
       // should set COUNTLY_CORS_ALLOWED_ORIGINS to a specific comma-
       // separated list (e.g. "https://my-app.example.com").
       const corsAllowed = parseCorsAllowed(process.env.COUNTLY_CORS_ALLOWED_ORIGINS);
+      // A server-side token (env or file) is used for any /mcp caller that
+      // supplies none, so browser-originated requests are refused unless
+      // their origin is allowlisted explicitly. See isOriginPermitted.
+      const serverHoldsToken = Boolean(
+        process.env.COUNTLY_AUTH_TOKEN || process.env.COUNTLY_AUTH_TOKEN_FILE
+      );
+      if (serverHoldsToken) {
+        console.error('Server-side Countly token configured: any caller that reaches /mcp without its own token acts with it. Expose this endpoint only on a trusted network.');
+      }
 
       // Rate limiter for /mcp endpoint. Defaults to 120 req/min per IP.
       // Tunable via COUNTLY_RATE_LIMIT_RPM=<number> or 0 to disable.
@@ -760,13 +911,12 @@ class CountlyMCPServer {
       console.error(`Health check available at: /health`);
       console.error(`All other endpoints are available for other applications on this server`);
       
-      // Create a single StreamableHTTPServerTransport instance in stateless mode
-      // Stateless mode (sessionIdGenerator: undefined) allows clients to manage their own sessions
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
-      
-      await this.server.connect(transport);
+      // Stateless mode (sessionIdGenerator: undefined): the SDK requires a
+      // fresh transport per request, and a Server can only be bound to one
+      // transport, so each /mcp request gets its own transport + Server pair
+      // (see the SDK's simpleStatelessStreamableHttp example). Handlers read
+      // per-request auth/server URL from AsyncLocalStorage, so nothing is
+      // lost by not sharing the Server instance.
       
       const httpServer = http.createServer((req, res) => {
         // Per-request wall-clock for the request log emitted at the bottom
@@ -798,6 +948,19 @@ class CountlyMCPServer {
         });
 
         void (async () => {
+        // Refuse browser-originated /mcp requests (including preflights)
+        // while the server holds its own token. Runs before CORS so a
+        // refused origin never receives Access-Control-Allow-* headers.
+        if (url.parse(req.url || '', true).pathname === mcpEndpoint
+          && !isOriginPermitted(corsAllowed, req.headers.origin as string | undefined, serverHoldsToken)) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Origin not allowed',
+            message: 'This server holds a configured Countly token, so browser requests to /mcp are refused unless their origin is listed in COUNTLY_CORS_ALLOWED_ORIGINS.',
+          }));
+          return;
+        }
+
         // Handle CORS for MCP and health endpoints only. Allowlist is
         // configured via COUNTLY_CORS_ALLOWED_ORIGINS; see parseCorsAllowed.
         if (corsEnabled) {
@@ -1012,7 +1175,10 @@ class CountlyMCPServer {
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
           
           // Also check URL parameters (alternative method)
-          const urlParams = new URL(req.url || '', `http://${req.headers.host}`).searchParams;
+          // Only the query string is read here, so parse against a fixed
+          // base: a malformed Host header made new URL() throw and turned
+          // the request into a 500.
+          const urlParams = new URL(req.url || '', 'http://localhost').searchParams;
           const paramServerUrl = urlParams.get('server_url') || urlParams.get('serverUrl');
           const paramAuthToken = urlParams.get('auth_token') || urlParams.get('authToken');
           
@@ -1101,6 +1267,15 @@ class CountlyMCPServer {
               // Inside the request scope, so it reports under this request's
               // server domain (multi-tenant) rather than the configured one.
               analytics.trackHttpRequest(mcpEndpoint, req.method || 'POST');
+              const mcpServer = this.createServer();
+              const transport = new StreamableHTTPServerTransport({
+                sessionIdGenerator: undefined,
+              });
+              res.on('close', () => {
+                transport.close().catch(() => {});
+                mcpServer.close().catch(() => {});
+              });
+              await mcpServer.connect(transport);
               // Pass the body we already buffered so the SDK doesn't try to
               // re-read the (now consumed) request stream. undefined for
               // bodyless methods, matching the SDK's optional parsedBody arg.
@@ -1125,13 +1300,17 @@ class CountlyMCPServer {
           // fine in a request line but not as an argument to `claude mcp add`.
           // Scheme: honour X-Forwarded-Proto only behind a trusted proxy,
           // otherwise assume TLS for anything that isn't a local address.
-          const pageHost = (req.headers.host || `${hostname}:${port}`).trim();
+          // The Host header is caller-controlled and ends up in a shell
+          // command readers copy, so only a plain host[:port] is used.
+          const requestHost = (req.headers.host || '').trim();
+          const pageHost = isPlainHostHeader(requestHost) ? requestHost : `${hostname}:${port}`;
           const forwardedProto = trustProxy
-            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim()
+            ? (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim().toLowerCase()
             : undefined;
-          const pageProto = forwardedProto
+          const pageProto = (forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : undefined)
             || (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(pageHost) ? 'http' : 'https');
-          const pageEndpointUrl = `${pageProto}://${pageHost}${mcpEndpoint}`;
+          // Escape as well, so the markup never depends on the check above.
+          const pageEndpointUrl = escapeHtml(`${pageProto}://${pageHost}${mcpEndpoint}`);
 
           const pageTools = filterTools(getAllToolDefinitions(), this.toolsConfig);
           const pageToolNames = new Set(pageTools.map((t: { name: string }) => t.name));
@@ -1145,7 +1324,15 @@ class CountlyMCPServer {
             .filter((c) => c.count > 0)
             .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          // The page embeds the request's Host header. A shared cache that
+          // ignores Host could otherwise serve one caller's forged host as the
+          // endpoint everyone is told to register, so the response is never
+          // stored and is marked as varying on Host.
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Vary': 'Host',
+          });
           res.end(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1788,7 +1975,9 @@ class CountlyMCPServer {
           hint: 'Visit / in your browser for connection instructions'
         }));
         })().catch(error => {
-          console.error('Error handling request:', error);
+          // Log only the message: an AxiosError's inspected form includes
+          // config.headers and config.params, which carry the auth token.
+          console.error('Error handling request:', sanitizeForLog(error instanceof Error ? error.message : String(error)));
           if (!res.headersSent) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Internal server error' }));

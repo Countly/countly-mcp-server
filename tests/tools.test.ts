@@ -8,6 +8,7 @@ import {
 } from '../src/lib/config.js';
 import {
   AppCache,
+  parseAppsMineResponse,
   resolveAppIdentifier,
   type CountlyApp,
 } from '../src/lib/app-cache.js';
@@ -270,6 +271,45 @@ describe('AppCache', () => {
       expect(() =>
         resolveAppIdentifier({ app_name: 'NonExistent' }, mockApps)
       ).toThrow('App not found: NonExistent');
+    });
+  });
+
+  describe('parseAppsMineResponse', () => {
+    const adminApp: CountlyApp = { _id: 'a1', name: 'AdminApp', key: 'k1', created_at: 1, timezone: 'UTC' };
+    const userApp: CountlyApp = { _id: 'u1', name: 'UserApp', key: 'k2', created_at: 2, timezone: 'UTC' };
+
+    it('returns admin_of apps for an admin-only response', () => {
+      const apps = parseAppsMineResponse({ admin_of: { a1: adminApp }, user_of: {} });
+      expect(apps).toEqual([adminApp]);
+    });
+
+    it('returns user_of apps when admin_of is empty (read-only user)', () => {
+      const apps = parseAppsMineResponse({ admin_of: {}, user_of: { u1: userApp } });
+      expect(apps).toEqual([userApp]);
+      expect(resolveAppIdentifier({ app_name: 'UserApp' }, apps)).toBe('u1');
+    });
+
+    it('merges admin_of and user_of, de-duplicated by _id', () => {
+      const apps = parseAppsMineResponse({
+        admin_of: { a1: adminApp },
+        user_of: { a1: { ...adminApp }, u1: userApp },
+      });
+      expect(apps.map((a) => a._id)).toEqual(['a1', 'u1']);
+    });
+
+    it('handles a response with only user_of', () => {
+      expect(parseAppsMineResponse({ user_of: { u1: userApp } })).toEqual([userApp]);
+    });
+
+    it('accepts plain array and {apps: [...]} shapes', () => {
+      expect(parseAppsMineResponse([adminApp])).toEqual([adminApp]);
+      expect(parseAppsMineResponse({ apps: [userApp] })).toEqual([userApp]);
+    });
+
+    it('returns an empty list for empty or unknown responses', () => {
+      expect(parseAppsMineResponse(undefined)).toEqual([]);
+      expect(parseAppsMineResponse({})).toEqual([]);
+      expect(parseAppsMineResponse({ admin_of: {}, user_of: {} })).toEqual([]);
     });
   });
 });

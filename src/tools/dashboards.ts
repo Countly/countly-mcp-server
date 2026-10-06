@@ -7,8 +7,19 @@
  */
 
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
 import { withDefault } from '../lib/validation.js';
 import type { ToolContext, ToolResult } from './types.js';
+import {
+  handleAddDashboardWidgetV2,
+  handleCreateDashboardV2,
+  handleDeleteDashboardV2,
+  handleGetDashboardDataV2,
+  handleListDashboardsV2,
+  handleRemoveDashboardWidgetV2,
+  handleUpdateDashboardV2,
+  handleUpdateDashboardWidgetV2,
+} from './dashboards-v2.js';
 
 /**
  * Tool: dashboards_list
@@ -780,6 +791,9 @@ export class DashboardsTools {
    * List all available dashboards
    */
   async listDashboards(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListDashboardsV2(this.context, args);
+    }
     return handleListDashboards(this.context, args);
   }
 
@@ -787,6 +801,9 @@ export class DashboardsTools {
    * Get dashboard data
    */
   async getDashboardData(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleGetDashboardDataV2(this.context, args);
+    }
     return handleGetDashboardData(this.context, args);
   }
 
@@ -794,6 +811,9 @@ export class DashboardsTools {
    * Create a dashboard
    */
   async createDashboard(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateDashboardV2(this.context, args);
+    }
     return handleCreateDashboard(this.context, args);
   }
 
@@ -801,6 +821,9 @@ export class DashboardsTools {
    * Update a dashboard
    */
   async updateDashboard(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateDashboardV2(this.context, args);
+    }
     return handleUpdateDashboard(this.context, args);
   }
 
@@ -808,6 +831,9 @@ export class DashboardsTools {
    * Delete a dashboard
    */
   async deleteDashboard(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteDashboardV2(this.context, args);
+    }
     return handleDeleteDashboard(this.context, args);
   }
 
@@ -815,6 +841,9 @@ export class DashboardsTools {
    * Add widget to dashboard
    */
   async addDashboardWidget(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleAddDashboardWidgetV2(this.context, args);
+    }
     return handleAddDashboardWidget(this.context, args);
   }
 
@@ -822,6 +851,9 @@ export class DashboardsTools {
    * Update dashboard widget
    */
   async updateDashboardWidget(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateDashboardWidgetV2(this.context, args);
+    }
     return handleUpdateDashboardWidget(this.context, args);
   }
 
@@ -829,6 +861,9 @@ export class DashboardsTools {
    * Remove dashboard widget
    */
   async removeDashboardWidget(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleRemoveDashboardWidgetV2(this.context, args);
+    }
     return handleRemoveDashboardWidget(this.context, args);
   }
 }

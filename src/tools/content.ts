@@ -1,5 +1,18 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { usesV2 } from '../lib/v2-api.js';
+import {
+  handleCreateContentBlockV2,
+  handleDeleteContentAssetV2,
+  handleDeleteContentBlockV2,
+  handleGetContentBlockV2,
+  handleListContentAssetsV2,
+  handleListContentBlocksV2,
+  handlePreviewContentBlockV2,
+  handleUpdateContentAssetV2,
+  handleUpdateContentBlockV2,
+  handleUploadContentAssetV2,
+} from './v2/content.js';
 
 /**
  * Content Module
@@ -242,6 +255,7 @@ export async function handleCreateContentBlock(
         type: 'text',
         text: `Error: Invalid blocks JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
       }],
+      isError: true,
     };
   }
 
@@ -352,6 +366,7 @@ export async function handleUpdateContentBlock(
           type: 'text',
           text: `Error: Invalid blocks JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
         }],
+        isError: true,
       };
     }
   }
@@ -363,6 +378,7 @@ export async function handleUpdateContentBlock(
         type: 'text',
         text: `Error: Could not resolve the content block type for "${content_id}" - the stored block has no type. Provide the type parameter explicitly.`,
       }],
+      isError: true,
     };
   }
 
@@ -563,6 +579,7 @@ export async function handleUploadContentAsset(
         type: 'text',
         text: `Error: Invalid file_base64 - ${error instanceof Error ? error.message : 'Unknown error'}`,
       }],
+      isError: true,
     };
   }
 
@@ -572,6 +589,7 @@ export async function handleUploadContentAsset(
         type: 'text',
         text: `Error: File size ${fileBuffer.length} bytes exceeds the 5MB limit.`,
       }],
+      isError: true,
     };
   }
 
@@ -653,6 +671,7 @@ export async function handleUpdateContentAsset(
         type: 'text',
         text: 'Error: Provide at least one of name or tags to update.',
       }],
+      isError: true,
     };
   }
 
@@ -812,42 +831,72 @@ export class ContentTools {
   constructor(private context: ToolContext) {}
 
   async content_blocks_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListContentBlocksV2(this.context, args);
+    }
     return handleListContentBlocks(this.context, args);
   }
 
   async content_blocks_get(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleGetContentBlockV2(this.context, args);
+    }
     return handleGetContentBlock(this.context, args);
   }
 
   async content_blocks_preview(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handlePreviewContentBlockV2(this.context, args);
+    }
     return handlePreviewContentBlock(this.context, args);
   }
 
   async content_blocks_create(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleCreateContentBlockV2(this.context, args);
+    }
     return handleCreateContentBlock(this.context, args);
   }
 
   async content_blocks_update(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateContentBlockV2(this.context, args);
+    }
     return handleUpdateContentBlock(this.context, args);
   }
 
   async content_blocks_delete(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteContentBlockV2(this.context, args, () => handleDeleteContentBlock(this.context, args));
+    }
     return handleDeleteContentBlock(this.context, args);
   }
 
   async content_assets_list(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleListContentAssetsV2(this.context, args);
+    }
     return handleListContentAssets(this.context, args);
   }
 
   async content_assets_upload(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUploadContentAssetV2(this.context, args);
+    }
     return handleUploadContentAsset(this.context, args);
   }
 
   async content_assets_update(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleUpdateContentAssetV2(this.context, args);
+    }
     return handleUpdateContentAsset(this.context, args);
   }
 
   async content_assets_delete(args: any): Promise<ToolResult> {
+    if (await usesV2(this.context)) {
+      return handleDeleteContentAssetV2(this.context, args);
+    }
     return handleDeleteContentAsset(this.context, args);
   }
 

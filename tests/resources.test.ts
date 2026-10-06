@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { listResources, readResource } from '../src/lib/resources.js';
 import { AppCache } from '../src/lib/app-cache.js';
 
@@ -65,6 +65,26 @@ describe('Resources', () => {
       const appResources = resources.filter(r => r.uri.includes('/app/app1'));
       expect(appResources.length).toBe(3); // config, events, overview
       expect(appResources.every(r => r.uri.includes('app1'))).toBe(true);
+    });
+
+    it('should include apps the user only has read access to (user_of)', async () => {
+      mockAppCache.isExpired = vi.fn().mockReturnValue(true);
+      mockHttpClient.get = vi.fn().mockResolvedValue({
+        data: {
+          admin_of: { app1: { _id: 'app1', name: 'AdminApp', key: 'key1' } },
+          user_of: {
+            app1: { _id: 'app1', name: 'AdminApp', key: 'key1' },
+            app2: { _id: 'app2', name: 'ReadOnlyApp', key: 'key2' },
+          },
+        },
+      });
+
+      const resources = await listResources(mockHttpClient, mockAppCache, mockGetAuthParams);
+
+      const cached = (mockAppCache.update as any).mock.calls[0][0];
+      expect(cached.map((a: any) => a._id)).toEqual(['app1', 'app2']);
+      expect(resources.filter(r => r.uri.includes('/app/app2')).length).toBe(3);
+      expect(resources.filter(r => r.uri.includes('/app/')).length).toBe(6);
     });
 
     it('should handle empty apps list', async () => {
@@ -174,5 +194,38 @@ describe('Resources', () => {
         mockGetAuthParams
       )).rejects.toThrow('App not found');
     });
+  });
+});
+describe('Resources: auth token is never logged', () => {
+  const TOKEN = 'secret-countly-token-0123456789abcdef';
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('does not write the countly-token header to any console stream during a resource read', async () => {
+    const spies = (['log', 'error', 'warn', 'info', 'debug'] as const).map(m =>
+      vi.spyOn(console, m).mockImplementation(() => {})
+    );
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const httpClient: any = {
+      get: vi.fn().mockResolvedValue({ data: [{ _id: 'app1', name: 'TestApp', key: 'key1' }] }),
+      defaults: { headers: { common: { 'countly-token': TOKEN } } },
+    };
+    const appCache: any = {
+      isExpired: vi.fn().mockReturnValue(true),
+      getAll: vi.fn().mockReturnValue([]),
+      update: vi.fn(),
+    };
+
+    await readResource('countly://app/app1/config', httpClient, appCache, () => ({}));
+
+    const output = [...spies, stderrSpy, stdoutSpy]
+      .flatMap(spy => spy.mock.calls)
+      .map(args => args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '))
+      .join('\n');
+    expect(output).not.toContain(TOKEN);
   });
 });
