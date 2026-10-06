@@ -592,6 +592,15 @@ export function getArgumentRefusal(toolName: string, args: any, config: ToolsCon
 }
 
 /**
+ * Whether the tools configuration removes argument values from this tool,
+ * leaving only the behavior its CRUD label describes.
+ */
+export function hasRestrictedArguments(toolName: string, config: ToolsConfig): boolean {
+  const rule = ARGUMENT_OPERATIONS[toolName];
+  return !!rule && !config[rule.category]?.has(rule.operation);
+}
+
+/**
  * Remove argument values the tools configuration would refuse from a tool's
  * input schema, so the model is not offered them. Returns the tool unchanged
  * when nothing applies.

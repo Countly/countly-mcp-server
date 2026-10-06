@@ -121,13 +121,18 @@ describe('formulas_run mode "saved" under the tools configuration', () => {
     it('lists formulas_run without "saved" in a read-only deployment', async () => {
       const { list } = dispatcher({ COUNTLY_TOOLS_FORMULAS: 'R' });
       const { tools } = await list();
-      expect(modeEnum(tools.find((t: any) => t.name === 'formulas_run'))).toEqual(['unsaved']);
+      const tool = tools.find((t: any) => t.name === 'formulas_run');
+      expect(modeEnum(tool)).toEqual(['unsaved']);
+      // only ad-hoc runs remain, so it is advertised as a plain read
+      expect(tool.annotations).toEqual({ readOnlyHint: true, openWorldHint: false });
     });
 
     it('lists "saved" when formulas allows Create', async () => {
       const { list } = dispatcher({ COUNTLY_TOOLS_ALL: 'CRUD' });
       const { tools } = await list();
-      expect(modeEnum(tools.find((t: any) => t.name === 'formulas_run'))).toEqual(['unsaved', 'saved']);
+      const tool = tools.find((t: any) => t.name === 'formulas_run');
+      expect(modeEnum(tool)).toEqual(['unsaved', 'saved']);
+      expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
     });
   });
 });

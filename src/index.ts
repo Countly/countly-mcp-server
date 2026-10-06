@@ -375,14 +375,15 @@ class CountlyMCPServer {
           tools: (this.autoDetect
             ? filterToolsByServer(filteredTools, this.toolsConfig, { plugins: null })
             : filteredTools
-          ).map(withAnnotations),
+          ).map((tool) => withAnnotations(tool, this.toolsConfig)),
         };
       }
       const overrides = caps.v2 ? getV2ToolDefinitionOverrides() : {};
       return {
         tools: filterToolsByServer(filteredTools, this.toolsConfig, caps)
           .map((tool) => withAnnotations(
-            overrides[tool.name] ? restrictToolArguments(overrides[tool.name], this.toolsConfig) : tool
+            overrides[tool.name] ? restrictToolArguments(overrides[tool.name], this.toolsConfig) : tool,
+            this.toolsConfig
           )),
       };
     });
