@@ -185,18 +185,19 @@ docker run -d \
 
 The server supports multiple authentication methods (in priority order):
 
-1. **HTTP Headers** (recommended for HTTP/SSE transport)
+1. **Tool Arguments**
+   - Passed as `countly_auth_token` parameter in individual tool calls
+   - Overrides every other source for that call
+
+2. **HTTP Headers** (recommended for HTTP/SSE transport)
    - Pass via `X-Countly-Server-Url` and `X-Countly-Auth-Token` headers
    - Supported by VS Code MCP extension and other HTTP clients
    - See [VS Code MCP Configuration](examples/vscode-mcp.md) for details
 
-2. **URL Parameters** (alternative for HTTP/SSE transport)
+3. **URL Parameters** (alternative for HTTP/SSE transport)
    - Pass as query string: `?server_url=https://your-server.count.ly&auth_token=your-api-key`
    - Useful for quick testing or tools that don't support custom headers
    - Less secure than headers, use headers when possible
-
-3. **Tool Arguments**
-   - Passed as `countly_auth_token` parameter in individual tool calls
 
 4. **Environment Variable**
    - Set `COUNTLY_AUTH_TOKEN` in environment
@@ -205,6 +206,9 @@ The server supports multiple authentication methods (in priority order):
 5. **Token File** (recommended for production)
    - Set `COUNTLY_AUTH_TOKEN_FILE` pointing to a file containing the token
    - Useful with Docker secrets
+
+A token the caller supplies (1–3) always wins over the server's own (4–5);
+the server-side token is only used for a request that brings none.
 
 ## Configuration
 

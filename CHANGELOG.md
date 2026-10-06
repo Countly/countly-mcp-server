@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **`collections_aggregate` sends only allow-listed stages** — the tool is classified as a read, so it stays available under `COUNTLY_TOOLS_ALL=R`, yet it forwarded any pipeline unchanged, including the write stages `$out` and `$merge`. Countly's dbviewer aggregation guard already refuses them, so this was not exploitable against current Countly. The tool now checks every top-level stage against the same stage allow-list as that guard and refuses anything else before sending the request: writes, server introspection such as `$currentOp`, and any stage a future MongoDB adds. Joins stay allowed and are restricted to global admins by Countly; operator-level and join-target checks remain server-side.
+
+### Fixed
+- **A caller's `X-Countly-Auth-Token` no longer loses to a server-side token** — `resolveAuthToken` falls back to `process.env` by default, and the server called it that way before consulting the per-request HTTP state, so with `COUNTLY_AUTH_TOKEN` or `COUNTLY_AUTH_TOKEN_FILE` set the header token was ignored and the request ran with the server token. Tool calls, resources and prompts now share one resolver whose order matches the documentation: tool arguments, MCP metadata, the request's header or URL parameter, then the env token, then the token file. The unused `this.config.authToken` fallback, which was never populated, is gone.
+- **README authentication order corrected** — tool arguments were listed third but have always overridden headers and URL parameters; the list now matches the code.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added
