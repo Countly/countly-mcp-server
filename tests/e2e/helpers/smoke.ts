@@ -5,6 +5,10 @@
  * Tools that need an object ID take it from the first item of a list call;
  * when that list is empty the tool is skipped, not failed. Anything else
  * that needs arguments we can't invent safely is skipped with a reason.
+ *
+ * Keep every call cheap: arturs.count.ly runs a single API worker, and one
+ * unfiltered user_profiles_query on its large app blocked it for minutes.
+ * Profile, drill and user-detail queries always get a narrow filter.
  */
 
 import { TOOL_CATEGORIES } from '../../../src/lib/tools-config.js';
@@ -20,7 +24,10 @@ export function isReadOnlyTool(name: string): boolean {
   return READ_ONLY_TOOLS.has(name);
 }
 
-/** Fixed arguments for tools whose required parameters aren't IDs */
+/** Matches no profile, but exercises the full query path cheaply */
+const NO_PROFILES = '{"uid":"mcp-e2e-no-such-user"}';
+
+/** Fixed arguments: required non-ID parameters, and narrow filters for heavy queries */
 const STATIC_ARGS: Record<string, (appId: string) => Record<string, unknown>> = {
   query_data: () => ({ query_type: 'analytics', method: 'sessions' }),
   databases_query: () => ({ collection: 'apps', limit: 1 }),
@@ -28,7 +35,10 @@ const STATIC_ARGS: Record<string, (appId: string) => Record<string, unknown>> = 
   collections_aggregate: () => ({ collection: 'apps', aggregation: '[{"$limit":1}]' }),
   collections_indexes: () => ({ collection: 'apps' }),
   databases_stats: () => ({ stat_type: 'mongotop' }),
-  user_profiles_breakdown: () => ({ projection_key: '["av"]' }),
+  user_profiles_query: () => ({ query: NO_PROFILES }),
+  user_profiles_breakdown: () => ({ projection_key: '["av"]', query: NO_PROFILES }),
+  user_loyalty: () => ({ query: NO_PROFILES }),
+  retention: () => ({ period: '7days', query: NO_PROFILES }),
   server_logs_contents: () => ({ log: 'api', bytes: 2000 }),
 };
 
@@ -38,6 +48,7 @@ const SKIPPED: Record<string, string> = {
   funnels_step_users: 'needs step indices of a real funnel',
   funnels_dropoff_users: 'needs step indices of a real funnel',
   journeys_stats_uids: 'needs a uid_type for a real journey',
+  user_profiles_get: 'finding a uid needs a broad profile query, too heavy for large apps',
 };
 
 const firstId = (json: unknown): string | undefined => {
@@ -73,11 +84,6 @@ const ID_SOURCES: Record<string, IdSource> = {
   content_blocks_get: { from: 'content_blocks_list', param: 'content_id' },
   content_blocks_preview: { from: 'content_blocks_list', param: 'content_id' },
   dashboards_data: { from: 'dashboards_list', param: 'dashboard_id' },
-  user_profiles_get: {
-    from: 'user_profiles_query',
-    param: 'uid',
-    pick: (json) => findDeep(json, (n) => !Array.isArray(n) && typeof n.uid === 'string')?.uid,
-  },
 };
 
 const SOURCE_TOOLS = new Set(Object.values(ID_SOURCES).map((s) => s.from));
@@ -104,7 +110,7 @@ export async function smokeReadOnlyTools(
   client: McpStdioClient,
   tools: ToolInfo[],
   appId: string,
-  concurrency = 4
+  concurrency = 2
 ): Promise<SmokeOutcome[]> {
   const visible = new Map(tools.map((t) => [t.name, t]));
   const candidates = tools.filter((t) => isReadOnlyTool(t.name));

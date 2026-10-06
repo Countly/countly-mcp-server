@@ -8,6 +8,8 @@
 # Secrets (per server KEY in LITE, ENTERPRISE, PLATFORM), see CONTRIBUTING.md:
 #   MCP_E2E_<KEY>_ADMIN_TOKEN, MCP_E2E_<KEY>_USER_TOKEN, MCP_E2E_<KEY>_APP_ID
 # Optional repository variables: MCP_E2E_<KEY>_URL to point at another server.
+# MCP_E2E_GITHUB_TOKEN (read access to countly-server, countly-enterprise-plugins
+# and countly-platform) enables the default-plugin snapshot check.
 name: E2E (live servers)
 
 on:
@@ -15,6 +17,11 @@ on:
     inputs:
       require_secrets:
         description: 'Fail (instead of skip) when a server has no secrets configured'
+        type: boolean
+        required: false
+        default: false
+      skip_plugin_snapshot:
+        description: 'Skip the check that src/lib/default-plugins.ts matches upstream'
         type: boolean
         required: false
         default: false
@@ -30,6 +37,8 @@ jobs:
 
     env:
       MCP_E2E_REQUIRE_SECRETS: ${{ inputs.require_secrets && '1' || '0' }}
+      MCP_E2E_SKIP_PLUGIN_SNAPSHOT: ${{ inputs.skip_plugin_snapshot && '1' || '0' }}
+      MCP_E2E_GITHUB_TOKEN: ${{ secrets.MCP_E2E_GITHUB_TOKEN }}
       MCP_E2E_LITE_ADMIN_TOKEN: ${{ secrets.MCP_E2E_LITE_ADMIN_TOKEN }}
       MCP_E2E_LITE_USER_TOKEN: ${{ secrets.MCP_E2E_LITE_USER_TOKEN }}
       MCP_E2E_LITE_APP_ID: ${{ secrets.MCP_E2E_LITE_APP_ID }}

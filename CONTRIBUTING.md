@@ -64,6 +64,7 @@ We welcome contributions to the Countly MCP Server project! This document provid
 - that hidden tools are refused with a missing-plugin or missing-permission message
 - that every visible read-only tool can be called without `isError`
 - a create, read back and delete round-trip of a note and a dashboard (with a widget on Platform), named `mcp-e2e-<timestamp>`
+- that the default plugin sets in `src/lib/default-plugins.ts` still match upstream `plugins.default.json` / `plugins.ee.json`. This needs `MCP_E2E_GITHUB_TOKEN`, a token that can read countly-server, countly-enterprise-plugins and countly-platform. It is skipped without that token, and the release gate skips it.
 
 It runs nightly and on manual dispatch (`.github/workflows/e2e-nightly.yml`), which opens or updates one `e2e-failure` issue when it fails. The release workflow also runs it before publishing to npm or Docker. It never runs on pull requests, because fork and Dependabot PRs get no secrets and the dev servers change daily.
 
@@ -96,7 +97,7 @@ Run against a single server locally:
 MCP_E2E_ENTERPRISE_ADMIN_TOKEN=... MCP_E2E_ENTERPRISE_USER_TOKEN=... MCP_E2E_ENTERPRISE_APP_ID=... npm run test:e2e
 ```
 
-The suite asserts behaviour and structure only, never data values. Objects it creates are deleted in `afterAll`. Leftovers older than an hour from crashed runs are swept at the start of the next run.
+The suite asserts behaviour and structure only, never data values. Keep calls cheap: arturs.count.ly runs a single API worker, and an unfiltered profile query on a large app blocks it for minutes. Profile, drill and user-detail queries in `tests/e2e/helpers/smoke.ts` always get a narrow filter. Objects it creates are deleted in `afterAll`. Leftovers older than an hour from crashed runs are swept at the start of the next run.
 
 ## Submitting Changes
 

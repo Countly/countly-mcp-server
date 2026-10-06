@@ -96,11 +96,13 @@ jobs:
   # Live e2e suite against the Countly dev servers (see e2e.yml). Publishing
   # needs it, so a release cannot ship while the suite fails. Missing e2e
   # secrets fail this gate rather than letting it pass on zero coverage.
+  # Upstream default-plugin drift is left to the nightly run.
   e2e:
     name: Live e2e gate
     uses: ./.github/workflows/e2e.yml
     with:
       require_secrets: true
+      skip_plugin_snapshot: true
     secrets: inherit
 
   # npm publishing is opt-in and OFF by default, including on tag pushes.

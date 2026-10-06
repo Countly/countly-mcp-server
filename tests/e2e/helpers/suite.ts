@@ -9,6 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { TOOL_GUARDS } from '../../../src/lib/tool-guards.js';
+import * as toolsConfig from '../../../src/lib/tools-config.js';
 import { findDeep, McpStdioClient, parseResultJson, resultText, type ToolInfo } from './mcp-client.js';
 import {
   E2E_PREFIX,
@@ -40,6 +41,14 @@ const VISIBLE_FOR_ADMIN: Record<Edition, string[]> = {
   enterprise: ['cohorts_list', 'drill_bookmarks_list', 'apps_create'],
   platform: ['cohorts_list', 'drill_bookmarks_list', 'apps_create'],
 };
+
+/**
+ * Tools backed only by Platform's /v2 API (exported once PR #196 lands; empty
+ * before that, which skips the check).
+ */
+const V2_ONLY_TOOLS: string[] = [
+  ...((toolsConfig as unknown as { V2_ONLY_TOOLS?: Set<string> }).V2_ONLY_TOOLS ?? []),
+];
 
 /** Write tools a read-only user must never see */
 const HIDDEN_FOR_READ_ONLY = ['notes_create', 'notes_delete', 'crashes_resolve', 'apps_create', 'apps_delete', 'events_create'];
@@ -170,6 +179,26 @@ export function defineLiveSuite(edition: Edition): void {
           expect(text).toContain(`requires the "${plugin}" plugin`);
         }
       });
+
+      it.skipIf(V2_ONLY_TOOLS.length === 0)(
+        edition === 'platform' ? 'lists the /v2-only tools' : 'hides and refuses the /v2-only tools',
+        async () => {
+          setup.check();
+          const listed = names(tools);
+          if (edition === 'platform') {
+            for (const tool of V2_ONLY_TOOLS) {
+              expect(listed, `${tool} should be listed on Platform`).toContain(tool);
+            }
+            return;
+          }
+          for (const tool of V2_ONLY_TOOLS) {
+            expect(listed, `${tool} should be hidden without /v2`).not.toContain(tool);
+          }
+          const result = await client.callTool(V2_ONLY_TOOLS[0], { app_id: config.appId });
+          expect(result.isError, resultText(result)).toBe(true);
+          expect(resultText(result)).toMatch(/not available/i);
+        }
+      );
 
       it('smoke-calls every visible read-only tool', async () => {
         setup.check();
