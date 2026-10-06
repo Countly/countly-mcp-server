@@ -33,6 +33,7 @@ describe('Transport Integration Tests', () => {
           ...process.env,
           COUNTLY_SERVER_URL: TEST_SERVER_URL,
           COUNTLY_AUTH_TOKEN: TEST_AUTH_TOKEN,
+          COUNTLY_AUTO_DETECT: 'false',
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -164,6 +165,7 @@ describe('Transport Integration Tests', () => {
             ...process.env,
             COUNTLY_SERVER_URL: TEST_SERVER_URL,
             COUNTLY_AUTH_TOKEN: TEST_AUTH_TOKEN,
+          COUNTLY_AUTO_DETECT: 'false',
           },
           stdio: ['ignore', 'pipe', 'pipe'],
         }

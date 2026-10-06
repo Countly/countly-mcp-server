@@ -3,6 +3,9 @@
  * Allows controlling which tool categories and CRUD operations are available
  */
 
+import { isToolPermitted } from './tool-guards.js';
+import type { MemberPermissions } from './user-permissions.js';
+
 export type CrudOperation = 'C' | 'R' | 'U' | 'D';
 
 export interface ToolsConfig {
@@ -248,7 +251,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'sdk_stats_get': 'R',
       'sdk_config_get': 'R',
     },
-    requiresPlugin: 'sdks',
+    requiresPlugin: 'sdk',
     availableByDefault: false,
   },
   compliance_hub: {
@@ -268,7 +271,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'filtering_rules_delete': 'D',
       'filtering_rules_toggle_status': 'U',
     },
-    requiresPlugin: 'blocks',
+    requiresPlugin: 'block',
     availableByDefault: false,
   },
   datapoint: {
@@ -577,4 +580,52 @@ export function getPluginRequirements(): Record<string, string> {
   }
   
   return requirements;
+}
+
+/**
+ * Plugin required by a tool, or undefined when the tool works on any server
+ */
+/**
+ * Tools whose endpoint belongs to a plugin even though their category is
+ * otherwise core (available by default).
+ */
+export const TOOL_PLUGIN_REQUIREMENTS: Record<string, string> = {
+  slipping_users: 'slipping-away-users',
+};
+
+export function getToolRequiredPlugin(toolName: string): string | undefined {
+  if (TOOL_PLUGIN_REQUIREMENTS[toolName]) {
+    return TOOL_PLUGIN_REQUIREMENTS[toolName];
+  }
+  for (const categoryData of Object.values(TOOL_CATEGORIES)) {
+    if (toolName in categoryData.operations) {
+      return categoryData.availableByDefault === false ? categoryData.requiresPlugin : undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Whether a tool can run on a server with the given enabled plugins.
+ * `plugins === null` means the plugin set is unknown: the tool stays visible.
+ */
+export function isToolSupported(toolName: string, plugins: string[] | null): boolean {
+  const required = getToolRequiredPlugin(toolName);
+  return !required || !plugins || plugins.includes(required);
+}
+
+/**
+ * Filter tool definitions by configuration and by what the server supports
+ */
+export function filterToolsByServer<T extends { name: string }>(
+  tools: T[],
+  config: ToolsConfig,
+  plugins: string[] | null,
+  member: MemberPermissions | null = null
+): T[] {
+  return tools.filter(
+    (tool) => isToolAllowed(tool.name, config)
+      && isToolSupported(tool.name, plugins)
+      && isToolPermitted(tool.name, member)
+  );
 }

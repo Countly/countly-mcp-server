@@ -21,32 +21,55 @@ Special values:
 - **CRUD**, **ALL**, or **\*** = All operations enabled (default)
 - **NONE** or empty = Disable category completely
 
-## Plugin-Based Tool Availability
+## Server Detection and Plugin-Based Tool Availability
 
-Some tool categories require specific Countly plugins to be installed on your server. The MCP server will automatically check plugin availability via the `/o/system/plugins` endpoint and only expose tools for installed plugins.
+On the first `tools/list` or `tools/call` for a server URL + token, the MCP server detects which Countly it is talking to and only exposes the tools that server supports. The result is cached per server URL and token for 10 minutes.
+
+| Flavor | How it is detected |
+|---|---|
+| **Countly Platform** (countly-platform, new architecture) | `/v2/countly_version` answers with the v2 JSON envelope, and plugins come from `/v2/plugins/enabled`, readable by any user. Builds without the new UI have no `/v2` API; they are recognised by `/o/system/observability` (Platform-only, any user) or by the `kafka`/`clickhouse` plugins. |
+| **Countly Enterprise** (countly-server + enterprise plugins) | No `/v2` API, and the plugin list contains enterprise-only plugins (drill, cohorts, funnels, users, block, …). |
+| **Countly Lite** (countly-server) | No `/v2` API, and no enterprise-only plugins. |
+
+On countly-server, `/o/system/plugins` is restricted to global admins. For other tokens the edition is still detected (a drill probe via `/o?method=drill_bookmarks` tells Lite from Enterprise), and the edition's **default plugin set** is assumed — `plugins.default.json` for Lite, `plugins.ee.json` for Enterprise, `plugins.default.json` for Platform — snapshotted in `src/lib/default-plugins.ts`.
+
+Detection never hides tools on a guess. If the server cannot be reached or the result is inconclusive, all tools allowed by your configuration are shown. Calling a tool whose plugin is missing returns an error that names the plugin and the detected edition. `get_version` also reports the detected edition.
+
+### User Permissions
+
+Detection also reads the connected user's permissions (`/o/users/me`) and hides tools the user could never run, for example write tools for a read-only user or `apps_create` for anyone but a global admin. The required permission of each tool is taken from the validator of the Countly endpoint it calls (see `src/lib/tool-guards.ts`). A tool is shown if the user may use it on **at least one** app. Group permissions are included, since Countly merges them into the user record.
+
+If `/o/users/me` cannot be read (e.g. tokens restricted to specific apps), no tools are hidden for permission reasons. Calling a hidden tool returns an error naming the missing permission.
+
+Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.
 
 ### Categories Requiring Plugins
 
-The following categories are **only available if their corresponding plugin is installed**:
+The following categories are **only available if their corresponding plugin is enabled**:
 
-- **alerts** → requires `alerts` plugin
-- **crashes** → requires `crashes` plugin  
-- **views** → requires `views` plugin
-- **database** → requires `dbviewer` plugin
-- **drill** → requires `drill` plugin
-- **user_profiles** → requires `users` plugin
-- **cohorts** → requires `cohorts` plugin
-- **funnels** → requires `funnels` plugin
-- **journeys** → requires `journey_engine` plugin (Countly Enterprise)
-- **content** → requires `content` plugin (Countly Enterprise)
+- **alerts** → `alerts`
+- **crashes** → `crashes`
+- **views** → `views`
+- **database** → `dbviewer`
+- **drill** → `drill` (Enterprise / Platform)
+- **user_profiles** → `users` (Enterprise / Platform)
+- **cohorts** → `cohorts` (Enterprise / Platform)
+- **funnels** → `funnels` (Enterprise / Platform)
+- **formulas** → `formulas` (Enterprise / Platform)
+- **live** → `concurrent_users` (Enterprise / Platform)
+- **retention** → `retention_segments` (Enterprise / Platform)
+- **ab_testing** → `ab-testing` (Enterprise / Platform)
+- **filtering_rules** → `block` (Enterprise / Platform)
+- **journeys** → `journey_engine` (Platform)
+- **content** → `content` (Platform)
+- **server_logs** → `errorlogs` (not available on Platform)
+- **remote_config** → `remote-config`, **logger** → `logger`, **sdks** → `sdk`, **compliance_hub** → `compliance-hub`, **datapoint** → `server-stats`, **email_reports** → `reports`, **dashboards** → `dashboards`, **times_of_day** → `times-of-day`, **hooks** → `hooks`
 
 ### Categories Available by Default
 
 These categories are always available without plugin checks:
 
-- **core**, **apps**, **analytics**, **notes**, **events**, **dashboard_users**, **app_users**
-
-**Note**: You should call the `get_plugins` tool first to check which plugins are available before attempting to use plugin-dependent tools.
+- **core**, **apps**, **analytics**, **notes**, **events**, **metadata**, **dashboard_users**, **app_users**
 
 ## Tool Categories
 

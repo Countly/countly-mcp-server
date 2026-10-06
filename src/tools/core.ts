@@ -1,5 +1,6 @@
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
+import { describeCapabilities } from '../lib/server-capabilities.js';
 
 // ============================================================================
 // PING TOOL
@@ -37,7 +38,7 @@ export async function handlePing(context: ToolContext, _args: any): Promise<Tool
 
 export const versionToolDefinition = {
   name: 'get_version',
-  description: 'Return the Countly server version string and edition via /o/system/version. Takes no arguments.',
+  description: 'Return the Countly server version string and the detected edition (Lite, Enterprise or Platform). Takes no arguments.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -51,11 +52,17 @@ export async function handleGetVersion(context: ToolContext, _args: any): Promis
     'Failed to get server version'
   );
 
+  let text = `Server version:\n${JSON.stringify(response.data, null, 2)}`;
+  const caps = await context.getServerCapabilities?.().catch(() => null);
+  if (caps) {
+    text += `\n\nDetected edition: ${describeCapabilities(caps)} (architecture: ${caps.architecture})`;
+  }
+
   return {
     content: [
       {
         type: 'text',
-        text: `Server version:\n${JSON.stringify(response.data, null, 2)}`,
+        text,
       },
     ],
   };

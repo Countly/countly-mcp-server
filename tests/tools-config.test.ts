@@ -545,9 +545,9 @@ describe('Tools Configuration', () => {
       expect(getRequiredPlugin('remote_config')).toBe('remote-config');
       expect(getRequiredPlugin('ab_testing')).toBe('ab-testing');
       expect(getRequiredPlugin('logger')).toBe('logger');
-      expect(getRequiredPlugin('sdks')).toBe('sdks');
+      expect(getRequiredPlugin('sdks')).toBe('sdk');
       expect(getRequiredPlugin('compliance_hub')).toBe('compliance-hub');
-      expect(getRequiredPlugin('filtering_rules')).toBe('blocks');
+      expect(getRequiredPlugin('filtering_rules')).toBe('block');
       expect(getRequiredPlugin('datapoint')).toBe('server-stats');
       expect(getRequiredPlugin('server_logs')).toBe('errorlogs');
       expect(getRequiredPlugin('email_reports')).toBe('reports');
