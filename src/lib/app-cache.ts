@@ -181,3 +181,39 @@ export function resolveAppIdentifier(
     'Example: { app_id: "abc123" } or { app_name: "MyApp" }'
   );
 }
+
+/**
+ * Normalize a /o/apps/mine response into a flat app list.
+ *
+ * Countly always returns `{admin_of: {...}, user_of: {...}}`. The key names are
+ * legacy, but the server fills them from the member's `permission` object
+ * (`permission._.a` → admin_of, `permission._.u` + `_.a` → user_of) and falls
+ * back to the legacy `admin_of`/`user_of` arrays only for members without one.
+ * A user with only read access has the app under `user_of` with an empty
+ * `admin_of`, so both maps are merged, de-duplicated by `_id` (admin entries
+ * take precedence).
+ * Plain arrays and `{apps: [...]}` shapes are also accepted.
+ */
+export function parseAppsMineResponse(data: any): CountlyApp[] {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (data && (data.admin_of || data.user_of)) {
+    const merged = new Map<string, CountlyApp>();
+    for (const group of [data.admin_of, data.user_of]) {
+      if (!group || typeof group !== 'object') {
+        continue;
+      }
+      for (const app of Object.values(group) as CountlyApp[]) {
+        if (app && app._id && !merged.has(app._id)) {
+          merged.set(app._id, app);
+        }
+      }
+    }
+    return [...merged.values()];
+  }
+  if (data && Array.isArray(data.apps)) {
+    return data.apps;
+  }
+  return [];
+}

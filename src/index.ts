@@ -36,7 +36,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
-import { AppCache, AppCacheRegistry, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
+import { AppCache, AppCacheRegistry, parseAppsMineResponse, resolveAppIdentifier, type CountlyApp } from './lib/app-cache.js';
 import { resolveAuthToken, createMissingAuthError } from './lib/auth.js';
 import { analytics } from './lib/analytics.js';
 import { assertSafeServerUrl, buildConfig, safeLookup } from './lib/config.js';
@@ -245,7 +245,62 @@ class CountlyMCPServer {
       console.error(getConfigSummary(this.toolsConfig));
     }
     
-    this.server = new Server(
+    this.server = this.createServer();
+    
+    // Initialize config from environment variables using lib/config.ts
+    // Auth token can be loaded from environment or overridden per-request from client metadata
+    this.config = buildConfig(process.env, undefined, testMode);
+
+    this.httpClient = axios.create({
+      baseURL: this.config.serverUrl,
+      timeout: this.config.timeout,
+    });
+
+    // Set auth header if token is available from environment
+    if (this.config.authToken) {
+      this.setAuthHeader(this.config.authToken);
+    }
+  }
+
+  /**
+   * Resolve the token for the current request.
+   * Priority: tool arguments > MCP metadata > per-request HTTP state (header
+   * or URL parameter) > COUNTLY_AUTH_TOKEN > COUNTLY_AUTH_TOKEN_FILE.
+   *
+   * The server-level env/file token is looked up last, explicitly: by
+   * default resolveAuthToken also reads process.env, and calling it that way
+   * first let a configured env token silently override the token a caller
+   * sent in X-Countly-Auth-Token.
+   */
+  private resolveRequestToken(metadata: any, args: any): string | undefined {
+    return resolveAuthToken({ metadata, args, env: {} })
+      || this.requestContext.getStore()?.authToken
+      || resolveAuthToken({ env: process.env });
+  }
+
+  /**
+   * Extract auth token for a tool call; see resolveRequestToken for priority.
+   */
+  private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
+    const metadata = (request as any)?._meta || (request as any)?.meta;
+    const authToken = this.resolveRequestToken(metadata, args);
+
+    if (!authToken) {
+      throw createMissingAuthError();
+    }
+
+    return { authToken };
+  }
+
+  /**
+   * Build a fully configured MCP Server instance with all handlers registered.
+   * Stdio mode uses a single instance for the life of the process; HTTP mode
+   * (stateless) builds one per request, because the SDK refuses to reuse a
+   * stateless transport across requests and a Server can only be bound to
+   * one transport at a time.
+   */
+  private createServer(): Server {
+    const server = new Server(
       {
         name: 'countly-mcp-server',
         version: PACKAGE_VERSION,
@@ -266,65 +321,22 @@ class CountlyMCPServer {
       }
     );
 
-    this.setupToolHandlers();
-    this.setupResourceHandlers();
-    this.setupPromptHandlers();
-    
-    // Initialize config from environment variables using lib/config.ts
-    // Auth token can be loaded from environment or overridden per-request from client metadata
-    this.config = buildConfig(process.env, undefined, testMode);
+    this.setupToolHandlers(server);
+    this.setupResourceHandlers(server);
+    this.setupPromptHandlers(server);
 
-    this.httpClient = axios.create({
-      baseURL: this.config.serverUrl,
-      timeout: this.config.timeout,
-    });
-
-    // Set auth header if token is available from environment
-    if (this.config.authToken) {
-      this.setAuthHeader(this.config.authToken);
-    }
+    return server;
   }
 
-  /**
-   * Extract auth token from request metadata, arguments, or environment
-   * Priority: request metadata > arguments > current config (set from headers) > environment variables > file
-   * Uses lib/auth.ts resolveAuthToken function
-   */
-  private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
-    const metadata = (request as any)?._meta || (request as any)?.meta;
-
-    // Try to get from metadata or args first
-    let authToken = resolveAuthToken({ metadata, args });
-
-    // Per-request HTTP state from AsyncLocalStorage (HTTP middleware sets it)
-    if (!authToken) {
-      const reqState = this.requestContext.getStore();
-      if (reqState?.authToken) {
-        authToken = reqState.authToken;
-      }
-    }
-
-    // Server-level config fallback (env / file in stdio mode)
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
-
-    if (!authToken) {
-      throw createMissingAuthError();
-    }
-
-    return { authToken };
-  }
-
-  private setupToolHandlers() {
+  private setupToolHandlers(server: Server) {
     // Use the modular tool definitions from tools/index.ts and filter by configuration
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
       const allTools = getAllToolDefinitions();
       const filteredTools = filterTools(allTools, this.toolsConfig);
       return { tools: filteredTools };
     });
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       const startTime = Date.now();
 
@@ -456,9 +468,9 @@ class CountlyMCPServer {
     });
   }
 
-  private setupResourceHandlers() {
+  private setupResourceHandlers(server: Server) {
     // Handle resources/list requests
-    this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+    server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -479,7 +491,7 @@ class CountlyMCPServer {
     });
 
     // Handle resources/read requests
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       try {
         const { client, cache, authToken } = this.buildPerRequestClient(request);
         const getAuthParams = () => (authToken ? { auth_token: authToken } : {});
@@ -507,9 +519,9 @@ class CountlyMCPServer {
     });
   }
 
-  private setupPromptHandlers() {
+  private setupPromptHandlers(server: Server) {
     // Handle prompts/list requests
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
       try {
         const prompts = listPrompts();
         
@@ -530,7 +542,7 @@ class CountlyMCPServer {
     });
 
     // Handle prompts/get requests
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       try {
         const { name, arguments: args } = request.params;
         
@@ -651,17 +663,8 @@ class CountlyMCPServer {
   } {
     const metadata = request?._meta || request?.meta;
     const args = request?.params || {};
-    let authToken = resolveAuthToken({ metadata, args });
+    const authToken = this.resolveRequestToken(metadata, args);
     const reqState = this.requestContext.getStore();
-    if (!authToken && reqState?.authToken) {
-      authToken = reqState.authToken;
-    }
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
-    if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-      authToken = process.env.COUNTLY_AUTH_TOKEN;
-    }
     const serverUrl = reqState?.serverUrl || this.config.serverUrl;
     const client = this.createRequestHttpClient(
       authToken,
@@ -683,16 +686,7 @@ class CountlyMCPServer {
     const params = authToken ? { auth_token: authToken } : {};
     const response = await client.get('/o/apps/mine', { params });
 
-    let apps: CountlyApp[];
-    if (response.data && Array.isArray(response.data)) {
-      apps = response.data;
-    } else if (response.data && response.data.admin_of) {
-      apps = Object.values(response.data.admin_of) as CountlyApp[];
-    } else if (response.data && response.data.apps) {
-      apps = response.data.apps;
-    } else {
-      apps = [];
-    }
+    const apps = parseAppsMineResponse(response.data);
 
     cache.update(apps);
     return apps;
@@ -775,13 +769,12 @@ class CountlyMCPServer {
       console.error(`Health check available at: /health`);
       console.error(`All other endpoints are available for other applications on this server`);
       
-      // Create a single StreamableHTTPServerTransport instance in stateless mode
-      // Stateless mode (sessionIdGenerator: undefined) allows clients to manage their own sessions
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
-      
-      await this.server.connect(transport);
+      // Stateless mode (sessionIdGenerator: undefined): the SDK requires a
+      // fresh transport per request, and a Server can only be bound to one
+      // transport, so each /mcp request gets its own transport + Server pair
+      // (see the SDK's simpleStatelessStreamableHttp example). Handlers read
+      // per-request auth/server URL from AsyncLocalStorage, so nothing is
+      // lost by not sharing the Server instance.
       
       const httpServer = http.createServer((req, res) => {
         // Per-request wall-clock for the request log emitted at the bottom
@@ -1127,6 +1120,15 @@ class CountlyMCPServer {
               serverUrlFromCaller: !!serverUrl,
             },
             async () => {
+              const mcpServer = this.createServer();
+              const transport = new StreamableHTTPServerTransport({
+                sessionIdGenerator: undefined,
+              });
+              res.on('close', () => {
+                transport.close().catch(() => {});
+                mcpServer.close().catch(() => {});
+              });
+              await mcpServer.connect(transport);
               // Pass the body we already buffered so the SDK doesn't try to
               // re-read the (now consumed) request stream. undefined for
               // bodyless methods, matching the SDK's optional parsedBody arg.

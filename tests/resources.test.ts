@@ -67,6 +67,26 @@ describe('Resources', () => {
       expect(appResources.every(r => r.uri.includes('app1'))).toBe(true);
     });
 
+    it('should include apps the user only has read access to (user_of)', async () => {
+      mockAppCache.isExpired = vi.fn().mockReturnValue(true);
+      mockHttpClient.get = vi.fn().mockResolvedValue({
+        data: {
+          admin_of: { app1: { _id: 'app1', name: 'AdminApp', key: 'key1' } },
+          user_of: {
+            app1: { _id: 'app1', name: 'AdminApp', key: 'key1' },
+            app2: { _id: 'app2', name: 'ReadOnlyApp', key: 'key2' },
+          },
+        },
+      });
+
+      const resources = await listResources(mockHttpClient, mockAppCache, mockGetAuthParams);
+
+      const cached = (mockAppCache.update as any).mock.calls[0][0];
+      expect(cached.map((a: any) => a._id)).toEqual(['app1', 'app2']);
+      expect(resources.filter(r => r.uri.includes('/app/app2')).length).toBe(3);
+      expect(resources.filter(r => r.uri.includes('/app/')).length).toBe(6);
+    });
+
     it('should handle empty apps list', async () => {
       mockAppCache.getAll = vi.fn().mockReturnValue([]);
       mockHttpClient.get = vi.fn().mockResolvedValue({ data: [] });
