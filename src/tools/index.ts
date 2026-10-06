@@ -316,6 +316,8 @@ import { eventsV2ToolDefinitions } from './v2/events.js';
 import { usersV2ToolDefinitions } from './v2/users.js';
 import { journeysV2ToolDefinitions } from './v2/journeys.js';
 import { contentV2ToolDefinitions } from './v2/content.js';
+import { hooksV2ToolDefinitions } from './v2/hooks.js';
+import { emailReportsV2ToolDefinitions } from './v2/email-reports.js';
 
 /**
  * Tool definitions that replace the legacy ones when the connected server
@@ -333,5 +335,7 @@ export function getV2ToolDefinitionOverrides(): Record<string, any> {
     ...usersV2ToolDefinitions,
     ...journeysV2ToolDefinitions,
     ...contentV2ToolDefinitions,
+    ...hooksV2ToolDefinitions,
+    ...emailReportsV2ToolDefinitions,
   };
 }

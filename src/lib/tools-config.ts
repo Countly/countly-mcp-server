@@ -349,6 +349,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategoryConfig> = {
       'hooks_create': 'C',
       'hooks_update': 'U',
       'hooks_delete': 'D',
+      'hooks_get': 'R',
     },
     requiresPlugin: 'hooks',
     availableByDefault: false,
@@ -701,6 +702,7 @@ export const V2_ONLY_TOOLS = new Set([
   'geo_locations_list',
   'revenue_iap_events',
   'crash_jira_issues',
+  'hooks_get',
 ]);
 
 /**

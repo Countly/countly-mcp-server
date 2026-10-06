@@ -204,6 +204,7 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
   hooks_update: f('hooks', 'c'),
   hooks_delete: f('hooks', 'd'),
   hooks_test: f('hooks', 'c'),
+  hooks_get: f('hooks', 'r'),
 
   // journeys
   journeys_list: f('journey_engine', 'r'),
@@ -277,6 +278,7 @@ export const TOOL_GUARDS: Record<string, ToolGuard> = {
 export const TOOL_GUARDS_V2: Record<string, ToolGuard> = {
   journeys_update: f('journey_engine', 'u'),
   journeys_delete: f('journey_engine', 'd'),
+  hooks_update: f('hooks', 'u'),
 };
 
 function guardFor(toolName: string, v2: boolean): ToolGuard | undefined {

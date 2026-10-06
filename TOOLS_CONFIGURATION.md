@@ -50,6 +50,7 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `views_top`: top views per metric
   - `crash_group_breakdown`, `crash_group_users`: crash distribution over a field, and affected users
   - `funnels_breakdown`, `funnels_trends`, `funnels_user_progress`: step breakdown by property, daily conversion, one user's progress
+  - `hooks_get` (requires the hooks plugin): one hook with its configuration, run counters and the last failed runs with error messages
   - `drill_query` (requires the drill plugin): ad-hoc metrics over raw events. Supports count, unique, sum, avg, min, max and percentile; cohort and formula metrics; filters, breakdowns, time series, sorting and cursor paging. Custom event keys are mapped to drill's storage format automatically.
   - `notes_update`: edit a graph note (owner or global admin). Editing a legacy note moves it to the new format, which the legacy dashboard no longer shows.
   - `journeys_complete`, `journeys_stats_blocks`, `journeys_stats_content`, `journeys_stats_active_users`, `journeys_templates` (require the journey_engine plugin): end a journey for good, per-block funnel, in-app content engagement, active users, and ready-made journey templates
@@ -74,6 +75,11 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
   - `crashes_resolve`, `crashes_unresolve`, `crashes_hide`, `crashes_show`: `PUT /v2/crashes/crashgroups/:id`, returning the group's new state
   - `apps_list`, `apps_get_by_name`: `/v2/apps`, with the caller's role per app. App name/id resolution for other tools still uses `/o/apps/mine`.
   - `dashboard_users`: `/v2/members`, compacted to identity, role, app access and login times
+  - `hooks_list`: hooks of one app or all apps, filters by enabled state and text, paging with totals, lean rows
+  - `hooks_create`, `hooks_update`, `hooks_delete`, `hooks_test`: same arguments, sent to `/v2/hooks`. `hooks_update` changes only the supplied fields, and uses the status route when only `enabled` changes
+  - `email_reports_list`: reports you own, receive or can see, optionally filtered by app and title, with a readable schedule
+  - `email_reports_core_create`, `email_reports_dashboard_create`, `email_reports_update`, `email_reports_send`, `email_reports_delete`: same arguments, sent to `/v2/reports`. Reports created there are hidden from the legacy dashboard, and dashboard reports reference new-UI dashboards (the ids `dashboards_list` returns on Platform). `email_reports_update` keeps the stored schedule fields it is not asked to change
+  - `email_reports_preview`: the rendered email reduced to readable text (one line per table row) instead of raw HTML
 
   Tools where v2 is only equivalent, or misses data (e.g. crash comments in `crashes_get`), stay on the legacy API. Also legacy: `crashes_stats_get` (no v2 stats endpoint), `apps_create` (`/v2/apps/create` skips the country/timezone/category validation and defaults), `apps_update`/`apps_delete`/`apps_reset`, `events_create`/`events_delete`, `user_profiles_get` and `app_users_*` (no v2 equivalent).
 - **Journeys** (`journeys_*`): all journey tools use `/v2/journey_engine`. This is required for writes: a journey written through `/v2` belongs to the new UI and the legacy write endpoints refuse it. The first `/v2` write on a journey created in the old dashboard moves it to the new UI for good. Block graphs keep the same JSON format. `journeys_list` gains status/search/sort/paging, `journeys_create`/`journeys_update` a description and conversion goal, `journeys_stats_uids` the `goal_converted` metric, and `journeys_stats_table` lists journey instances. `journeys_publish` cannot unpublish to draft on Platform (use `journeys_pause` or `journeys_complete`). Stats default to the last 30 days.
