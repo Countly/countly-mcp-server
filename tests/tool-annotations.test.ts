@@ -25,9 +25,11 @@ describe('tool annotations', () => {
   });
 
   it('marks exactly the read tools as read-only', () => {
+    // formulas_run is labelled 'R' but persists the formula in mode "saved"
+    const writesDespiteReadLabel = new Set(['formulas_run']);
     for (const name of allToolNames) {
       expect({ name, readOnly: getToolAnnotations(name)!.readOnlyHint })
-        .toEqual({ name, readOnly: operationOf(name) === 'R' });
+        .toEqual({ name, readOnly: operationOf(name) === 'R' && !writesDespiteReadLabel.has(name) });
     }
   });
 
@@ -46,6 +48,8 @@ describe('tool annotations', () => {
     expect(getToolAnnotations('alerts_create')).toMatchObject({ destructiveHint: true });
     // events_create overwrites an existing event key's metadata
     expect(getToolAnnotations('events_create')).toMatchObject({ destructiveHint: true });
+    // formulas_save replaces a saved formula with the same key
+    expect(getToolAnnotations('formulas_save')).toMatchObject({ destructiveHint: true });
     // a new filtering rule is enabled by default and drops incoming data
     expect(getToolAnnotations('filtering_rules_create')).toMatchObject({ destructiveHint: true });
   });

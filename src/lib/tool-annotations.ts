@@ -50,6 +50,10 @@ const OVERRIDES: Record<string, ToolAnnotations> = {
   // alert_config._id is given, an event key's name/description/category
   alerts_create: { destructiveHint: true, ...SENDS_OUTSIDE },
   events_create: { destructiveHint: true },
+  // Upserts by key (default "unnamed_formula"), replacing a saved formula
+  formulas_save: { destructiveHint: true },
+  // Labelled 'R', but mode "saved" persists the formula like formulas_save
+  formulas_run: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
   // Rules are enabled by default, so creating one starts dropping incoming data
   filtering_rules_create: { destructiveHint: true },
   // Deletes whatever data matches at call time, so a retry removes records
