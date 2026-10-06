@@ -263,28 +263,27 @@ class CountlyMCPServer {
   }
 
   /**
-   * Extract auth token from request metadata, arguments, or environment
-   * Priority: request metadata > arguments > current config (set from headers) > environment variables > file
-   * Uses lib/auth.ts resolveAuthToken function
+   * Resolve the token for the current request.
+   * Priority: tool arguments > MCP metadata > per-request HTTP state (header
+   * or URL parameter) > COUNTLY_AUTH_TOKEN > COUNTLY_AUTH_TOKEN_FILE.
+   *
+   * The server-level env/file token is looked up last, explicitly: by
+   * default resolveAuthToken also reads process.env, and calling it that way
+   * first let a configured env token silently override the token a caller
+   * sent in X-Countly-Auth-Token.
+   */
+  private resolveRequestToken(metadata: any, args: any): string | undefined {
+    return resolveAuthToken({ metadata, args, env: {} })
+      || this.requestContext.getStore()?.authToken
+      || resolveAuthToken({ env: process.env });
+  }
+
+  /**
+   * Extract auth token for a tool call; see resolveRequestToken for priority.
    */
   private getCredentials(request?: CallToolRequest, args?: any): { authToken?: string } {
     const metadata = (request as any)?._meta || (request as any)?.meta;
-
-    // Try to get from metadata or args first
-    let authToken = resolveAuthToken({ metadata, args });
-
-    // Per-request HTTP state from AsyncLocalStorage (HTTP middleware sets it)
-    if (!authToken) {
-      const reqState = this.requestContext.getStore();
-      if (reqState?.authToken) {
-        authToken = reqState.authToken;
-      }
-    }
-
-    // Server-level config fallback (env / file in stdio mode)
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
+    const authToken = this.resolveRequestToken(metadata, args);
 
     if (!authToken) {
       throw createMissingAuthError();
@@ -664,17 +663,8 @@ class CountlyMCPServer {
   } {
     const metadata = request?._meta || request?.meta;
     const args = request?.params || {};
-    let authToken = resolveAuthToken({ metadata, args });
+    const authToken = this.resolveRequestToken(metadata, args);
     const reqState = this.requestContext.getStore();
-    if (!authToken && reqState?.authToken) {
-      authToken = reqState.authToken;
-    }
-    if (!authToken && this.config.authToken) {
-      authToken = this.config.authToken;
-    }
-    if (!authToken && process.env.COUNTLY_AUTH_TOKEN) {
-      authToken = process.env.COUNTLY_AUTH_TOKEN;
-    }
     const serverUrl = reqState?.serverUrl || this.config.serverUrl;
     const client = this.createRequestHttpClient(
       authToken,
