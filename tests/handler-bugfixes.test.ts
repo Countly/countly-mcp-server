@@ -2,6 +2,7 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleCreateNote } from '../src/tools/notes.js';
 import { handleCreateHook, handleUpdateHook } from '../src/tools/hooks.js';
+import { findDisallowedStage, handleAggregateCollection } from '../src/tools/database.js';
 import { TOOL_CATEGORIES } from '../src/lib/tools-config.js';
 import { ToolContext } from '../src/tools/types.js';
 
@@ -237,5 +238,53 @@ describe('tools-config: metadata_get is always available', () => {
     // require a plugin or it will be hidden on drill-less servers.
     expect(TOOL_CATEGORIES.metadata.availableByDefault).toBe(true);
     expect(TOOL_CATEGORIES.metadata.requiresPlugin).toBeUndefined();
+  });
+});
+
+describe('database.ts handleAggregateCollection: read-only tool allows only reviewed stages', () => {
+  // collections_aggregate is classified R, so it is exposed under
+  // COUNTLY_TOOLS_ALL=R. The stage allow-list mirrors Countly's dbviewer guard.
+  let context: ToolContext;
+
+  beforeEach(() => {
+    context = makeContext();
+  });
+
+  it.each(['$out', '$merge', '$currentOp', '$collStats', '$documents', '$madeUpFutureStage'])(
+    'rejects %s without calling Countly',
+    async (op) => {
+      const aggregation = JSON.stringify([{ $match: {} }, { [op]: 'x' }]);
+      await expect(
+        handleAggregateCollection(context, { collection: 'apps', aggregation })
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+      expect(context.httpClient.get).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects an already-parsed pipeline array', () => {
+    expect(findDisallowedStage([{ $match: {} }, { $merge: { into: 'x' } }])).toBe('$merge');
+  });
+
+  it('forwards an ordinary read pipeline unchanged', async () => {
+    const aggregation = '[{"$match":{"_id":"x"}},{"$group":{"_id":"$field","n":{"$sum":1}}}]';
+    await handleAggregateCollection(context, { collection: 'apps', aggregation });
+    const call = (context.httpClient.get as any).mock.calls[0];
+    expect(call[0]).toBe('/o/db');
+    expect(call[1].params.aggregation).toBe(aggregation);
+  });
+
+  it('leaves joins to Countly, which allows them for global admins only', () => {
+    expect(findDisallowedStage([{ $lookup: { from: 'events', as: 'e' } }, { $unionWith: 'x' }])).toBeUndefined();
+  });
+
+  it('checks stage names only, not operators or values inside them', () => {
+    expect(findDisallowedStage([
+      { $match: { $expr: { $eq: ['$a', 1] } } },
+      { $project: { note: '$merge', m: { $mergeObjects: ['$a', '$b'] } } },
+    ])).toBeUndefined();
+  });
+
+  it('leaves non-JSON input for Countly to reject', () => {
+    expect(findDisallowedStage('not json')).toBeUndefined();
   });
 });

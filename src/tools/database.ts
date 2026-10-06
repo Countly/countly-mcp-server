@@ -1,3 +1,4 @@
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ToolContext, ToolResult } from './types.js';
 import { safeApiCall } from '../lib/error-handler.js';
 
@@ -216,7 +217,7 @@ export async function handleGetDocument(context: ToolContext, args: any): Promis
 
 export const aggregateCollectionToolDefinition = {
   name: 'collections_aggregate',
-  description: 'Run a MongoDB aggregation pipeline on a collection via /o/db. Requires the dbviewer plugin. MongoDB databases only: for ClickHouse databases on Countly Platform use databases_query or drill_query. For simple find queries use databases_query.',
+  description: 'Run a read-only MongoDB aggregation pipeline on a collection via /o/db; write and introspection stages such as $out, $merge and $currentOp are rejected. Requires the dbviewer plugin. MongoDB databases only: for ClickHouse databases on Countly Platform use databases_query or drill_query. For simple find queries use databases_query.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -235,11 +236,74 @@ export const aggregateCollectionToolDefinition = {
   },
 };
 
+/**
+ * Aggregation stages collections_aggregate may send, mirroring the stage
+ * allow-list of Countly's dbviewer aggregation guard
+ * (plugins/dbviewer/api/parts/aggregation_guard.js: STAGES_USER plus
+ * STAGES_GLOBAL_ADMIN_ONLY). The MCP server cannot tell whether the token
+ * belongs to a global admin, so it allows the union and Countly narrows the
+ * joins per role.
+ *
+ * This is an allow-list, so it fails closed: writes ($out, $merge),
+ * server/cluster introspection ($currentOp, $collStats, ...), $documents and
+ * any stage a future MongoDB adds are refused until reviewed here. Only stage
+ * names are checked. Countly's guard also validates every operator at every
+ * depth and the join targets; those depend on its MongoDB version and the
+ * caller's role, so they stay server-side rather than being copied here to
+ * drift.
+ */
+const ALLOWED_STAGES = new Set([
+  '$addFields', '$bucket', '$bucketAuto', '$count', '$densify', '$facet',
+  '$fill', '$geoNear', '$group', '$limit', '$match', '$project',
+  '$querySettings', '$redact', '$replaceRoot', '$replaceWith', '$sample',
+  '$search', '$searchMeta', '$set', '$setWindowFields', '$skip', '$sort',
+  '$sortByCount', '$unset', '$unwind', '$vectorSearch',
+  // joins and unions: global admins only, enforced by Countly
+  '$lookup', '$graphLookup', '$unionWith',
+]);
+
+/**
+ * collections_aggregate is classified as a read operation, so it stays
+ * available under COUNTLY_TOOLS_ALL=R. Return the first top-level stage that
+ * is not on the allow-list, or undefined. Input that is not a JSON array is
+ * left for Countly to reject as an invalid pipeline.
+ */
+export function findDisallowedStage(aggregation: unknown): string | undefined {
+  let pipeline = aggregation;
+  if (typeof pipeline === 'string') {
+    try {
+      pipeline = JSON.parse(pipeline);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!Array.isArray(pipeline)) {
+    return undefined;
+  }
+  for (const stage of pipeline) {
+    if (stage && typeof stage === 'object' && !Array.isArray(stage)) {
+      const found = Object.keys(stage).find((key) => key.startsWith('$') && !ALLOWED_STAGES.has(key));
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return undefined;
+}
+
 export async function handleAggregateCollection(context: ToolContext, args: any): Promise<ToolResult> {
   const { database = 'countly', collection, aggregation } = args;
   const unsupported = clickhouseUnsupported(database, 'collections_aggregate');
   if (unsupported) {
     return unsupported;
+  }
+
+  const disallowedStage = findDisallowedStage(aggregation);
+  if (disallowedStage) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `collections_aggregate is read-only and does not allow the ${disallowedStage} stage. Allowed stages: ${[...ALLOWED_STAGES].join(', ')}.`
+    );
   }
   
   const params: any = {
