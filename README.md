@@ -14,7 +14,7 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 
 ### Server Requirements
 - **Node.js 18+** (for local installation) OR **Docker** (recommended)
-- **Countly Server**: Access to a Countly instance (cloud or self-hosted)
+- **Countly Server**: Access to a Countly instance (cloud or self-hosted): Countly Lite, Countly Enterprise or Countly Platform (see [Supported Countly Editions](#supported-countly-editions))
 - **Auth Token**: Valid Countly authentication token with appropriate permissions
 
 ### Client Requirements
@@ -33,17 +33,35 @@ The Model Context Protocol (MCP) is an open protocol that enables seamless integ
 - **Prompts** for common tasks - Pre-built templates for crash analysis, engagement reports, and more
 - **Multiple Transport Options**: Supports both stdio (recommended) and HTTP/SSE connections
 - **Flexible Authentication**: Environment variables, HTTP headers, URL parameters, or token files
-- **Plugin-Aware**: Automatically detects and enables tools based on available Countly plugins
+- **Edition-Aware**: Detects Countly Lite, Enterprise or Platform on connection and only exposes the tools that server and the connected user can use
 - **Docker Support**: Pre-built Docker images with multi-architecture support (amd64, arm64)
 - **Anonymous Analytics**: Optional usage tracking (disabled by default) to help improve the server
 -
+
+## Supported Countly Editions
+
+The server works with every Countly flavor and detects which one it is talking to on the first request for a server URL and token. The result is cached for 10 minutes.
+
+| Edition | What it is | How it is detected |
+|---|---|---|
+| **Countly Lite** | `countly-server` | No `/v2` API, no enterprise plugins |
+| **Countly Enterprise** | `countly-server` + enterprise plugins | No `/v2` API, enterprise plugins present (drill, funnels, cohorts, …) |
+| **Countly Platform** | `countly-platform`, the new architecture | Answers the `/v2` API (new UI), or Platform-only endpoints/plugins when running without it |
+
+Based on the detection, `tools/list` only contains tools that will work:
+
+- **Plugins**: tools whose Countly plugin is not enabled are hidden (e.g. cohorts on Lite, server logs on Platform). Global admins read the real plugin list. For other users the edition's default plugin set is assumed, because Countly only shows the plugin list to global admins.
+- **User permissions**: tools the connected user could never run are hidden, based on the user's feature permissions (create/read/update/delete per app, app admin, global admin), including group permissions. A read-only user sees roughly half the tools.
+- **Explanations instead of failures**: calling a hidden tool returns an error naming the missing plugin or permission, so the assistant can tell the user what is missing.
+
+Detection never hides tools on a guess: if the server cannot be reached or the user's permissions cannot be read, the configured tools stay available. `get_version` reports the detected edition. Set `COUNTLY_AUTO_DETECT=false` to turn detection off. Details are in [TOOLS_CONFIGURATION.md](TOOLS_CONFIGURATION.md#server-detection-and-plugin-based-tool-availability).
 
 ## MCP Capabilities
 
 This server implements the full MCP specification with support for:
 
 ### Tools (151 available)
-Execute Countly operations like analytics queries, app management, crash analysis, etc.
+Execute Countly operations like analytics queries, app management, crash analysis, etc. Each connection only sees the tools its Countly edition, plugins and user permissions support (see [Supported Countly Editions](#supported-countly-editions)).
 
 ### Resources
 Read-only access to Countly data for AI context:
