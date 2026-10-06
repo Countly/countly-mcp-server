@@ -712,8 +712,23 @@ export const V2_ONLY_TOOLS = new Set([
  * Whether a tool can run on a server with the given enabled plugins and API.
  * `plugins === null` means the plugin set is unknown: the tool stays visible.
  */
-export function isToolSupported(toolName: string, plugins: string[] | null, v2 = false): boolean {
+/**
+ * Tools that must not run against Countly Platform (with or without /v2).
+ * databases_stats calls mongotop/mongostat, which Platform images do not
+ * ship; the failed spawn is an uncaught exception that restarts the API.
+ */
+export const NOT_ON_PLATFORM_TOOLS = new Set(['databases_stats']);
+
+export function isToolSupported(
+  toolName: string,
+  plugins: string[] | null,
+  v2 = false,
+  architecture?: string
+): boolean {
   if (V2_ONLY_TOOLS.has(toolName) && !v2) {
+    return false;
+  }
+  if (architecture === 'platform' && NOT_ON_PLATFORM_TOOLS.has(toolName)) {
     return false;
   }
   const required = getToolRequiredPlugin(toolName);
@@ -726,11 +741,11 @@ export function isToolSupported(toolName: string, plugins: string[] | null, v2 =
 export function filterToolsByServer<T extends { name: string }>(
   tools: T[],
   config: ToolsConfig,
-  server: { plugins: string[] | null; member?: MemberPermissions | null; v2?: boolean }
+  server: { plugins: string[] | null; member?: MemberPermissions | null; v2?: boolean; architecture?: string }
 ): T[] {
   return tools.filter(
     (tool) => isToolAllowed(tool.name, config)
-      && isToolSupported(tool.name, server.plugins, server.v2 === true)
+      && isToolSupported(tool.name, server.plugins, server.v2 === true, server.architecture)
       && isToolPermitted(tool.name, server.member ?? null, server.v2 === true)
   );
 }

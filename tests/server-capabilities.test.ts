@@ -240,3 +240,14 @@ describe('Platform /v2-only tools', () => {
     expect(isToolSupported('funnels_trends', ['funnels'], true)).toBe(true);
   });
 });
+
+describe('tools unsafe on Platform', () => {
+  it('hides databases_stats on Platform with or without /v2', () => {
+    const config = loadToolsConfig({});
+    const tools = [{ name: 'databases_stats' }, { name: 'databases_list' }];
+    const names = (server: any) => filterToolsByServer(tools, config, server).map((t) => t.name);
+    expect(names({ plugins: null, architecture: 'platform', v2: true })).toEqual(['databases_list']);
+    expect(names({ plugins: null, architecture: 'platform', v2: false })).toEqual(['databases_list']);
+    expect(names({ plugins: null, architecture: 'legacy' })).toEqual(['databases_stats', 'databases_list']);
+  });
+});
