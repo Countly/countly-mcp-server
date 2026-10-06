@@ -97,7 +97,7 @@ When the server serves the Platform `/v2` API (Platform with the new UI), some t
 On Platform, raw events and user profiles are stored in ClickHouse. The database tools can read them through the dbviewer plugin:
 - `databases_list` shows the `clickhouse_countly_drill` database (`drill_events`, `app_users`, …).
 - `databases_query` and `databases_document` read ClickHouse tables with the same Mongo-style filter, projection, sort and paging; the server translates them to SQL. Always filter `drill_events` by `a` (app id).
-- `collections_aggregate` and `collections_indexes` are refused for ClickHouse databases, because Platform's dbviewer has no ClickHouse implementation for them and the request never returns. Use `drill_query` for counts, unique users, sums and breakdowns.
+- `collections_aggregate` and `collections_indexes` apply to MongoDB only: ClickHouse has no aggregation pipelines or MongoDB-style indexes. The tools refuse ClickHouse databases up front. Use `drill_query` for counts, unique users, sums and breakdowns.
 
 Set `COUNTLY_AUTO_DETECT=false` to turn detection off and always expose every configured tool.
 

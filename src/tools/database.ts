@@ -18,8 +18,8 @@ export const listDatabasesToolDefinition = {
 const CLICKHOUSE_PREFIX = 'clickhouse_';
 
 /**
- * Platform's dbviewer only implements find/document reads for ClickHouse
- * databases; aggregation and index requests on them never get a response.
+ * ClickHouse databases (Countly Platform) have no aggregation pipelines or
+ * MongoDB-style indexes, so these tools only apply to MongoDB databases.
  */
 function clickhouseUnsupported(database: unknown, toolName: string): ToolResult | null {
   if (typeof database !== 'string' || !database.startsWith(CLICKHOUSE_PREFIX)) {
