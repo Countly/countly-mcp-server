@@ -255,6 +255,7 @@ export async function handleCreateContentBlock(
         type: 'text',
         text: `Error: Invalid blocks JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
       }],
+      isError: true,
     };
   }
 
@@ -365,6 +366,7 @@ export async function handleUpdateContentBlock(
           type: 'text',
           text: `Error: Invalid blocks JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
         }],
+        isError: true,
       };
     }
   }
@@ -376,6 +378,7 @@ export async function handleUpdateContentBlock(
         type: 'text',
         text: `Error: Could not resolve the content block type for "${content_id}" - the stored block has no type. Provide the type parameter explicitly.`,
       }],
+      isError: true,
     };
   }
 
@@ -576,6 +579,7 @@ export async function handleUploadContentAsset(
         type: 'text',
         text: `Error: Invalid file_base64 - ${error instanceof Error ? error.message : 'Unknown error'}`,
       }],
+      isError: true,
     };
   }
 
@@ -585,6 +589,7 @@ export async function handleUploadContentAsset(
         type: 'text',
         text: `Error: File size ${fileBuffer.length} bytes exceeds the 5MB limit.`,
       }],
+      isError: true,
     };
   }
 
@@ -666,6 +671,7 @@ export async function handleUpdateContentAsset(
         type: 'text',
         text: 'Error: Provide at least one of name or tags to update.',
       }],
+      isError: true,
     };
   }
 

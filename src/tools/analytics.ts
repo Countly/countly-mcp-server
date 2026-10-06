@@ -395,6 +395,7 @@ export async function handleQueryData(context: ToolContext, args: any): Promise<
             text: 'Drill plugin not available on this server. Use analytics or events query types.',
           },
         ],
+        isError: true,
       };
     }
   }

@@ -256,6 +256,13 @@ describe('email reports on Platform', () => {
     expect(text(res)).toContain('"sent": 1');
   });
 
+  it('flags a send the server declined as an error', async () => {
+    const { context } = platformContext(() => ok('No recipients'));
+    const res = await new EmailReportsTools(context).sendEmailReport({ app_id: 'app', report_id: 'r1' });
+    expect(text(res)).toContain('Email report not sent: No recipients');
+    expect(res.isError).toBe(true);
+  });
+
   it('deletes by id', async () => {
     const { context, request } = platformContext(() => ok({ ok: true, _id: 'r1' }));
     await new EmailReportsTools(context).deleteEmailReport({ app_id: 'app', report_id: 'r1' });

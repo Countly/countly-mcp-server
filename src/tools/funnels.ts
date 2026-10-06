@@ -147,6 +147,7 @@ export async function handleGetFunnelData(
         type: 'text',
         text: `Error: Invalid filter JSON - ${filter}`,
       }],
+      isError: true,
     };
   }
 
@@ -426,6 +427,7 @@ export async function handleCreateFunnel(
         type: 'text',
         text: 'Error: steps, queries, query_texts, and step_groups arrays must have the same length',
       }],
+      isError: true,
     };
   }
 

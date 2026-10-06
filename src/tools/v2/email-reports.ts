@@ -327,7 +327,7 @@ export async function handleSendEmailReportV2(context: ToolContext, args: any): 
     }
     const data = await v2Request<any>(context, 'post', `/v2/reports/${encodeURIComponent(args.report_id)}/send`);
     if (typeof data === 'string') {
-      return { content: [{ type: 'text', text: `Email report not sent: ${data}` }] };
+      return { content: [{ type: 'text', text: `Email report not sent: ${data}` }], isError: true };
     }
     return jsonResult('Email report sent', data);
   } catch (error) {
