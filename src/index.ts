@@ -1022,7 +1022,10 @@ class CountlyMCPServer {
           const headerAuthToken = req.headers['x-countly-auth-token'] as string;
           
           // Also check URL parameters (alternative method)
-          const urlParams = new URL(req.url || '', `http://${req.headers.host}`).searchParams;
+          // Only the query string is read here, so parse against a fixed
+          // base: a malformed Host header made new URL() throw and turned
+          // the request into a 500.
+          const urlParams = new URL(req.url || '', 'http://localhost').searchParams;
           const paramServerUrl = urlParams.get('server_url') || urlParams.get('serverUrl');
           const paramAuthToken = urlParams.get('auth_token') || urlParams.get('authToken');
           

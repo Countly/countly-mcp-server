@@ -43,6 +43,12 @@ describe('welcome page', () => {
       expect(indexSource).toMatch(/const pageEndpointUrl = escapeHtml\(/);
     });
 
+    it('does not build the query-string URL from the Host header', () => {
+      // new URL(req.url, `http://${host}`) threw on a malformed Host and
+      // returned a 500 for an otherwise valid /mcp request.
+      expect(indexSource).not.toMatch(/new URL\(req\.url[^)]*req\.headers\.host/);
+    });
+
     it('accepts only http or https from X-Forwarded-Proto', () => {
       expect(indexSource).toMatch(/forwardedProto === 'http' \|\| forwardedProto === 'https'/);
     });

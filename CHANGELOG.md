@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - **Welcome page escapes the request's `Host` header** — the copy-pasteable endpoint URL on `/` was built from `req.headers.host` (and `X-Forwarded-Proto` behind a trusted proxy) and interpolated into the HTML raw, so a forged `Host` reflected markup into the page. A browser cannot be made to send a forged `Host`, so this needed a caching proxy that does not key on `Host` to reach anyone else, but it is now HTML-escaped regardless, and `X-Forwarded-Proto` is accepted only as `http` or `https`.
 
+### Fixed
+- **Malformed `Host` header no longer turns `/mcp` requests into a 500** — the query string was parsed with `new URL(req.url, \`http://${host}\`)`, which throws on a `Host` such as `a b` or `[`. It is now parsed against a fixed base, since only the query string is read.
+
 ## [1.6.0] - 2026-09-21
 
 ### Added
