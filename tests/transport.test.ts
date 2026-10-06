@@ -389,6 +389,8 @@ describe('Transport Integration Tests', () => {
 
     beforeAll(async () => {
       const port = await getFreePort();
+      // Nothing listens here, so tool calls fail fast without network access
+      const deadCountlyPort = await getFreePort();
       mcpUrl = `http://localhost:${port}/mcp`;
       serverProcess = spawn(
         'node',
@@ -396,7 +398,7 @@ describe('Transport Integration Tests', () => {
         {
           env: {
             ...process.env,
-            COUNTLY_SERVER_URL: TEST_SERVER_URL,
+            COUNTLY_SERVER_URL: `http://127.0.0.1:${deadCountlyPort}`,
             COUNTLY_AUTH_TOKEN: TEST_AUTH_TOKEN,
             COUNTLY_AUTO_DETECT: 'false',
             ENABLE_ANALYTICS: 'false',
@@ -445,6 +447,28 @@ describe('Transport Integration Tests', () => {
       expect(list.body.id).toBe(4);
       expect(Array.isArray(list.body.result.tools)).toBe(true);
       expect(list.body.result.tools.length).toBeGreaterThan(0);
+    });
+
+    it('lists tools with behavior annotations', async () => {
+      const { body } = await rpc(20, 'tools/list');
+      const tools: any[] = body.result.tools;
+      expect(tools.filter(t => !t.annotations).map(t => t.name)).toEqual([]);
+      const byName = Object.fromEntries(tools.map(t => [t.name, t.annotations]));
+      expect(byName.apps_list).toMatchObject({ readOnlyHint: true });
+      expect(byName.apps_delete).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    });
+
+    it('returns tool failures as isError results', async () => {
+      const { status, body } = await rpc(21, 'tools/call', { name: 'apps_list', arguments: {} });
+      expect(status).toBe(200);
+      expect(body.error).toBeUndefined();
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0].text).toMatch(/^Error executing tool apps_list:/);
+    });
+
+    it('keeps unknown tools a protocol error', async () => {
+      const { body } = await rpc(22, 'tools/call', { name: 'no_such_tool', arguments: {} });
+      expect(body.error.code).toBe(-32601);
     });
 
     it('answers concurrent requests without mixing up responses', async () => {

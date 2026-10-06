@@ -231,6 +231,7 @@ export async function handleCreateCohort(
         type: 'text',
         text: `Error: Invalid steps JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
       }],
+      isError: true,
     };
   }
 
@@ -244,6 +245,7 @@ export async function handleCreateCohort(
           type: 'text',
           text: `Error: Invalid user_segmentation JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
         }],
+        isError: true,
       };
     }
   }
@@ -374,6 +376,7 @@ export async function handleUpdateCohort(
           type: 'text',
           text: `Error: Invalid steps JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
         }],
+        isError: true,
       };
     }
   }
@@ -388,6 +391,7 @@ export async function handleUpdateCohort(
           type: 'text',
           text: `Error: Invalid user_segmentation JSON - ${error instanceof Error ? error.message : 'Unknown error'}`,
         }],
+        isError: true,
       };
     }
   }
