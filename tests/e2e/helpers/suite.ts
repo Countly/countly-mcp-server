@@ -52,6 +52,18 @@ const V2_ONLY_TOOLS = optionalToolSet('V2_ONLY_TOOLS');
 /** Tools Platform can't run at all (e.g. databases_stats); also from PR #196 */
 const NOT_ON_PLATFORM_TOOLS = optionalToolSet('NOT_ON_PLATFORM_TOOLS');
 
+/** Platform APIs can belong to optional plugins, such as Stage. */
+export function expectPlatformV2Tools(listed: string[], plugins: string[]): void {
+  for (const tool of V2_ONLY_TOOLS) {
+    const requiredPlugin = toolsConfig.getToolRequiredPlugin(tool);
+    if (requiredPlugin && !plugins.includes(requiredPlugin)) {
+      expect(listed, `${tool} should be hidden without the ${requiredPlugin} plugin`).not.toContain(tool);
+    } else {
+      expect(listed, `${tool} should be listed on Platform`).toContain(tool);
+    }
+  }
+}
+
 /** Write tools a read-only user must never see */
 const HIDDEN_FOR_READ_ONLY = ['notes_create', 'notes_delete', 'crashes_resolve', 'apps_create', 'apps_delete', 'events_create'];
 
@@ -145,12 +157,21 @@ export function defineLiveSuite(edition: Edition): void {
     describe('as global admin', () => {
       const client = new McpStdioClient(config.url, config.adminToken);
       let tools: ToolInfo[] = [];
+      let plugins: string[] = [];
       const setup = setupGuard();
 
       beforeAll(() => setup.run(async () => {
         await client.start();
         await assertReachable(client, config);
         tools = await client.listTools();
+        if (edition === 'platform') {
+          const result = await client.callTool('get_plugins');
+          expect(result.isError, resultText(result)).toBeFalsy();
+          const enabled = parseResultJson(result);
+          expect(Array.isArray(enabled) && enabled.every((p: unknown) => typeof p === 'string'),
+            'get_plugins should return an enabled-plugin list').toBe(true);
+          plugins = enabled;
+        }
       }));
       afterAll(() => client.stop());
 
@@ -188,14 +209,12 @@ export function defineLiveSuite(edition: Edition): void {
       });
 
       it.skipIf(V2_ONLY_TOOLS.length === 0)(
-        edition === 'platform' ? 'lists the /v2-only tools' : 'hides and refuses the /v2-only tools',
+        edition === 'platform' ? 'lists the /v2-only tools for enabled plugins' : 'hides and refuses the /v2-only tools',
         async () => {
           setup.check();
           const listed = names(tools);
           if (edition === 'platform') {
-            for (const tool of V2_ONLY_TOOLS) {
-              expect(listed, `${tool} should be listed on Platform`).toContain(tool);
-            }
+            expectPlatformV2Tools(listed, plugins);
             return;
           }
           for (const tool of V2_ONLY_TOOLS) {
