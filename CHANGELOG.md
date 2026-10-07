@@ -1,424 +1,270 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to this project are documented here, following [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Security
-- **`formulas_run` cannot save formulas in read-only deployments** — the tool is classified as a read, so it stays available under `COUNTLY_TOOLS_ALL=R` or `COUNTLY_TOOLS_FORMULAS=R`, but its `mode: "saved"` argument persists the formula through `/o?method=calculated_metrics`, creating or overwriting a saved formula. When the formulas category lacks Create, the server now refuses `mode: "saved"` with an error that tells the model to use `mode: "unsaved"` (or `formulas_save` where it is allowed), and the listed schema offers only `"unsaved"`. In that configuration the tool is also annotated as a plain read instead of destructive, since it can no longer save. Ad-hoc formula runs are unaffected, and deployments that allow Create on formulas behave as before.
-- **`collections_aggregate` sends only allow-listed stages** — the tool is classified as a read, so it stays available under `COUNTLY_TOOLS_ALL=R`, yet it forwarded any pipeline unchanged, including the write stages `$out` and `$merge`. Countly's dbviewer aggregation guard already refuses them, so this was not exploitable against current Countly. The tool now checks every top-level stage against the same stage allow-list as that guard and refuses anything else before sending the request: writes, server introspection such as `$currentOp`, and any stage a future MongoDB adds. Joins stay allowed and are restricted to global admins by Countly; operator-level and join-target checks remain server-side.
-- **Browser requests refused while the server holds its own token** — with `COUNTLY_AUTH_TOKEN` or `COUNTLY_AUTH_TOKEN_FILE` set in HTTP mode, any caller that reaches `/mcp` without a token acts with the configured one, and CORS defaults to `*`. A web page open in the operator's browser could therefore call a localhost server and read the responses, and DNS rebinding reaches it even under a CORS allowlist because the page then looks same-origin. `/mcp` now answers 403 to any request carrying an `Origin` header while a server-side token is configured, unless that origin is listed explicitly in `COUNTLY_CORS_ALLOWED_ORIGINS` (`*` does not count). MCP clients send no `Origin` and are unaffected, and servers without a configured token, where each caller brings its own, behave exactly as before. The server also logs a startup warning when it runs HTTP mode with a server-side token.
-- **Welcome page escapes the request's `Host` header** — the copy-pasteable endpoint URL on `/` was built from `req.headers.host` (and `X-Forwarded-Proto` behind a trusted proxy) and interpolated into the HTML raw, so a forged `Host` reflected markup into the page. A browser cannot be made to send a forged `Host`, so this needed a caching proxy that does not key on `Host` to reach anyone else, but it is now HTML-escaped regardless, and `X-Forwarded-Proto` is accepted only as `http` or `https`. Because the same URL appears in a `claude mcp add` command readers copy into a shell, where HTML escaping does not help (`a.test$(cmd)` survives it), the `Host` is also used only when it is a plain hostname or IP with an optional port; anything else is replaced by the server's own address. The page is also served with `Cache-Control: no-store` and `Vary: Host`, so a shared cache cannot hand one caller's forged host, however plain, to everyone else as the endpoint to register.
 
-- **Countly auth token no longer written to stderr** — `getAppsForCache` dumped axios's default headers, including `countly-token`, as a debug line before every `/o/apps/mine` fetch, so each resource list or read that missed the cache logged the token in both stdio and standalone HTTP modes, and from there into any log collector reading that stream. The dump is gone, and the HTTP request error handler now logs only the sanitized error message instead of the raw error object, whose inspected form for an `AxiosError` includes `config.headers` and the `auth_token` parameter.
+- Prevented `formulas_run` from saving formulas in read-only deployments.
+- Restricted `collections_aggregate` to approved read-only aggregation stages.
+- Blocked browser requests using a server-side token unless their origin is explicitly allowed.
+- Validated and escaped welcome-page endpoint URLs and prevented shared caching.
+- Removed auth tokens and sensitive request details from debug and error logs.
 
 ### Added
-- **Server detection: tools gated per Countly edition, plugins and user permissions** — on the first `tools/list` or `tools/call` for a server URL and token, the server detects whether it talks to Countly Lite, Enterprise or Platform (with or without the `/v2` API) and which plugins are enabled, and reads the user's merged permissions from `/o/users/me`. Only tools the server supports and the user can use on at least one app are listed; calling a hidden tool returns an `isError` result naming the missing plugin or permission instead of a raw 400. For tokens that cannot read `/o/system/plugins` the edition's default plugin set is assumed (`src/lib/default-plugins.ts`). Each tool's permission check is mapped in `src/lib/tool-guards.ts`, and a test enforces full coverage. Results are cached for 10 minutes per server and token; detection fails open, so nothing is hidden on a guess. `get_version` reports the detected edition. Opt out with `COUNTLY_AUTO_DETECT=false`. The plugin names `sdks` and `blocks` are corrected to `sdk` and `block`, which filtering would otherwise have hidden everywhere.
-- **Countly Platform `/v2` support** — on servers that serve `/v2`, every tool with a `/v2` alternative uses it, keeping its name, and `tools/list` returns the matching definitions; Lite, Enterprise and Platform builds without `/v2` keep the legacy tools unchanged. Dashboards move to `/v2/dashboards`, so boards made in the new UI (which the legacy endpoints filter out) are visible, with the Platform widget kinds and per-widget results in `dashboards_data`. Notes, crash status changes, `apps_list`, `dashboard_users`, `events_list`, `user_profiles_breakdown`, `user_profiles_query`, hooks, email reports, journeys, content, live users, drill bookmarks, `queriable_fields_list`, `metadata_get`, `crash_groups_list`, `funnels_*` and `sdk_logs_list` switch to `/v2` where it is strictly better; `crashes_get`, `apps_create`, `query_data` and a few others stay on legacy on purpose. New Platform-only tools include `drill_query` (ad-hoc metrics, formulas, breakdowns and series through `/v2/drill/execute`), `events_summary`/`top`/`movers`, `views_top`, crash group breakdown and users, funnel breakdown, trends and user progress, `notes_update`, `hooks_get`, journey stats and templates, flows, ratings/NPS, campaigns, tasks and more; they are listed only when the server serves `/v2`. Permission guards follow the server's v2 flag, since some v2 routes check different rights than the legacy endpoints. The README tool list is kept in sync by a test.
-- **Stage tools (Countly Platform)** — 23 `stage_*` tools for the Stage plugin (`/v2/stage`), aimed at people who cannot use the builder getting an embed-ready scene (presentation, player or single responsive section) from a request. Start from a designed template (`stage_templates_list`, `stage_scenes_create` with `template`); build and change it with `stage_scenes_edit`, a list of operations saved once (layers that start from their piece's example content, steps, scenarios an app page plays, delivery, responsive fit and breakpoints), dry-run checked before saving; discover the pieces a server accepts with every prop they take (`stage_pieces_list`, `stage_pieces_get`) and the recorded product walkthroughs (`stage_scenarios_list`, `stage_scenarios_get`); check a scene without saving (`stage_scenes_validate`). Results carry a preview link to the builder, and published scenes an embed snippet per delivery their sequence offers. Pieces, templates, scenarios and validate need Countly/countly-platform#1990; older servers fall back to a built-in list of piece ids. Also: list, read, create, edit and delete scene drafts; publish them as immutable versions and get the public URLs and embed snippet; roll back, unpublish and restore; manage demo companies; check the public host; and a `stage_reference` tool with the scene format (looks `web`/`product`, `theme`, steps with per-step `dark`, delivery `autoplay`/`click`/`player`, A4 and Letter paper sizes) and the piece ids the server accepts, matching the scene format of Countly/countly-platform#1975. Edits are optimistic: `rev` from a read is sent, and a save made by someone else in between is refused instead of overwritten. Listed only on `/v2` with the `stage` plugin enabled, and only to members whose server-wide Stage level allows them (View for reads, Edit for writes; global admins always), read from `permission.stage`, since no app permission grants Stage. The tool count is now 209.
-- **MCP tool annotations** — every tool in `tools/list` now carries `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint`, derived from its CRUD category in `tools-config.ts`. Clients use these hints to decide what needs confirmation. Without them they had to assume any of the ~230 tools could be destructive, so `apps_list` was treated the same as `apps_delete`. Updates and deletes are marked destructive, including status changes such as `crashes_resolve` and `journeys_pause`, because the spec reserves `destructiveHint: false` for purely additive updates. Status changes are marked idempotent. `alerts_create`, `events_create` and `formulas_save` are marked destructive because they also update existing records. `formulas_run` is not marked read-only, because with `mode: "saved"` it also saves the formula. `filtering_rules_create` and `hooks_create` are marked destructive because what they create is enabled by default: a rule starts dropping incoming data, and a hook's effects can call any URL or run custom code. Deletes are idempotent except `apps_reset` and `app_users_delete`, whose retry would remove data that arrived in between. Tools that send email or call webhooks (`hooks_test`, `hooks_create`/`update`, `email_reports_send`, the email report create/update tools, `alerts_create`, `notes_create` with `emails`, `dashboards_create` with `send_email_invitation`, and `journeys_publish`/`resume`, which activate Platform `call-webhook` blocks) are marked open-world.
-- **Library entry point, `countly-mcp-server/library`** — lets a host (Countly itself) serve the tools in-process over stateless streamable HTTP. The host authenticates and passes, per request, the Countly token, a grant id, the allowed CRUD operations, and whether admin tools are allowed. Which apps a call reaches is left to the token's own rights in Countly. Credentials come only from that context: environment variables, the `X-Countly-*` headers, the `auth_token`/`server_url` query parameters and the `countly_auth_token` tool argument are ignored. Exports `createMcpHandler`, `getToolCatalog`, `toolsCalledIn` and `requiredOperations`, and reports every tool call (outcome, duration and the operations it needed) to an optional `onToolCall` callback. Stdio and standalone HTTP modes are unchanged apart from the per-call operation check below.
-  - **Effective operation per call.** Tools that write depending on their arguments are checked against what the call actually does, not their single catalog operation: `formulas_run` with a `mode` other than `"unsaved"` (or a `report_name`) and `retention` with `save_report` need `C` as well as `R`, `alerts_create` with `alert_config._id` needs `U`, and `events_create` (which overwrites an existing event's definition) needs `C` and `U`. The rules live in `TOOL_OPERATION_RULES` with the audit of every tool; library mode, the standalone `COUNTLY_TOOLS_*` configuration and `requiredOperations(body)` (`{ tool, operation, adminOnly }[]`, for a host's `403 insufficient_scope`) all use them. `ToolInfo` gains `possibleOperations`; `ToolCallReport` gains `operations`.
-- **Tool classification** — every tool category now has a user-facing `area`, and global-admin tools are listed in `ADMIN_ONLY_TOOLS`. A unit test fails if a registered tool is missing a category, operation, area or app scope.
+
+- Added automatic tool filtering based on enabled plugins, server capabilities, and user permissions.
+- Expanded tools for dashboards, events, views, crashes, funnels, journeys, flows, ratings, campaigns, and tasks on supported servers.
+- Added Stage tools for creating, editing, validating, publishing, and managing scenes.
+- Added MCP tool annotations for read-only, destructive, idempotent, and external actions.
+- Added `countly-mcp-server/library` for embedding MCP tools with per-request authentication and permissions.
+- Added per-call permission checks for tools that perform different operations depending on their arguments.
+- Added tool areas and global-admin classification with complete registry checks.
 
 ### Fixed
-- **HTTP mode answered every request after the first with an empty 500** — one stateless `StreamableHTTPServerTransport` was reused for all `/mcp` requests, and the MCP SDK refuses to reuse a stateless transport. Each request now gets its own transport and `Server`, closed when the response ends, inside the existing per-request auth scope; stdio keeps one long-lived server.
-- **`notes_create` saved notes no one could list** — the app id was sent only inside the `args` JSON, but Countly binds a note to the top-level `app_id`, so notes were stored with `app_id: "undefined"`. It is now sent at the top level, and `noteType` defaults to `private`, which Countly requires. `notes_list` counted the response envelope's keys and so reported 4 notes when there were none; it now counts the rows.
-- **`hooks_update` on Enterprise** — it expected a different shape for the hook list response and failed.
-- **Weekly email report day** — the description said Sunday = 0; Countly uses 1 = Monday to 7 = Sunday.
-- **Legacy widgets in `campaigns_list` explained** — on Countly Platform the campaigns list includes old-dashboard survey, NPS and rating widgets not yet migrated to campaigns, which `campaigns_get` and `campaigns_results` answer with 404 by design. The rows now keep their `legacy: true` flag, the descriptions say they open only after migration in the dashboard (legacy rating widgets work with `ratings_stats` and `ratings_comments` by the same id), and a 404 from those tools carries that explanation.
-- **One tool pipeline for every mode** — listing and calling tools (configuration and per-call checks, server detection, `/v2` definitions and routing, plugin and permission refusals, annotations, error results) now live in `lib/tool-pipeline.ts`, used by stdio, standalone HTTP and library mode alike. Library mode had rebuilt these steps separately and kept missing ones (Platform `/v2` routing, annotations, `isError` results); its refusals are now `isError` results like the standalone modes'.
-- **Bounded caches** — server capability detections, per-token and per-grant app caches and the analytics "started" set are capped (least recently used dropped first), and a failed detection is no longer cached, so a long-running server's memory no longer grows with every token or grant it sees.
-- **Device id follows Countly's own rule** — the telemetry device id is the server's host (with any non-default port) and path, read with the standard URL parser, skipped only when empty or exactly `localhost`, as the Countly platform derives its own; credentials, query and fragment are never part of it.
-- **Library analytics keep each event's device id** — events are batched for up to 10 seconds; each now keeps the device id it was recorded under and a batch is sent per id, so a host whose `deviceId()` follows the request (one tenant per request) never has one tenant's calls sent under another's id, or dropped when the request has ended.
-- **Library mode uses the Platform /v2 API** — tools got no server capabilities in library mode, so on Countly Platform they always took their legacy paths and `/v2`-only tools answered "needs Countly Platform". The handler now detects the server once per grant (as the standalone modes do), hands the result to the tools and hides tools the server does not support.
-- **App list refreshed after app changes** — in library mode `apps_create`, `apps_update` and `apps_delete` clear the grant's app cache, so a new or renamed app resolves by name at once.
-- **Update-only standalone configs offer `alerts_create`** — `COUNTLY_TOOLS_ALERTS=U` lists it for updating an existing alert, as library mode does; each call is still checked against its own arguments.
-- **Tool failures return `isError` results instead of protocol errors** — when a tool failed (a Countly API error, invalid arguments), the server threw a JSON-RPC error. Some clients show those only to the user, so the model never saw what went wrong. The MCP spec asks for a normal result with `isError: true` and the message as text. Handlers that returned an `Error:` text for invalid input (bad JSON in journey, content, cohort and funnel arguments, a missing hook, a journey version that cannot be resolved, drill queries on a server without drill, a Platform email report the server declined to send) now set `isError` too. An unknown tool name is still a protocol error.
-- **`hooks_test` no longer calls itself a dry run** — its description said it ran effects "in test mode", but Countly really executes them: emails are sent, webhooks are called and custom code runs. The description now warns about this. `email_reports_send` now warns that the emails it sends cannot be recalled, and `journeys_delete` and the Platform `dashboards_widget_remove` gained the irreversibility warning the other delete tools already had.
-- **A caller's `X-Countly-Auth-Token` no longer loses to a server-side token** — `resolveAuthToken` falls back to `process.env` by default, and the server called it that way before consulting the per-request HTTP state, so with `COUNTLY_AUTH_TOKEN` or `COUNTLY_AUTH_TOKEN_FILE` set the header token was ignored and the request ran with the server token. Tool calls, resources and prompts now share one resolver whose order matches the documentation: tool arguments, MCP metadata, the request's header or URL parameter, then the env token, then the token file. The unused `this.config.authToken` fallback, which was never populated, is gone.
-- **README authentication order corrected** — tool arguments were listed third but have always overridden headers and URL parameters; the list now matches the code.
-- **Malformed `Host` header no longer turns `/mcp` requests into a 500** — the query string was parsed with `new URL(req.url, \`http://${host}\`)`, which throws on a `Host` such as `a b` or `[`. It is now parsed against a fixed base, since only the query string is read.
-- **Telemetry never carries error messages or URL queries** — an error is reported as its type and tool only (no message, no crash report), since a message can echo what the caller sent; the device id drops the server URL's query and fragment along with `user:pass@`.
-- **Update-only connections see `alerts_create`** — in library mode a tool is listed when any kind of its calls is allowed (updating an existing alert needs only update rights); each call is still checked against its own arguments.
-- **Projects a user only has user rights to are listed** — the app list (`apps_list`, `app_name` lookups, the apps resource) read only `admin_of` from `/o/apps/mine`, so a member without admin rights, or any read-only token, saw no projects. It now lists `user_of` too.
-- **`retention` saved a report when `save_report` was false** — the handler sent `save_report=0`, and Countly treats any non-empty value as "save", so asking not to save dispatched the calculation to the report manager anyway. It is now sent only when true.
-- **Host-driven usage analytics in library mode** — an optional `analytics: { isEnabled, deviceId, host? }` option reports tool usage to the Countly server telemetry app on stats.count.ly with the standalone event names, under the host's device id and only while the host allows it. Library mode never initializes the global Countly SDK.
+
+- Fixed empty HTTP 500 responses after the first request.
+- Fixed `notes_create` app assignment and defaults, and corrected `notes_list` counts.
+- Fixed `hooks_update` handling of hook list responses.
+- Corrected weekly email report days to Monday = 1 through Sunday = 7.
+- Clarified when older campaign widgets require migration before they can be opened.
+- Made tool listing, routing, permission checks, and errors consistent across all transport modes.
+- Bounded capability and app caches and allowed failed capability detection to retry.
+- Fixed server capability detection and tool routing in library mode.
+- Refreshed the app cache after app creation, updates, and deletion in library mode.
+- Made `alerts_create` available for existing-alert updates in update-only configurations and connections.
+- Returned tool failures as `isError` results so clients can expose them to the model.
+- Clarified real side effects of hook tests, email sending, and destructive tools.
+- Fixed HTTP caller-token precedence when a server-side token is configured.
+- Corrected the documented authentication priority order.
+- Prevented malformed `Host` headers from causing HTTP 500 responses.
+- Included apps accessible through user permissions in app lists and name lookups.
+- Prevented `retention` from saving a report when `save_report` is false.
 
 ### Removed
-- **`databases_stats` tool** — it called `/o/db/mongotop` and `/o/db/mongostat`, which spawn the MongoDB command line tools on the Countly server. Platform images do not ship those tools, the spawn failure crashed the Platform API, and the endpoints are removed from Countly (Countly/countly-platform#1971). The tool is gone on every server, and with it the Platform-only hiding rule (`NOT_ON_PLATFORM_TOOLS`) that existed only for it. The tool count is now 186.
+
+- Removed the `databases_stats` tool and its dependency on MongoDB command-line utilities.
 
 ### Changed
-- **Releases gated by a live end-to-end suite** — `npm run test:e2e` drives the built server over stdio against Enterprise and Platform dev servers (and Lite when its secrets are set), as a global admin and a read-only user: edition detection, which tools are listed and refused, a read-only smoke call of the visible tools, and write round-trips. The smoke run skips tools whose ids or arguments it cannot obtain (an empty list, funnel steps, formulas) and a few it never calls (`user_profiles_get`, `journeys_stats_uids`), so those can still regress unnoticed. It runs nightly (opening or updating an `e2e-failure` issue) and before npm and Docker publishing, where Enterprise and Platform are required and Lite is optional. `npm test` stays hermetic.
-- **Dependencies** — `@modelcontextprotocol/sdk` ^1.31.0 and `axios` ^1.20.0, plus development and transitive dependency updates.
-- **Docs: server-side tokens in HTTP mode** — README and `DOCKER.md` now state that the HTTP transport does not authenticate its callers, so a server-side token belongs only on a trusted network, and the Docker quick-starts that pass a token publish the port on `127.0.0.1` instead of all interfaces.
-- **Usage analytics are on by default and report under your Countly server's domain** — like the Countly platform's own telemetry. The device ID is the domain of `COUNTLY_SERVER_URL` (per request in multi-tenant HTTP mode), derived exactly as the platform does: nothing is sent only when it is empty or exactly `localhost`; any other address, local ones included (`localhost:3001`, `127.0.0.1`), is reported as is. Credentials (`user:pass@`), a query and a fragment are dropped first, so a secret in the URL is never sent. Opt out with `ENABLE_ANALYTICS=false`. Previously analytics were opt-in and reported under the fixed device ID `"mcp"`.
-- **Usage goes to the Countly server telemetry app** (`9c28c347…`) on stats.count.ly, the app the Countly platform reports to, instead of the separate MCP app. Every event, session, view and crash is sent with its own domain device ID; the SDK's stored device ID is no longer used, and anything without a domain (page visits, health checks and startup in multi-tenant mode with no configured server) is not reported. The `/mcp` request event now reports under the request's own server.
+
+- Added nightly live end-to-end checks and required them before package and Docker releases.
+- Updated `@modelcontextprotocol/sdk` to ^1.31.0, `axios` to ^1.20.0, and development dependencies.
+- Clarified HTTP server-token deployment guidance and bound Docker quick-start ports to localhost.
 
 ## [1.6.0] - 2026-09-21
 
 ### Added
-- **`limit` on `query_data` drill queries** — Countly caps a segmentation breakdown at 10 rows unless the request says otherwise, and nothing in the response indicates the truncation. A projection over a high-cardinality key (`did`, or any key combined with `ts`) therefore came back quietly incomplete, and the tool had no way to raise the cap because the handler built its parameter list from a fixed set that did not include `limit`. It is now an optional integer, 1 to 10000, sent only for `query_type: "drill"` and only when supplied, so every existing call keeps the server default. Verified live: the same query returns 10 rows without it, 500 with `limit: 500`, and all 1176 events with `limit: 5000`. Responses run roughly 1KB per row, which the parameter description states.
-- **Warning on wide drill breakdowns** — a `query_data` drill query with more than 3 projection keys still runs, but the response text is prefixed with a warning that the breakdown is likely to be slow or time out, so the model can explain it and suggest narrowing it.
+
+- Added an optional `limit` of 1–10000 rows to `query_data` drill queries.
+- Added a warning for drill breakdowns with more than three projection keys.
 
 ### Fixed
-- **`query_data` (`query_type: "drill"`) silently ignored `projection_key`** — the handler forwarded the parameter to axios as a raw JS array, which serializes as `projectionKey[]=did`. Countly reads `qstring.projectionKey`, so it never saw the parameter and answered with bare period totals and no per-value section, identical to a call with no breakdown at all. The value is now JSON-encoded into a single query-string field (`projectionKey=["did"]`), matching the encoding this codebase already used for `by_val` in `drill_bookmarks_create` and for `projectionKey` in `user_profiles_breakdown`. With this, a per-user breakdown of a custom event (`projection_key: ["did"]`) works, which is the supported route for event-level user data: on Countly 26.01 and later, raw drill events are streamed through Kafka into ClickHouse rather than stored in MongoDB, so the dbviewer-backed `databases_*` tools cannot reach them.
 
-  Backward compatibility is unaffected. No tool, parameter, type or required-ness changes; `projection_key` stays `type: "array"`. An array, a JSON-array string, a bare key such as `"did"`, and an empty array (parameter omitted, as before) are all accepted, and every other `query_data` mode and response shape is untouched, apart from the warning prefix above on drill queries with more than 3 projection keys.
+- Fixed `query_data` drill queries ignoring `projection_key` breakdowns.
 
 ## [1.5.0] - 2026-08-25
 
 ### Security
-- **SSRF via hostnames resolving to internal addresses, and DNS rebinding** (#152) — the caller-supplied server URL check only classified IP literals, so a hostname whose A/AAAA record pointed at a private, loopback or metadata address passed straight through, and a resolve-public-then-flip rebinding defeated any parse-time-only check. Adds `safeLookup`, a `dns.lookup`-compatible function that re-classifies the resolved address and fails with `ESSRFBLOCKED` for any non-public target, wired into the per-request axios client (with `maxRedirects: 0`) **only** for the caller-controlled path. The operator's own `COUNTLY_SERVER_URL` — often a private-IP on-prem host — skips the guard and keeps working.
-- **The configured token is no longer sent to caller-named servers** (#152) — a request naming a `X-Countly-Server-Url` different from the configured one now has to bring its own token, instead of falling back to the operator's. Requests that name the configured server, or name none, are unaffected.
-- **RFC 8215 local-use NAT64 prefix rejected** (#152) — `ipaddr.js@1.9.1` reports `64:ff9b:1::/48` as generic unicast, so it bypassed a classifier whose documented intent is to treat NAT64 as non-public. Network-specific NAT64 prefixes carved from an operator's own global-unicast space cannot be distinguished by prefix and remain out of scope.
-- **`hooks_test` reclassified from read to create** (#165) — `COUNTLY_TOOLS_ALL=R` is offered as a read-only mode, but `/i/hook/test` does not simulate a hook's effects, it runs them: the effect loop calls `effect.run()` for real, `EmailEffect` ignores the mock flag and delivers to every configured address, and the custom-code effect executes. A caller confined to read-only — in practice an agent restricted so a prompt injection cannot cause writes — could deliver arbitrary HTML email through the instance's configured sender and execute custom code. `tests/tools-config.test.ts` now asserts that no tool reachable in read-only mode maps to a write endpoint.
+
+- Blocked caller-supplied hostnames resolving to private addresses and DNS rebinding. (#152)
+- Prevented configured auth tokens from being sent to caller-supplied servers. (#152)
+- Blocked the RFC 8215 local-use NAT64 address range. (#152)
+- Reclassified `hooks_test` as a create operation because it executes real effects. (#165)
 
 ### Fixed
-- **The HTTP transport was unusable at any positive `COUNTLY_MAX_BODY_BYTES`, including the 1 MiB default** (#153) — the body-size guard attached a `data` listener to count bytes, putting the request into flowing mode and draining it before `StreamableHTTPServerTransport.handleRequest()` could read it. Every request came back as `Parse error: Invalid JSON`, and the transport only worked with the limit explicitly disabled. Replaced with `readLimitedBody`, which buffers the body while still enforcing the limit, and the parsed body is handed to the SDK's documented pre-parsed-body path.
-- **Welcome page install instructions were broken, not merely stale** — the page told users to `npx @countly/countly-mcp-server`, a scoped package that has never existed (the registry returns 404 for it), and linked to the same non-existent package on npm. Both now derive from `package.json`, so the advertised name cannot drift from the published one again.
-- **Welcome page called the auth token an "API key"** — it showed `"COUNTLY_AUTH_TOKEN": "your-api-key"` in four places. There is no API-key auth path in this server; the credential is a Countly auth token created in the Token Manager. The page now says so and links the official setup guide.
-- **Welcome page VS Code instructions targeted a setting VS Code no longer reads** — `"mcp.servers"` in `settings.json` became `"servers"` in `mcp.json`, opened via **MCP: Open User Configuration**. Updated to match, and Claude Code instructions (both stdio and HTTP) were added alongside Claude Desktop.
-- **Welcome page advertised nine tool categories for a server exposing thirty-three** — the grid was a hardcoded list. It is now derived from `TOOL_CATEGORIES` and filtered through the active `toolsConfig`, so it reports live per-category counts, notes which categories need a plugin, and honours `COUNTLY_TOOLS_*` restrictions rather than advertising tools the operator has disabled. The `COUNTLY_TOOLS_*` controls themselves are now documented on the page, and URL-parameter auth is labelled deprecated where it appears.
-- **Manifest reported 38 tool categories for a server with 33** — `capabilities.tools.categories` counted distinct tool-name prefixes, so one category owning both `crash_groups_*` and `crashes_*` was double-counted. It now counts real categories from the registry.
-- **CLI examples on the welcome page used a bare path** — `claude mcp add --transport http countly /mcp` is not a usable command. The page now builds an absolute URL from the request host, honouring `X-Forwarded-Proto` behind a trusted proxy and assuming TLS for any non-local host.
+
+- Fixed HTTP request parsing with body-size limits enabled. (#153)
+- Corrected welcome-page npm package names and installation commands.
+- Clarified that authentication uses a Countly auth token from Token Manager.
+- Updated VS Code setup instructions and added Claude Code examples.
+- Made welcome-page tool categories and counts reflect the active configuration.
+- Corrected manifest tool-category counts.
+- Fixed welcome-page CLI examples to use absolute endpoint URLs.
 
 ### Added
-- **Favicon** — the served page had none, so browsers showed a blank tab icon and every `/favicon.ico` request fell through to the catch-all handler. The Countly mark is now inlined in `src/lib/favicon.ts` and served at both `/favicon.svg` and `/favicon.ico`. It is embedded rather than CDN-linked so self-hosted and air-gapped deployments still render it.
-- **`tests/welcome-page.test.ts`** — asserts the welcome page's claims against the code that implements them: the advertised package name matches `package.json`, no environment variable is documented that nothing reads, no tool category is documented that does not exist, the tool grid is derived rather than hardcoded, and the favicon is inlined. The page is customer-facing setup documentation that happens to live in `src/index.ts`, and nothing previously tested prose.
+
+- Added an embedded Countly favicon for self-hosted and offline deployments.
+- Added regression checks for welcome-page setup instructions and tool listings.
 
 ### Changed
-- **Release workflow builds each architecture on native hardware** — the Docker job built `linux/amd64,linux/arm64` on an amd64 runner, so the arm64 half ran under QEMU and, because the Dockerfile is multi-stage, emulated `npm ci` twice. The v1.4.0 build hit the six-hour job ceiling and was cancelled, which is why no 1.3.0 or 1.4.0 image was ever published and `:latest` on Docker Hub stayed at 1.2.0. Now one job per architecture (`ubuntu-24.04-arm` for arm64, free for public repositories) pushes by digest, and a merge job joins them with `docker buildx imagetools create` and verifies both architectures are present. Every job has a `timeout-minutes`, so a misconfigured build fails in minutes instead of masking other failures for six hours. `:latest` moves only on a real tag push, so a `workflow_dispatch` rehearsal cannot repoint it at a throwaway build.
-- **npm publishing is opt-in until its trusted publisher is configured** — `npm publish` fails with `E404` on the `PUT`, npm's response when the presented OIDC credential is not authorised for the package. It failed this way for v1.4.0, and 1.2.1, 1.3.0 and 1.4.0 were all published by hand. The job no longer runs on tag pushes, so an expected failure cannot hide a real one; re-enable it once the trusted publisher is set up on npmjs.com.
+
+- Built Docker images on native amd64 and arm64 runners with release verification and timeouts.
+- Made automated npm publishing opt-in until trusted publishing is configured.
 
 ### Dependencies
-- `@modelcontextprotocol/sdk` ^1.29.0 → ^1.30.0, `axios` ^1.18.1 → ^1.19.0, and `ipaddr.js` ^1.9.1 added as an explicit dependency (it backs the address classifier and was previously resolved transitively). Dev-dependency and transitive updates via Dependabot: `@typescript-eslint/eslint-plugin`, `eslint`, `@vitest/coverage-v8`, `js-yaml`, `postcss`, `brace-expansion`, `fast-uri`, `ip-address`.
+
+- Updated `@modelcontextprotocol/sdk` to ^1.30.0, `axios` to ^1.19.0, and development dependencies.
+- Added `ipaddr.js` ^1.9.1 as an explicit dependency for address validation.
 
 ## [1.4.0] - 2026-07-09
 
 ### Fixed
-- **`datapoint`, `server-logs`, `dashboards`, and `email-reports` schemas were invisible to MCP clients** (#142) — the last four modules declaring `inputSchema` as live zod objects now ship plain JSON Schema. Their schemas previously serialized as `{"def":{...}}` (no `properties`, no descriptions) in the `tools/list` response, so clients saw 20 tools with zero visible parameters, and zod defaults like `.default('30days')` never applied because handlers receive raw args without parsing. All descriptions, enums, required lists, and defaults are preserved; handlers now take `(context, input)` and apply defaults via `withDefault`, so `datapoints_stats` without a period really queries `30days`, `server_logs_contents` really tails `100000` bytes, and `dashboards_create` really sends its documented sharing/refresh defaults. `server_logs_contents.log` is now correctly marked required. The known-offenders list in `tests/tool-registration.test.ts` is empty and enforced to stay that way. This also removes the last imports of zod, which was never a declared dependency — it resolved as a phantom dependency out of `@modelcontextprotocol/sdk`'s tree.
-- **Client-compatibility violations in `alerts_create` and `dashboards_widget_add`** (#142) — eight pre-existing `type: ['string','null']` union arrays in the `alerts_create` config schema (plus one three-way `['string','array','null']`) violated the schema rules established for WebStorm-class clients (no `anyOf`, 1e82b1b) and the Claude API (no `allOf`/unions, #48). Nullable unions are now single `string` types with "omit" semantics in the description; the genuinely string-or-array `filterValue` is typeless with an explanatory description. The embedded widget JSON examples in `dashboards_widget_add` were also aligned with the string-typed schema (`custom_period: null/false` → omitted/`"false"`, `filter_id: 0` → `"0"`, `drill_query`/`cmetric_refs` `period: true` → `"true"`, note-widget `apps: "*"` → `["*"]`). A new schema walker in `tests/tool-registration.test.ts` rejects `anyOf`/`allOf`/`oneOf`/`not`/`$ref` and type-union arrays in every tool definition so these constructs cannot be reintroduced.
-- **`hooks_*` and `times_of_day` tools were listed but impossible to call** (#141) — both modules (added in v1.0.2) were wired into `getAllToolDefinitions()`/`getAllToolHandlers()` but never into `getAllToolMetadata()`, which is the only routing source the `CallToolRequestSchema` dispatcher uses. Every call to `hooks_list`, `hooks_test`, `hooks_create`, `hooks_update`, `hooks_delete`, or `times_of_day` returned `McpError -32601 "Unknown tool"`. Their `inputSchema` fields were also raw zod objects, which serialize as `{"def":{...}}` (no `properties`, no descriptions) in the `tools/list` response, so clients saw the tools with zero visible parameters. Both modules are now migrated to the metadata/class pattern used by the rest of the codebase, with hand-written conservative JSON Schema (flat `type`/`properties`/`required`, inline descriptions, string enums — the same client-compatible subset as every other module). As a side effect, `hooks_create`'s `enabled: true` default now actually applies (the zod `.default()` never ran because the schema was never parsed at runtime).
-- **Regression tests for tool registration** (#141) — new `tests/tool-registration.test.ts` asserts every tool returned by `getAllToolDefinitions()` has a dispatcher route in `getAllToolMetadata()` with a real method on its tool class, and that its schema is plain JSON-round-trip-safe JSON Schema. The four modules that still declared zod schemas at the time (`datapoint`, `server-logs`, `dashboards`, `email-reports` — routable, but parameter-less in `tools/list`) were tracked in an explicit known-offenders list, emptied by #142 in this same release.
+
+- Fixed invisible tool parameters and missing defaults in datapoint, server-log, dashboard, and email-report tools. (#142)
+- Fixed client-incompatible schemas and widget examples in `alerts_create` and `dashboards_widget_add`. (#142)
+- Fixed routing, schemas, and defaults for `hooks_*` and `times_of_day` tools. (#141)
+- Added regression checks for tool registration, routing, and JSON Schema compatibility. (#141, #142)
 
 ### Added
-- **Journey stats tools** — `journeys_stats_summary` (KPIs with period-over-period change), `journeys_stats_table` (per-block breakdown, taskmanager-aware: long queries return a task id that can be passed back as `task_id`), `journeys_stats_performance` (time series), and `journeys_stats_uids` (user UID lists per stat bucket), wrapping `/o/journey-engine/stats/*`.
-- **`journeys_block_reference` tool** — static reference documentation for the journey block JSON schema (block types, per-subtype fields, filter/condition formats, publish-time validation rules, and sample graphs), compiled from the journey engine source. Includes runtime caveats the samples get wrong: the engine reads `nextBlock` (not `next_block`), only canonical `BlockSubTypes` strings match at runtime, and `call-webhook`/`run-code`/`repeat`/push/email blocks are not implemented. Referenced from the `blocks` parameter descriptions of `journeys_create`/`journeys_update` so models fetch the schema before authoring graphs.
-- **Content asset tools** — `content_assets_list`, `content_assets_upload` (base64 in, multipart out, 5MB limit enforced client-side), `content_assets_update`, `content_assets_delete`, wrapping `/o/content/assets` and `/i/content/asset-*`, plus `content_langs_list` for translation-eligible languages via `/o/content/langs`.
-- **Journeys tools** — new `journeys` category (requires the `journey_engine` plugin, Countly Enterprise): `journeys_list`, `journeys_get`, `journeys_create`, `journeys_update`, `journeys_delete`, `journeys_publish`, `journeys_pause`, `journeys_resume`. Write operations post JSON bodies to `/i/journey-engine/journeys/*` and reads use `/o/journey-engine/*`, matching the API exposed by both the current enterprise plugins and the new Countly platform codebase. Update/publish/pause/resume resolve the target journey version automatically when the journey has exactly one candidate version; otherwise they list the available versions and ask for `version_id`.
-- **Content blocks tools** — new `content` category (requires the `content` plugin, Countly Enterprise): `content_blocks_list`, `content_blocks_get`, `content_blocks_preview`, `content_blocks_create`, `content_blocks_update`, `content_blocks_delete`, wrapping `/o/content`, `/o/content/by-id`, `/i/content/save`, and `/i/content/delete`. `content_blocks_update` fetches the existing block first so omitted fields (title, type, blocks, favorite) are preserved. `content_blocks_preview` validates the block exists, then returns a link to the server's public `/_external/content` renderer (the page SDK webviews load) so users can see the block rendered in a browser.
+
+- Added journey statistics tools for summaries, block breakdowns, time series, and user lists.
+- Added `journeys_block_reference` for journey schemas, validation rules, and examples.
+- Added content asset listing, upload, update, deletion, and language discovery tools.
+- Added journey creation, editing, publishing, pausing, resuming, and deletion tools.
+- Added content block listing, preview, creation, editing, and deletion tools.
 
 ## [1.3.0] - 2026-04-23
 
-### Changed
-- **Anonymous server identification in telemetry** — every analytics event now carries a short opaque `server` segment: a 16-hex-char SHA-256 prefix of the normalized Countly server URL. This lets `stats.count.ly` aggregate per-distinct-server counts (for any event type) without ever seeing the raw URL. The device ID stays at `"mcp"` — only events carry the hash. In HTTP transport the hash is recomputed per request from the request-scoped server URL (via `AsyncLocalStorage`), so multi-tenant deployments naturally emit per-tenant counts. The README analytics section was updated to reflect what is (and isn't) tracked. Opt-in still required (`ENABLE_ANALYTICS=true`).
-
 ### Security
-- **Cross-tenant auth token mixing (HTTP transport)** (#110) — the HTTP transport previously mutated a shared axios client and shared config on every incoming request. Concurrent requests could interleave at `await` boundaries, causing tenant A's in-flight API calls to go out with tenant B's token. Fixed by constructing a per-request axios instance (with the `countly-token` header baked in) and passing state from the HTTP middleware to the MCP handler through `AsyncLocalStorage`. The shared client is now used only as a stdio-mode fallback and is never mutated per-request.
-- **Cross-tenant data leak via shared AppCache** (#110) — the apps cache was a single instance per process, so the first tenant's apps were visible to every other tenant's `resolveAppId` lookups for up to five minutes. Replaced with `AppCacheRegistry`, which keeps one `AppCache` per tenant keyed by SHA-256(token) so the raw token is never held as a Map key.
-- **SSRF via `X-Countly-Server-Url` / `?server_url=`** (#110) — the HTTP transport accepted a caller-supplied Countly server URL and wired it into the outbound axios client with no validation, allowing any caller to redirect outbound requests at cloud metadata (169.254.169.254), Docker internal services, loopback, and private RFC 1918 ranges (with the response body returned in tool output). New `assertSafeServerUrl` rejects loopback, link-local, RFC 1918, carrier-grade NAT, `0.0.0.0/8`, IPv6 private ranges, `.local`/`.localhost` hostnames, and non-`http(s)` schemes. Not a full DNS-rebinding defense — that still requires egress firewalling — but closes the trivial syntactic bypass.
-- **Telemetry default flipped to opt-in** (#110) — the README has always said "analytics disabled by default" but the code evaluated `process.env.ENABLE_ANALYTICS !== 'false'`, which was `true` for any empty/unset value. Analytics now fire only when `ENABLE_ANALYTICS=true` is explicitly set. README table (`Default: false`) and prose updated to match.
-- **Auth token in URL query params deprecated** (#110) — tokens passed via `?auth_token=` leak into access logs, reverse-proxy logs, browser history, and Referer headers. The transport still accepts them for backward compatibility but now emits a rate-limited security warning to stderr and the behavior is scheduled for removal in a future release. Use `X-Countly-Auth-Token` header instead.
-- **CORS allowlist is now configurable** (#110) — defaults remain `Access-Control-Allow-Origin: *` (backward compatible) but operators can lock it down via `COUNTLY_CORS_ALLOWED_ORIGINS="https://a.example.com,https://b.example.com"`. When a specific allowlist is set, the server echoes only allowed origins and adds `Vary: Origin`; pre-flight requests from disallowed origins get a `403`.
-- **Per-IP rate limiting on `/mcp`** (#110) — sliding-window, in-memory. Defaults to 120 requests per minute per IP; tunable via `COUNTLY_RATE_LIMIT_RPM=<n>` (set to `0` to disable). Uses the socket address by default; honors `X-Forwarded-For` only when `COUNTLY_TRUST_PROXY=true` is set. Returns `429 Too Many Requests` with `Retry-After`.
-- **CORS flag logic bug** (#110) — `httpConfig?.cors || true` always evaluated to `true` (it treats `false` as falsy), so `--no-cors` didn't actually disable CORS. Fixed to use nullish coalescing (`?? true`).
-- **Auth-token residue in `LoopDetector` history** (#110) — when a caller passed `countly_auth_token` as a tool argument the loop detector retained the raw args for up to 30s, risking exposure in heap snapshots / crash dumps. The detector now scrubs sensitive arg keys (`countly_auth_token`) to `[REDACTED]` before storing.
-- **Token redaction in error messages** (#110) — `extractErrorDetails` and `Analytics.trackError` now run error strings through `redactSensitiveInMessage`, which redacts `auth_token=`/`api_key=`/`token=` query-param values, `"auth_token":"..."` JSON fields, and `countly-token:`/`Authorization:` header lines. Defence-in-depth against an upstream Countly server accidentally echoing a token in an error body, and against the token reaching the telemetry endpoint when analytics is opted in.
-- **Dev-dependency CVE** (#110) — `npm audit fix` applied; `brace-expansion` moderate DoS cleared.
-- **Request-body size cap** (#110) — new `COUNTLY_MAX_BODY_BYTES` (default 1 MiB). Requests that declare (or stream) more bytes get `413 Payload Too Large` and the socket is destroyed so a malicious client can't keep shipping data.
-- **Per-IP concurrent-connection cap** (#110) — new `COUNTLY_MAX_CONCURRENT_PER_IP` (default 50). Closes the connection-exhaustion and slow-loris amplification primitive that Node's raw `http.createServer` leaves wide open.
-- **Server timeouts tightened** (#110) — `requestTimeout=30s`, `headersTimeout=10s`, `keepAliveTimeout=5s`, `timeout=60s`. Complements the concurrent-connection cap against slow clients.
-- **Opt-in structured request log** (#110) — new `COUNTLY_REQUEST_LOG=true` emits one NDJSON line per request to stderr (`{ts, ip, method, path, status, durationMs, rateLimitHit}`). No tokens, bodies, or headers logged. Useful for piping into aggregators to spot abuse patterns.
+
+- Isolated HTTP request credentials to prevent cross-tenant token mixing. (#110)
+- Isolated app caches by token to prevent cross-tenant data exposure. (#110)
+- Added URL validation to block caller-supplied private addresses and unsafe schemes. (#110)
+- Deprecated auth tokens in URL parameters in favor of HTTP headers. (#110)
+- Added configurable CORS origin allowlists. (#110)
+- Added configurable per-IP request rate limits. (#110)
+- Fixed `--no-cors` being ignored. (#110)
+- Redacted auth tokens from loop-detection history. (#110)
+- Redacted credentials from error messages. (#110)
+- Fixed a development dependency denial-of-service vulnerability. (#110)
+- Added a configurable request-body size limit, defaulting to 1 MiB. (#110)
+- Added a configurable per-IP concurrent-connection limit, defaulting to 50. (#110)
+- Tightened HTTP request, header, and connection timeouts. (#110)
+- Added optional structured HTTP request logs without credentials or bodies. (#110)
 
 ### Removed
-- **Jobs module** (#112) — dropped the `jobs_list` and `job_runs` tools from the `core` category. Both called `/o?method=jobs`, which is not documented in the Countly API reference; operators looking for background-task visibility should use the documented `/o/tasks/*` endpoints directly.
-- **`views_segments` tool** (#112) — removed the `views_segments` tool (was calling `/o?method=get_view_segments`, which is not documented in the Countly API reference). For view segmentation discovery use `metadata_get` or `queriable_fields_list` with the `[CLY]_view` event.
+
+- Removed `jobs_list` and `job_runs`, which used undocumented endpoints. (#112)
+- Removed `views_segments`; use `metadata_get` or `queriable_fields_list` instead. (#112)
 
 ### Changed
-- **Tool descriptions rewritten for model-pickability** (#110) — rewrote the `description` string and every input-schema field description across all ~128 tool definitions in `src/tools/*.ts`. Descriptions now name the concrete endpoint, include a disambiguation sentence pointing to siblings, standardize `app_id`/`app_name`/`period` wording everywhere, add `WARNING: irreversible` to destructive tools, and add `Requires the <name> plugin` to plugin-gated tools. The original `app_analytics_summary` "will show available apps" false promise and similar lies across other tools are gone. No handler logic, schema types, or runtime behavior changed — description strings only.
-- **`metadata_get` is now always available** (#110) — moved out of the `drill` category into a new `metadata` category with `availableByDefault: true`. The handler already degraded gracefully without the drill plugin (returning custom events, built-in `[CLY]_*` event segments, and system fields); it was just hidden on drill-less servers by its category classification.
+
+- Clarified tool descriptions, parameters, plugin requirements, and destructive-action warnings. (#110)
+- Made `metadata_get` available without the Drill plugin. (#110)
 
 ### Fixed
-- **`notes_create` TypeError when `color` omitted** (#110) — `handleCreateNote` called `color.toLowerCase()` unconditionally while `color` was optional. Guarded the call and marked `note` and `ts` as `required` in the schema (they were already dereferenced unguarded).
-- **`hooks_update` silent asymmetry on trigger fields** (#110) — the handler silently ignored partial trigger updates when only one of `trigger_type` or `trigger_config` was supplied while still reporting success. Now throws `McpError(InvalidParams)` with a clear message; both fields must be supplied together, or neither.
-- **Version string drift** (#110) — the MCP handshake (`Server({version})`), the well-known manifest, and `package.json` reported three different versions. All three now read from `package.json` at runtime via `createRequire(import.meta.url)`.
+
+- Fixed `notes_create` failing when `color` was omitted and marked required inputs correctly. (#110)
+- Required `hooks_update` trigger type and configuration to be supplied together. (#110)
+- Aligned handshake, manifest, and package version strings. (#110)
 
 ## [1.2.1] - 2026-04-22
 
 ### Fixed
-- **npx startup crash**: Fixed the main-module detection so the server actually starts when launched through a `bin` symlink. The previous check compared `import.meta.url` directly against `` `file://${process.argv[1]}` ``, which never matched when Node invoked the script through `node_modules/.bin/countly-mcp-server` (argv[1] is the symlink path, `import.meta.url` is the resolved real path). As a result, `npx countly-mcp-server` and MCP clients that launched it would see the process exit immediately after receiving `initialize`. The check now resolves `argv[1]` via `realpathSync` and compares to `pathToFileURL(...).href`.
+
+- Fixed immediate startup exits when launched through `npx` or a bin symlink.
 
 ## [1.2.0] - 2026-04-22
 
 ### Added
-- **npx execution support** (#107): The server can now be run directly via `npx countly-mcp-server` without cloning or building. Exposed `build/index.js` as a `bin` entry in `package.json` and added a `prepack` script so the published tarball always contains a freshly built entrypoint. README documents the new usage path with an example MCP client configuration.
-- **Events module**: new `events_delete` tool (#47): deletes events and all their data for an application via `/i/events/delete_events`.
+
+- Added direct execution through `npx countly-mcp-server`. (#107)
+- Added `events_delete` for deleting events and their app data. (#47)
 
 ### Fixed
-- **Schema compatibility**: replaced `z.union` with simple types in dashboard widget schemas to match MCP client expectations.
-- **Schema compatibility**: removed unsupported `allOf` from the `query_data` tool schema.
-- **Events**: `events_update` now calls the correct `/i/events/edit_map` endpoint; tests updated accordingly.
-- TypeScript build errors.
+
+- Fixed dashboard widget schema compatibility with MCP clients.
+- Removed unsupported `allOf` from the `query_data` schema.
+- Fixed `events_update` using the wrong endpoint.
+- Fixed TypeScript build errors.
 
 ### Changed
-- Dependency bumps across runtime and dev dependencies (via Dependabot), including: `@modelcontextprotocol/sdk`, `axios`, `hono`, `@hono/node-server`, `express`, `express-rate-limit`, `body-parser`, `dotenv`, `qs`, `path-to-regexp`, `follow-redirects`, `picomatch`, `vite`, `rollup`, `glob`, `js-yaml`, `flatted`, `minimatch`, `ajv`, and multiple grouped development-dependency updates.
-- CI dependency bumps: `actions/checkout`, `actions/upload-artifact`, `actions/download-artifact`, `docker/setup-buildx-action`, `docker/login-action`, `docker/setup-qemu-action`.
+
+- Updated runtime and development dependencies.
+- Updated GitHub Actions and Docker build dependencies.
 
 ## [1.1.0] - 2025-11-12
 
 ### Added
-- **MCP Resources Support**: Implemented full resources capability for providing read-only context to AI assistants
-  - `resources/list`: List all available resources across applications
-  - `resources/read`: Read specific resource content by URI
-  - Resource types: app configuration (`countly://app/{id}/config`), event schemas (`countly://app/{id}/events`), analytics overview (`countly://app/{id}/overview`)
-  - Resources provide AI context without requiring tool calls, improving efficiency
 
-- **MCP Prompts Support**: Implemented full prompts capability with 8 pre-built analysis templates
-  - `prompts/list`: List all available prompt templates
-  - `prompts/get`: Get specific prompt with arguments
-  - Prompt templates:
-    * `analyze_crash_trends`: Analyze crash and error patterns over time
-    * `generate_engagement_report`: Comprehensive user engagement analysis
-    * `compare_app_versions`: Compare performance metrics between versions
-    * `user_retention_analysis`: Analyze retention patterns and cohort behavior
-    * `funnel_optimization`: Conversion funnel analysis with optimization suggestions
-    * `event_health_check`: Event tracking implementation quality check
-    * `identify_churn_risk`: Find users showing signs of decreased engagement
-    * `performance_dashboard`: Comprehensive application performance overview
-  - Prompts can be exposed as slash commands in MCP clients for guided workflows
-
-- **Hooks Module** (6 tools): Webhook and automation management based on `hooks` plugin
-  - `hooks_list`: List all webhooks/hooks configured for an app
-  - `hooks_test`: Test hook configuration with mock data before creating
-  - `hooks_create`: Create webhooks with multiple trigger types (IncomingDataTrigger, APIEndPointTrigger, InternalEventTrigger, ScheduledTrigger) and effects (HTTPEffect, EmailEffect, CustomCodeEffect)
-  - `hooks_update`: Update existing webhook configurations
-  - `hooks_delete`: Delete webhooks by ID
-  - `hooks_internal_triggers_get`: Get list of 23 available internal Countly events for triggers
-
-- **Times of Day Module** (1 tool): User behavior pattern analysis based on `times-of-day` plugin
-  - `times_of_day`: Analyze when users are most active throughout the day/week in their local time
-
-- **Dashboards Module** (8 tools): Custom dashboard management based on `dashboards` plugin
-  - `dashboards_list`: List all available dashboards
-  - `dashboards_data`: Get widgets and data for specific dashboard
-  - `dashboards_create`: Create dashboards with sharing, auto-refresh, and themes
-  - `dashboards_update`: Update dashboard configuration
-  - `dashboards_delete`: Delete dashboards
-  - `dashboards_widget_add`: Add widgets with full configuration
-  - `dashboards_update_widget`: Update widget position/size in grid layout
-  - `dashboards_widget_remove`: Remove widgets from dashboard
-
-- **Email Reports Module** (7 tools): Periodic email report management based on `reports` plugin
-  - `email_reports_list`: List all configured email reports
-  - `email_reports_core_create`: Create reports with analytics, events, crashes, and star-rating metrics
-  - `email_reports_dashboard_create`: Create reports for specific dashboards
-  - `email_reports_update`: Update report configuration
-  - `email_reports_preview`: Preview reports before sending
-  - `email_reports_send`: Manually trigger report sending
-  - `email_reports_delete`: Delete report configurations
-
-- **Server Logs Module** (2 tools): Server log file access based on `errorlogs` plugin
-  - `server_logs_files_list`: List available log files (api, dashboard, jobs)
-  - `server_logs_contents`: View log file contents (non-Docker deployments only)
-
-- **Datapoint Module** (3 tools): Data point monitoring for billing/capacity planning based on `server-stats` plugin
-  - `datapoints_stats`: Get overall data point collection statistics
-  - `get_top_apps_by_datapoints`: Rank apps by data point usage
-  - `datapoints_punch_card`: Hourly load pattern visualization
-
-- **Filtering Rules Module** (4 tools): Request blocking management based on `blocks` plugin
-  - `filtering_rules_list`: List all configured blocking rules
-  - `filtering_rules_create`: Create rules to block requests by IP, version, or properties
-  - `filtering_rules_update`: Update existing blocking rules
-  - `filtering_rules_delete`: Delete blocking rules
-
-- **Compliance Hub Module** (4 tools): Data consent and privacy management based on `compliance-hub` plugin
-  - `list_consents`: List all consent features configured for an app
-  - `get_consent_history`: Get change history for a specific consent feature
-  - `export_user_data`: Request data export for a specific user
-  - `anonymize_user`: Anonymize user data while preserving analytics
-
-- **SDKs Module** (2 tools): SDK version monitoring based on `sdks` plugin
-  - `get_sdks_list`: List SDK versions used by apps
-  - `get_sdks_stats`: Get detailed SDK usage statistics
-
-- **Logger Module** (1 tool): System log viewing based on `logger` plugin
-  - `get_logger_data`: Retrieve and filter system logs
-
-- **AB Testing Module** (8 tools): A/B test experiment management based on `ab-testing` plugin
-  - `list_experiments`: List all A/B testing experiments
-  - `get_experiment`: Get detailed experiment information
-  - `create_experiment`: Create new experiments with control/variant groups
-  - `update_experiment`: Update experiment configuration
-  - `start_experiment`: Start running an experiment
-  - `stop_experiment`: Stop a running experiment
-  - `finish_experiment`: Mark experiment as finished
-  - `delete_experiment`: Delete experiments
-
-- **Remote Config Module** (8 tools): Remote configuration management based on `remote-config` plugin
-  - `list_remote_config_parameters`: List all parameters
-  - `get_remote_config_parameter`: Get specific parameter details
-  - `create_remote_config_parameter`: Create new parameters
-  - `remote_config_parameters_update`: Update parameters
-  - `remote_config_parameters_delete`: Delete parameters
-  - `list_remote_config_conditions`: List targeting conditions
-  - `create_remote_config_condition`: Create targeting conditions
-  - `remote_config_conditions_delete`: Delete conditions
-
-- **Retention Module** (1 tool): User retention analysis based on `retention_segments` plugin
-  - `retention_data`: Analyze user retention cohorts over time
-
-- **Live Users Module** (6 tools): Real-time concurrent user monitoring based on `concurrent_users` plugin
-  - `live_users`: Get current concurrent users
-  - `get_live_user_details`: Get detailed information about live users
-  - `get_live_cities`: See cities with active users
-  - `get_live_countries`: See countries with active users
-  - `get_live_durations`: Analyze session durations of live users
-  - `get_live_sources`: See traffic sources of live users
-
-- **Formulas Module** (6 tools): Custom metric formula management based on `formulas` plugin
-  - `formulas_list`: List all configured formulas
-  - `get_formula`: Get specific formula details
-  - `create_formula`: Create custom metric formulas
-  - `update_formula`: Update formula configuration
-  - `formulas_delete`: Delete formulas
-  - `get_formula_data`: Get calculated formula data
-
-- **Funnels Module** (7 tools): Conversion funnel analysis based on `funnels` plugin
-  - `funnels_list`: List all configured funnels
-  - `funnels_data`: Get funnel conversion data
-  - `funnels_step_users`: Get users who reached a specific step
-  - `funnels_dropoff_users`: Get users who dropped off between steps
-  - `funnels_create`: Create conversion funnels with multiple steps
-  - `funnels_update`: Update funnel configuration
-  - `funnels_delete`: Delete funnels
-
-- **Cohorts Module** (8 tools): User cohort management based on `cohorts` plugin
-  - `cohorts_list`: List all cohorts
-  - `cohorts_data`: Get cohort data over a period
-  - `cohorts_create`: Create user cohorts with conditions
-  - `cohorts_update`: Update cohort configuration
-  - `cohorts_delete`: Delete cohorts
-  - `cohorts_details_users`: Get users in a cohort
-  - `recalculate_cohort`: Trigger cohort recalculation
-  - `cohorts_details_user_count`: Get current user count
-
-- **User Profiles Module** (4 tools): App user profile management based on `users` plugin
-  - `search_user_profiles`: Search users with filters and sorting
-  - `get_user_profile`: Get detailed user profile
-  - `export_user_profiles`: Export user data to CSV
-  - `get_user_profile_schema`: Get available user properties
-
-- **Drill Module** (5 tools): Advanced query and segmentation based on `drill` plugin
-  - `drill_query`: Execute custom drill queries
-  - `get_drill_meta`: Get available drill properties
-  - `get_drill_bookmarks`: List saved drill queries
-  - `drill_bookmarks_create`: Save drill queries
-  - `drill_bookmarks_delete`: Delete saved queries
-
-- **Core Module Enhancements** (2 additional tools):
-  - `jobs_list`: List background jobs with pagination and sorting
-  - `job_runs`: Get execution history for specific jobs
-
-- **Analytics Module Enhancements** (4 additional tools):
-  - `user_loyalty`: Analyze user loyalty and session count distribution
-  - `session_durations`: Analyze session duration patterns
-  - `session_frequency`: Analyze time between user sessions
-  - `slipping_users`: Identify users becoming inactive
+- Added MCP resources for app configuration, event schemas, and analytics overviews.
+- Added eight MCP prompts for engagement, crashes, retention, funnels, events, churn, and performance analysis.
+- Added hook listing, testing, creation, editing, deletion, and trigger discovery.
+- Added times-of-day analysis for daily and weekly user activity.
+- Added dashboard management, widget editing, and dashboard data tools.
+- Added email report creation, editing, preview, sending, and deletion.
+- Added server log file listing and content retrieval.
+- Added datapoint statistics, app rankings, and hourly load analysis.
+- Added filtering rule listing, creation, editing, and deletion.
+- Added consent history, user data export, and anonymization tools.
+- Added SDK version and usage statistics.
+- Added system log retrieval and filtering.
+- Added A/B experiment creation, editing, lifecycle, and deletion tools.
+- Added remote configuration parameter and targeting-condition management.
+- Added user retention cohort analysis.
+- Added live user counts, profiles, locations, session durations, and traffic sources.
+- Added custom formula management and calculated metric retrieval.
+- Added funnel analysis, user progression, drop-off, creation, editing, and deletion.
+- Added cohort management, recalculation, user lists, and user counts.
+- Added user profile search, retrieval, CSV export, and property discovery.
+- Added Drill queries, property discovery, and bookmark management.
+- Added background job listing and execution history.
+- Added user loyalty, session duration, session frequency, and slipping-user analysis.
 
 ### Changed
-- **Tool Count**: Expanded from 27 tools to 132 tools across 30 categories
-- **Plugin Coverage**: Added support for 21 additional Countly plugins
-- **Plugin Availability**: Automatically check plugin availability for specific tools, ensuring only compatible tools are exposed based on server configuration
-- **URL Parameter Authentication**: Added support for passing Server URL and auth token as URL parameters for flexible authentication
-- **Analytics Tracking**: Added comprehensive anonymous usage analytics with opt-out capability
-- **Error Handling**: Improved API error messages and formatting throughout all modules
-- **Testing**: Expanded test suite with 223 tests including analytics, transport, and tool configuration tests
-- **Documentation**: Updated README with all new modules and tool descriptions
-- **Configuration**: Added plugin-based tool filtering and availability checks
-- **Home Page**: Added informational home page with basic project information and links
-- **Server Discovery**: Added `.well-known/mcp-manifest.json` endpoint for automated server discovery and capability detection
+
+- Expanded from 27 to 132 tools across 30 categories.
+- Added support for 21 additional Countly plugins.
+- Added automatic plugin availability checks for compatible tool exposure.
+- Added server URL and auth-token URL parameters.
+- Improved API error messages and formatting.
+- Expanded transport and tool-configuration test coverage.
+- Updated the README with new modules and tool descriptions.
+- Added plugin-based tool filtering and configuration.
+- Added an informational home page with project links.
+- Added `.well-known/mcp-manifest.json` for server discovery.
 
 ### Fixed
-- **Security Updates**: Updated SECURITY.md with vulnerability levels and reward structure
-- **URL Handling**: Improved URL parameter support for server URL and auth token
+
+- Updated security documentation with vulnerability levels and reward details.
+- Improved server URL and auth-token URL parameter handling.
 
 ### Testing
-- Added 748 new analytics tests covering tracking, sessions, events, and error handling
-- Added 141 core tools tests for new job management features
-- Added 399 error handler tests for improved error scenarios
-- Added comprehensive transport integration tests for stdio and HTTP/SSE modes
-- Updated tool configuration tests to cover all 30 categories and 132 tools
+
+- Added core job-management and error-handling tests.
+- Added stdio and HTTP transport integration tests.
+- Expanded configuration tests to cover all 30 categories and 132 tools.
 
 ## [1.0.1] - 2025-11-07
 
 ### Added
-- **Transport Integration Tests**: Added comprehensive integration tests for both stdio and HTTP/SSE transports (`tests/transport.test.ts`)
-  - 13 new tests covering initialization, tool listing, health checks, CORS, and SSE streaming
-  - Tests validate both stdio and HTTP/SSE transport modes work correctly
-- **HTTP Header Authentication**: Added support for passing Countly credentials via custom HTTP headers
-  - `X-Countly-Server-Url` header for specifying server URL
-  - `X-Countly-Auth-Token` header for authentication token
-  - Headers are extracted and applied dynamically per request
-- **npm Publishing Workflow**: Added GitHub Actions workflow for automated npm package publishing on version tags
+
+- Added integration tests for stdio and HTTP transports.
+- Added HTTP header authentication through `X-Countly-Server-Url` and `X-Countly-Auth-Token`.
+- Added automated npm publishing on version tags.
 
 ### Changed
-- **Upgraded Transport Layer**: Migrated from deprecated `SSEServerTransport` to modern `StreamableHTTPServerTransport`
-  - Uses MCP protocol version 2025-03-26 (Streamable HTTP specification)
-  - Operates in stateless mode (`sessionIdGenerator: undefined`) for better client compatibility
-  - Eliminates "legacy SSE" warnings in VS Code and other MCP clients
-- **Enhanced Authentication Flexibility**: 
-  - Server URL is now optional in environment variables - can be provided via HTTP headers or client configuration
-  - Credentials fallback logic: metadata → args → config (from headers) → environment → file
-  - `getCredentials()` method now checks `this.config.authToken` as fallback (set from HTTP headers)
-- **Docker Configuration Improvements**:
-  - Updated documentation to reflect environment-based configuration
-  - Enhanced Dockerfile with proper build stages and health checks
-- **Documentation Updates**:
-  - Updated `.env.example` with clearer instructions for HTTP header-based authentication
-  - Enhanced `README.md` with transport configuration examples
-  - Updated `DOCKER.md` with secure configuration practices
-  - Updated VS Code MCP integration example (`examples/vscode-mcp.md`)
+
+- Migrated to stateless Streamable HTTP transport for improved MCP client compatibility.
+- Allowed server URLs and credentials to be supplied through HTTP headers and client configuration.
+- Improved Docker build stages, health checks, and configuration documentation.
+- Updated environment, README, Docker, and VS Code setup examples.
 
 ### Fixed
-- **Security: ReDoS Vulnerability**: Fixed Regular Expression Denial of Service (ReDoS) vulnerability in URL normalization
-  - Replaced regex `/\/+$/` with iterative `while` loop approach
-  - Prevents potential DoS attacks via maliciously crafted URLs
-  - Applied fix in both `src/index.ts` and `src/lib/config.ts`
-- **Test Suite Improvements**:
-  - Updated authentication tests to reflect new priority order
-  - Fixed test expectations for optional server URL configuration
-  - Updated error messages in tests to match new authentication flow
+
+- Updated authentication tests, optional server URL expectations, and error messages.
 
 ### Security
-- **ReDoS Mitigation**: Fixed Regular Expression Denial of Service vulnerability in URL normalization (CodeQL alert)
+
+- Fixed a regular expression denial-of-service vulnerability in URL normalization.
 
 ## [1.0.0] - 2025-10-29
 
 Initial release of Countly MCP Server.
 
 ### Features
-- Model Context Protocol (MCP) server for Countly analytics platform
-- Support for stdio and HTTP/SSE transport layers
-- Comprehensive Countly API integration:
-  - Analytics data retrieval (sessions, users, locations, events, etc.)
-  - Crash analytics
-  - App management
-  - Dashboard users management
-  - Alerts configuration
-  - Notes management
-  - Views analytics
-  - Database operations
-  - Event management
-  - App user management
-- Environment-based configuration
-- Docker support with multi-architecture builds
-- Comprehensive test suite
-- GitHub Actions CI/CD integration
+
+- Added a Model Context Protocol server for Countly.
+- Added stdio and HTTP/SSE transports.
+- Added analytics data retrieval for sessions, users, locations, events, and views.
+- Added crash analytics tools.
+- Added app and dashboard-user management.
+- Added alert configuration and note management.
+- Added database, event, and app-user operations.
+- Added environment-based configuration.
+- Added Docker support with multi-architecture builds.
+- Added automated tests and GitHub Actions CI/CD.
 
 [1.3.0]: https://github.com/Countly/countly-mcp-server/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Countly/countly-mcp-server/compare/v1.2.0...v1.2.1
