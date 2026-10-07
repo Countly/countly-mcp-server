@@ -4,6 +4,8 @@ All notable changes to this project are documented here, following [Keep a Chang
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-07
+
 ### Security
 
 - Prevented `formulas_run` from saving formulas in read-only deployments.
@@ -45,6 +47,7 @@ All notable changes to this project are documented here, following [Keep a Chang
 ### Removed
 
 - Removed the `databases_stats` tool and its dependency on MongoDB command-line utilities.
+- Removed the stale static MCP manifest; the discovery endpoint uses the package version and current capabilities.
 
 ### Changed
 
@@ -272,3 +275,6 @@ Initial release of Countly MCP Server.
 [1.1.0]: https://github.com/Countly/countly-mcp-server/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Countly/countly-mcp-server/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Countly/countly-mcp-server/releases/tag/v1.0.0
+
+[Unreleased]: https://github.com/Countly/countly-mcp-server/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/Countly/countly-mcp-server/compare/v1.6.0...v1.7.0
