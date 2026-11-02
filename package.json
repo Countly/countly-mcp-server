@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
-    "@typescript-eslint/eslint-plugin": "^8.72.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.46.3",
     "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9.39.5",
