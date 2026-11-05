@@ -1,19 +1,23 @@
 # Security Policy
 
-Security is very important to us. If you discover any issue regarding security, please disclose the information responsibly by sending an email to security@count.ly and not by creating a GitHub issue.
+Security is very important to us. If you discover a security issue in this project, please report it privately by email to security@count.ly, or through GitHub's private vulnerability reporting for this repository, not by opening a public issue or pull request.
 
-All software related security bugs with severity of medium and higher will be awarded accordingly with a bug bounty reward.
+# No bug bounty
 
-# Vulnerability levels
-**Critical Severity:** software can be exploited at any time without any additional information
+Countly does not run a bug bounty programme. We do not offer, promise or negotiate payment or rewards for security reports, and a report does not create any obligation to pay. Reports are still very welcome.
 
-**High Severity:** some additional information, access or action required (from the user, like clicking on injected link) for software to be exploited
+# What happens to a report
 
-**Medium Severity:** the impact is limited (for example, can only access limited information) or requires special conditions to achieve it (when server is configured in specific way)
+- **Every report is evaluated.** Each report is recorded and assessed by our team, and confirmed issues are fixed and released according to their severity.
+- **Replies are not guaranteed.** Because of the volume of reports we receive, we cannot promise to acknowledge or answer every report, or to give status updates. Not hearing back does not mean a report was not read.
+- **Duplicates.** Once a root cause is known to us, further reports of it are recorded against the original assessment.
 
-**Low** - no bounty rewards, does not directly lead to vulnerability, but provides a possibility (like exposing software version, which can be mapped to specific vulnerabilities), old dependencies, server misconfiguration
+# How to report
 
-**Exclusion**
+Please include the affected version or commit, the component involved, clear steps to reproduce on a setup you control with a working proof of concept, and what an attacker needs beforehand and what they gain. Send one root cause per report.
 
-Server specific configurations and deployment specific configurations due to on premise nature of our software.
-All server configuration related issues will be reported to related departments/parties/companies, but we cannot guarantee any bounty rewards for them.
+Test only against your own setup. Do not test against our hosted, demo or production services or touch data that is not yours, and keep details private until a fix has been released. We will not pursue legal action against good-faith research that follows this policy.
+
+# How we assess reports
+
+Reports are assessed with the severity levels and exclusions in the [Countly Server security policy](https://github.com/Countly/countly-server/blob/master/SECURITY.md). This server acts on a Countly deployment with the credentials it is given, so a finding that requires those credentials, or access the credential holder already has, is not a vulnerability in this project.
