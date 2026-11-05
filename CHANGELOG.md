@@ -4,6 +4,11 @@ All notable changes to this project are documented here, following [Keep a Chang
 
 ## [Unreleased]
 
+### Changed
+
+- Removed the live end-to-end suite from CI: the nightly run and the release gate no longer run it. It still runs locally with `npm run test:e2e`.
+- Removed references to the retired hosted endpoint `mcp.count.ly` and the retired Lite dev server.
+
 ## [1.7.0] - 2026-10-07
 
 ### Security

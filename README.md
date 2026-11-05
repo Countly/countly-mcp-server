@@ -324,8 +324,8 @@ For complete documentation, examples, and per-tool CRUD mappings, see **[TOOLS_C
 
 ## Security & Production Hardening
 
-The HTTP transport is designed to be usable both as a public-facing MCP
-endpoint (e.g. `mcp.count.ly`) and as a self-hosted single-tenant server.
+The HTTP transport is designed to be usable both as a shared multi-tenant MCP
+endpoint and as a self-hosted single-tenant server.
 The defaults favor compatibility; operators should opt into the tighter
 settings below based on their deployment model.
 

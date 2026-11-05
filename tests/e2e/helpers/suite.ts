@@ -366,7 +366,7 @@ export function defineLiveSuite(edition: Edition): void {
       });
     });
 
-    // The release gate needs the read-only checks too, not just the admin ones.
+    // MCP_E2E_REQUIRE_SECRETS=1 needs the read-only checks too, not just the admin ones.
     if (!config.userToken && requireSecrets && server.required) {
       describe('as read-only user', () => {
         it('has its e2e secrets configured', () => {

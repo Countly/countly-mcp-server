@@ -463,7 +463,7 @@ describe('isOriginPermitted: browser requests while the server holds a token', (
 });
 
 describe('isPlainHostHeader', () => {
-  it.each(['localhost', 'localhost:3101', 'mcp.count.ly', 'mcp.count.ly:443', '127.0.0.1:3000', '[::1]:3101', '[2001:db8::1]'])(
+  it.each(['localhost', 'localhost:3101', 'mcp.example.com', 'mcp.example.com:443', '127.0.0.1:3000', '[::1]:3101', '[2001:db8::1]'])(
     'accepts %s',
     (h) => expect(isPlainHostHeader(h)).toBe(true)
   );
