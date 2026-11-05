@@ -4,8 +4,8 @@
  * stale snapshot silently hides or shows the wrong tools.
  *
  * Needs MCP_E2E_GITHUB_TOKEN with read access to the (partly private) source
- * repos. Skipped without it, and by the release gate
- * (MCP_E2E_SKIP_PLUGIN_SNAPSHOT=1): upstream drift shouldn't block a release.
+ * repos. Skipped without it, or with MCP_E2E_SKIP_PLUGIN_SNAPSHOT=1 when
+ * upstream drift should not fail the run.
  */
 
 import { describe, expect, it } from 'vitest';
