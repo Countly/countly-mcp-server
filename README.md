@@ -750,7 +750,7 @@ The server provides 209 tools across 43 categories for comprehensive Countly int
 - **`sdk_logs_list`** (v2 on Platform) - List incoming data logs sent by SDK to the server for debugging and monitoring; on Platform with paging and filters by request type, SDK, time range and problem requests
 
 ### SDKs (requires `sdk` plugin)
-- **`sdk_stats_get`** - Get statistics about SDKs sending data (names, versions, request types, health checks)
+- **`sdk_stats_get`** - Get statistics about SDKs sending data (names, versions, request types, health checks); with `summary: true`, a compact per-SDK and per-version table of sessions, new users and unique users
 - **`sdk_config_get`** - Get SDK configuration settings controlling SDK behavior and enabled features
 
 ### Compliance Hub (requires `compliance-hub` plugin)

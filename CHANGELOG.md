@@ -4,6 +4,10 @@ All notable changes to this project are documented here, following [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- Added an optional `summary` parameter to `sdk_stats_get` that returns sessions, new users and unique users per SDK and per SDK version, as computed by Countly, instead of the raw time series.
+
 ### Changed
 
 - Removed the live end-to-end suite from CI: the nightly run and the release gate no longer run it. It still runs locally with `npm run test:e2e`.
